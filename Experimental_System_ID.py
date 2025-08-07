@@ -356,7 +356,7 @@ def create_model(eleType=None, inputx=None, inputy=None):
 def get_inputs(i, events, input_channels, scale=1):
     event = events[i]
     inputs, dt = extract_channels(event, input_channels)
-    inputs = (scale*i for i in inputs)
+    inputs = scale*inputs
     return inputs, dt
 
 

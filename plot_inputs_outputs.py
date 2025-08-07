@@ -33,7 +33,10 @@ if __name__ == "__main__":
 
     input_channels = [1,3]
     for i in range(len(events)):
-        inputs = get_inputs(i, events, input_channels)
-        for i in inputs:
-            plt.plot(i.T)
-            plt.show()
+        print(f"Event {i+1}")
+        inputs, dt = get_inputs(i, events, input_channels)
+
+        fig,ax = plt.subplots()
+        ax.plot(inputs.T)
+        ax.set_title(f"Event {i+1}")
+        plt.show()
