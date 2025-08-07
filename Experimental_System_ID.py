@@ -45,9 +45,7 @@ from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
 #针对lacy 字体显示白色了话需要在左边打开文件夹
 import cvxpy as cp #print(cvxpy.__version__)用这个可以检查版本号
-print(cp.__version__)
 import dccp
-print(dccp.__version__)
 
 
 def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBars, barArea, nfCoreY, nfCoreZ, nfCoverY, nfCoverZ, GJ):
@@ -351,7 +349,7 @@ def create_model(eleType=None, inputx=None, inputy=None):
     return model
 
 
-def get_inputs(i):
+def get_inputs(i, events, input_channels):
     event = events[i]
     inputs, dt = extract_channels(event, input_channels)
     return inputs, dt
@@ -482,6 +480,9 @@ def stabilize_with_lmi(A_hat, epsilon=1e-10, solver='CVXOPT'):
     return A_stable
 
 if __name__ == "__main__":
+    print(cp.__version__)
+    print(dccp.__version__)
+
     base_out = "output_srim_window_channel0103_option_lmi-new-3"  #rename:output_okid-era_zoomin_channel0317_original_A_option按照这个顺序来写
     pred_dir = os.path.join(base_out, "predictions")
     data_dir = os.path.join(base_out, "event_data")
@@ -509,11 +510,9 @@ if __name__ == "__main__":
     num_events   = len(events)
     num_channels = 6    # 1F X/Y, 2F X/Y, 3F X/Y
     error_matrix = np.zeros((num_channels, num_events))
-    
-    element = "forceBeamColumn"
 
     for i in range(21):
-        inputs, dt = get_inputs(i)
+        inputs, dt = get_inputs(i, events=events, input_channels=input_channels)
 
         print(f"event {i+1}inputs shape: {inputs.shape}, dt = {dt}")
         print(" channel 1 first 5 sample: ", inputs[0, :5])
@@ -536,7 +535,7 @@ if __name__ == "__main__":
 
         # option
         n = 6
-        option = Config(
+        options = Config(
             m           = 500,
             horizon     = 190,
             nc          = 190,
@@ -548,8 +547,6 @@ if __name__ == "__main__":
             threads     = 8,
             chunk       = 200
         )
-
-        options = vars(option)
 
         # **Choose whether to stabilize matrix A and whether to use the LMI method
         sys_s  = sysid(inputs,  outputs, method='srim', **option) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
