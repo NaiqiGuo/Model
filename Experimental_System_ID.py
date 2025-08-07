@@ -47,6 +47,10 @@ from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 import cvxpy as cp #print(cvxpy.__version__)用这个可以检查版本号
 import dccp
 
+import pickle
+
+
+LOAD_EVENTS = False
 
 def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBars, barArea, nfCoreY, nfCoreZ, nfCoverY, nfCoverZ, GJ):
     r"""
@@ -349,9 +353,10 @@ def create_model(eleType=None, inputx=None, inputy=None):
     return model
 
 
-def get_inputs(i, events, input_channels):
+def get_inputs(i, events, input_channels, scale=1):
     event = events[i]
     inputs, dt = extract_channels(event, input_channels)
+    inputs = (scale*i for i in inputs)
     return inputs, dt
 
 
@@ -495,10 +500,16 @@ if __name__ == "__main__":
     # **choose channel
     input_channels = [1,3]
 
-    events = sorted([
-        print(file) or quakeio.read(file, exclusions=["*filter*"])
-        for file in list(Path(f"/Users/guonaiqi/Documents/GitHub/mdof_studies/uploads/{station_id}/").glob("????????*.[zZ][iI][pP]"))[:21]
-    ], key=lambda event: abs(event["peak_accel"]))
+    if LOAD_EVENTS:
+        events = sorted([
+            print(file) or quakeio.read(file, exclusions=["*filter*"])
+            for file in list(Path(f"../uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+        ], key=lambda event: abs(event["peak_accel"]))
+        with open("events.pkl","wb") as f:
+            pickle.dump(events,f)
+    else:
+        with open("events.pkl","rb") as f:
+            events = pickle.load(f)
 
     try:
         plt.style.use("typewriter")
@@ -512,7 +523,8 @@ if __name__ == "__main__":
     error_matrix = np.zeros((num_channels, num_events))
 
     for i in range(21):
-        inputs, dt = get_inputs(i, events=events, input_channels=input_channels)
+        # TODO: if earthquake is too strong, change scale to smaller. try 0.3
+        inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=1)
 
         print(f"event {i+1}inputs shape: {inputs.shape}, dt = {dt}")
         print(" channel 1 first 5 sample: ", inputs[0, :5])
@@ -549,7 +561,7 @@ if __name__ == "__main__":
         )
 
         # **Choose whether to stabilize matrix A and whether to use the LMI method
-        sys_s  = sysid(inputs,  outputs, method='srim', **option) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
+        sys_s  = sysid(inputs,  outputs, method='srim', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
         A_s, B_s, C_s, D_s, *rest = sys_s
         A_s = stabilize_discrete(A_s)
         A_stable = stabilize_with_lmi(A_s, epsilon=1e-6, solver='CVXOPT')
