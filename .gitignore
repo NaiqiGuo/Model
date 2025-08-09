@@ -1,0 +1,4 @@
+*.pkl
+plots/
+output*/
+__pycache__
