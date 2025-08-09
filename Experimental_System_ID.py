@@ -18,7 +18,7 @@
 
 
 #import opensees.openseespy as ops
-import xara as ops
+import xara
 #import openseespy.opensees as ops
 import xara.units.iks as units
 import math
@@ -28,17 +28,12 @@ from pathlib import Path
 import quakeio
 import numpy as np
 from mdof.utilities.config import extract_channels
-import json
 import csv
 import os
-import numpy as np
 import matplotlib.pyplot as plt
 from mdof.simulate import simulate
 from mdof import sysid
-from mdof.realize import n4sid
-from mdof.utilities.printing import plot_pred
 from mdof.validation import stabilize_discrete
-from mdof import modes
 from mdof.utilities.config import Config
 
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
@@ -140,13 +135,15 @@ def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBar
 
 
 
-def create_model(eleType=None, inputx=None, inputy=None):
+def create_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None, dt=None):
+    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
+        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
 
-    if eleType is None:
-        eleType = "forceBeamColumn"
+    if column is None:
+        column = "forceBeamColumn"
 
     # create Model in three-dimensions with 6 DOF/node
-    model = ops.Model(ndm=3, ndf=6)
+    model = xara.Model(ndm=3, ndf=6)
 
     # Geometry
     # ---------------
@@ -247,64 +244,56 @@ def create_model(eleType=None, inputx=None, inputy=None):
 
     # Define column elements
     # ----------------------
-    PDelta = "OFF"
-    #PDelta = "ON"
-
     # Geometric transformation for columns
-    if (PDelta == "OFF"):
-       model.geomTransf("Linear", 1, (1.0, 0.0, 0.0))
-    else:
-       model.geomTransf("PDelta", 1, (1.0, 0.0, 0.0))
+    colTransf = 1
+    model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
 
     # Number of column integration points (sections)
-    np = 4
-    itg = 1
-    model.beamIntegration("Lobatto", itg, colSec, np)
+    itg_col = 1
+    npts_col = 4
+    model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
 
 
     #                   tag ndI ndJ transfTag integrationTag
-    model.element(eleType,  1, ( 1,  5), 1, itg)
-    model.element(eleType,  2, ( 2,  6), 1, itg)
-    model.element(eleType,  3, ( 3,  7), 1, itg)
-    model.element(eleType,  4, ( 4,  8), 1, itg)
+    model.element(column,  1, ( 1,  5), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  2, ( 2,  6), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  3, ( 3,  7), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  4, ( 4,  8), transform=colTransf, section=colSec, shear=0)
 
-    model.element(eleType,  5, ( 5, 10), 1, itg)
-    model.element(eleType,  6, ( 6, 11), 1, itg)
-    model.element(eleType,  7, ( 7, 12), 1, itg)
-    model.element(eleType,  8, ( 8, 13), 1, itg)
+    model.element(column,  5, ( 5, 10), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  6, ( 6, 11), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  7, ( 7, 12), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  8, ( 8, 13), transform=colTransf, section=colSec, shear=0)
 
-    model.element(eleType,  9, (10, 15), 1, itg)
-    model.element(eleType, 10, (11, 16), 1, itg)
-    model.element(eleType, 11, (12, 17), 1, itg)
-    model.element(eleType, 12, (13, 18), 1, itg)
+    model.element(column,  9, (10, 15), transform=colTransf, section=colSec, shear=0)
+    model.element(column, 10, (11, 16), transform=colTransf, section=colSec, shear=0)
+    model.element(column, 11, (12, 17), transform=colTransf, section=colSec, shear=0)
+    model.element(column, 12, (13, 18), transform=colTransf, section=colSec, shear=0)
 
     # Define beam elements
     # --------------------
 
     # Geometric transformation for beams
-    model.geomTransf("Linear", 2, 1.0, 1.0, 0.0)
+    beamTransf = 2
+    model.geomTransf("Linear", beamTransf, 1.0, 1.0, 0.0)
 
-    # Number of beam integration points (sections)
-    np = 3
-    model.beamIntegration("Lobatto", beamSec, beamSec, np)
 
     # Create the beam elements
-    eleType = "forceBeamColumn"
     #                   tag (ndI ndJ) transfTag integrationTag
-    model.element(eleType, 13, ( 5,  6), 2, beamSec)
-    model.element(eleType, 14, ( 6,  7), 2, beamSec)
-    model.element(eleType, 15, ( 7,  8), 2, beamSec)
-    model.element(eleType, 16, ( 8,  5), 2, beamSec)
+    model.element(girder, 13, ( 5,  6), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 14, ( 6,  7), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 15, ( 7,  8), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 16, ( 8,  5), transform=beamTransf, section=beamSec, shear=0)
 
-    model.element(eleType, 17, (10, 11), 2, beamSec)
-    model.element(eleType, 18, (11, 12), 2, beamSec)
-    model.element(eleType, 19, (12, 13), 2, beamSec)
-    model.element(eleType, 20, (13, 10), 2, beamSec)
+    model.element(girder, 17, (10, 11), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 18, (11, 12), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 19, (12, 13), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 20, (13, 10), transform=beamTransf, section=beamSec, shear=0)
 
-    model.element(eleType, 21, (15, 16), 2, beamSec)
-    model.element(eleType, 22, (16, 17), 2, beamSec)
-    model.element(eleType, 23, (17, 18), 2, beamSec)
-    model.element(eleType, 24, (18, 15), 2, beamSec)
+    model.element(girder, 21, (15, 16), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 22, (16, 17), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 23, (17, 18), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 24, (18, 15), transform=beamTransf, section=beamSec, shear=0)
 
     # Define gravity loads
     # --------------------
@@ -336,16 +325,11 @@ def create_model(eleType=None, inputx=None, inputy=None):
 
     # Define earthquake excitation
     # ----------------------------
-    dt = 0.02
-    # Set up the acceleration records for Tabas fault normal and fault parallel
-    if inputx is None and inputy is None:
-        model.timeSeries("Path", 2, filePath="tabasFN.txt", dt=dt, factor=units.gravity)
-        model.timeSeries("Path", 3, filePath="tabasFP.txt", dt=dt, factor=units.gravity)
-    else:
-        model.timeSeries("Path", 2, values=inputx, dt=dt, factor=1.0)
-        model.timeSeries("Path", 3, values=inputy, dt=dt, factor=1.0)
+    # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
+    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
 
-    # Define the excitation using the Tabas ground motion records
+    # Define the excitation using the given ground motion records
     #                         tag dir         accel series args
     model.pattern("UniformExcitation", 2, 1, accel=2)
     model.pattern("UniformExcitation", 3, 2, accel=3)
@@ -388,18 +372,18 @@ def analyze(model, output_nodes, nt, dt):
     # ----------------------------
 
     # create the system of equation
-    model.system("UmfPack")
+    model.system("BandGen")
 
     # create the DOF numberer
-    model.numberer("Plain")
+    model.numberer("RCM")
 
     # create the constraint handler
     model.constraints("Transformation")
 
     # Configure the analysis such that iterations are performed until either:
-    # 1. the energy increment is less than 1.0e-8 (success)
+    # 1. the energy increment is less than 1.0e-14 (success)
     # 2. the number of iterations surpasses 20 (failure)
-    model.test("EnergyIncr", 1.0e-8, 20)
+    model.test("EnergyIncr", 1.0e-14, 20)
 
     # Perform iterations with the Newton-Raphson algorithm
     model.algorithm("Newton")
@@ -410,14 +394,6 @@ def analyze(model, output_nodes, nt, dt):
     # Define the analysis
     model.analysis("Transient")
 
-    # ------------------------------
-    # 2. Define quantities to record
-    # ------------------------------
-
-    # Record DOF 1 and 2 displacements at nodes 9, 14, and 19
-    model.recorder("Node", "disp", "-file", "Node51.out", "-time", "-node", *output_nodes, "-dof", 1, 2) #原来是9，14，19改成*output_nodes
-
-
     # -----------------------
     # 3. Perform the analysis
     # -----------------------
@@ -426,9 +402,10 @@ def analyze(model, output_nodes, nt, dt):
     displacements = {
         node: [model.nodeDisp(node)] for node in output_nodes
     }
-
-    # Perform 2000 analysis steps with a time step of 0.01
-    for i in range(nt):
+    import tqdm
+    # Perform nt analysis steps with a time step of dt
+    print(f"Analysis Progress ({nt} timesteps)")
+    for i in tqdm.tqdm(range(nt)):
         status = model.analyze(1, dt) #dt控制时间间隔原来是0.01
         if status != 0:
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
@@ -494,12 +471,7 @@ if __name__ == "__main__":
     os.makedirs(pred_dir, exist_ok=True)
     os.makedirs(data_dir, exist_ok=True)
 
-    # —— First load channel configuration ——  
-    station_id = 'CE89324'
-
-    # **choose channel
-    input_channels = [1,3]
-
+    # Load events
     if LOAD_EVENTS:
         events = sorted([
             print(file) or quakeio.read(file, exclusions=["*filter*"])
@@ -511,10 +483,8 @@ if __name__ == "__main__":
         with open("events.pkl","rb") as f:
             events = pickle.load(f)
 
-    try:
-        plt.style.use("typewriter")
-    except:
-        pass
+    # Choose inputs channels [x,y]
+    input_channels = [1,3]
 
     do_plot = True   # **Control whether to plot a heatmap
     # Preallocate an error matrix (channels × events) 
@@ -522,27 +492,32 @@ if __name__ == "__main__":
     num_channels = 6    # 1F X/Y, 2F X/Y, 3F X/Y
     error_matrix = np.zeros((num_channels, num_events))
 
-    for i in range(21):
+    for i in range(num_events):
         # TODO: if earthquake is too strong, change scale to smaller. try 0.3
-        inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=1)
+        inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
 
-        print(f"event {i+1}inputs shape: {inputs.shape}, dt = {dt}")
+        print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
         print(" channel 1 first 5 sample: ", inputs[0, :5])
         print(" channel 3 first 5 sample: ", inputs[1, :5])
 
 
-        model = create_model("forceBeamColumn",
+        model = create_model(column="forceBeamColumn",
+                             girder="forceBeamColumn",
                              inputx=inputs[0],
-                             inputy=inputs[1])
+                             inputy=inputs[1],
+                             dt=dt)
         
         nt = inputs.shape[1] # The second axis represents the number of sample points per channel
-        disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
+        try:
+            disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
+        except RuntimeError:
+            continue
         outputs = get_outputs(disp)     # shape (6, nt)
         outputs = outputs[:, 1:]
-        inputs = inputs[:, :nt]
+        assert inputs.shape[1] == outputs.shape[1], "inputs and outputs have different length of time samples."
         time = np.arange(nt) * dt
 
-        i_val = 2 #when method choosed as n4sid or deterministic
+        i_val = 2 # For n4sid or deterministic methods
         j_val = 80
 
         # option
@@ -563,15 +538,14 @@ if __name__ == "__main__":
         # **Choose whether to stabilize matrix A and whether to use the LMI method
         sys_s  = sysid(inputs,  outputs, method='srim', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
         A_s, B_s, C_s, D_s, *rest = sys_s
-        A_s = stabilize_discrete(A_s)
-        A_stable = stabilize_with_lmi(A_s, epsilon=1e-6, solver='CVXOPT')
+        A_stable = stabilize_discrete(A_s)
+        A_lmi = stabilize_with_lmi(A_s, epsilon=1e-6, solver='CVXOPT')
         
-        eigvals_A_s = np.linalg.eigvals(A_s)
-        eigvals_A_stable = np.linalg.eigvals(A_stable)
-        print("A_s Eigenvalues:", eigvals_A_s)
-        print("A_stable Eigenvalues:", eigvals_A_stable)
+        print("A_s Eigenvalues:", np.linalg.eigvals(A_s))
+        print("A_stable Eigenvalues:", np.linalg.eigvals(A_stable))
+        print("A_lmi Eigenvalues:", np.linalg.eigvals(A_lmi))
 
-        pred_s = simulate((A_stable, B_s, C_s, D_s),  inputs) #A_s, B_s, C_s, D_s
+        pred_s = simulate((A_lmi, B_s, C_s, D_s),  inputs) #A_s, B_s, C_s, D_s
         print("C_s:", C_s.shape)
         
         windowed_plot = True # **True or False
@@ -582,8 +556,8 @@ if __name__ == "__main__":
             # (from the 0.01 to 0.99 quantiles)
             bounds = intensity_bounds(outputs[0], lb=0.01, ub=0.99)
             outputs_trunc          = truncate_by_bounds(outputs, bounds)
-            pred_s_trunc           = truncate_by_bounds(pred_s,   bounds)
-            time_trunc             = time[bounds[0]:bounds[1]]
+            pred_s_trunc           = truncate_by_bounds(pred_s,  bounds)
+            time_trunc             = truncate_by_bounds(time,    bounds)
         else:
             outputs_trunc          = outputs
             pred_s_trunc           = pred_s
