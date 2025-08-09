@@ -48,16 +48,6 @@ if __name__ == "__main__":
         t_out = np.arange(outputs.shape[1]) * dt
 
         if windowed_plot:
-            # def intensity_bounds(arr, lb=0.01, ub=0.99):
-            #     energy = np.cumsum(arr**2)
-            #     energy = energy / energy[-1]
-            #     i_start = np.searchsorted(energy, lb)
-            #     i_end = np.searchsorted(energy, ub)
-            #     return i_start, i_end
-
-            # def truncate_by_bounds(arr, bounds):
-            #     return arr[..., bounds[0]:bounds[1]]
-
             bounds = intensity_bounds(outputs[0], lb=0.001, ub=0.999)
             inputs_trunc = truncate_by_bounds(inputs, bounds)
             t_in_trunc = t_in[bounds[0]:bounds[1]]
