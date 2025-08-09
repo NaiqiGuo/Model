@@ -43,7 +43,7 @@ import cvxpy as cp #print(cvxpy.__version__)用这个可以检查版本号
 import dccp
 
 import pickle
-
+import tqdm
 
 LOAD_EVENTS = False
 
@@ -402,7 +402,7 @@ def analyze(model, output_nodes, nt, dt):
     displacements = {
         node: [model.nodeDisp(node)] for node in output_nodes
     }
-    import tqdm
+
     # Perform nt analysis steps with a time step of dt
     print(f"Analysis Progress ({nt} timesteps)")
     for i in tqdm.tqdm(range(nt)):
