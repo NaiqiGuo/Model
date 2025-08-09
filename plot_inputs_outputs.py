@@ -33,11 +33,13 @@ if __name__ == "__main__":
     num_events = min(4, len(events))
     for i in range(num_events):
         print(f"Event {i+1}")
-        inputs, dt = get_inputs(i, events, input_channels)
+        inputs, dt = get_inputs(i, events, input_channels, scale=2.54)
         nt = inputs.shape[1]
-        model = create_model("forceBeamColumn",
+        model = create_model(column="forceBeamColumn",
+                             girder="forceBeamColumn",
                              inputx=inputs[0],
-                             inputy=inputs[1])
+                             inputy=inputs[1],
+                             dt=dt)
         disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
         outputs = get_outputs(disp)   
         outputs = outputs[:, 1:]
@@ -46,17 +48,17 @@ if __name__ == "__main__":
         t_out = np.arange(outputs.shape[1]) * dt
 
         if windowed_plot:
-            def intensity_bounds(arr, lb=0.01, ub=0.99):
-                energy = np.cumsum(arr**2)
-                energy = energy / energy[-1]
-                i_start = np.searchsorted(energy, lb)
-                i_end = np.searchsorted(energy, ub)
-                return i_start, i_end
+            # def intensity_bounds(arr, lb=0.01, ub=0.99):
+            #     energy = np.cumsum(arr**2)
+            #     energy = energy / energy[-1]
+            #     i_start = np.searchsorted(energy, lb)
+            #     i_end = np.searchsorted(energy, ub)
+            #     return i_start, i_end
 
-            def truncate_by_bounds(arr, bounds):
-                return arr[..., bounds[0]:bounds[1]]
+            # def truncate_by_bounds(arr, bounds):
+            #     return arr[..., bounds[0]:bounds[1]]
 
-            bounds = intensity_bounds(outputs[0], lb=0.01, ub=0.99)
+            bounds = intensity_bounds(outputs[0], lb=0.001, ub=0.999)
             inputs_trunc = truncate_by_bounds(inputs, bounds)
             t_in_trunc = t_in[bounds[0]:bounds[1]]
             outputs_trunc = truncate_by_bounds(outputs, bounds)
@@ -77,7 +79,7 @@ if __name__ == "__main__":
         plt.legend()
         plt.tight_layout()
         plt.savefig(f"{save_dir}/event_{i+1}_inputs.png")
-        plt.show()
+        # plt.show()
         plt.close()
 
         # --------- output ---------
@@ -90,5 +92,5 @@ if __name__ == "__main__":
         plt.legend()
         plt.tight_layout()
         plt.savefig(f"{save_dir}/event_{i+1}_outputs.png")
-        plt.show()
+        # plt.show()
         plt.close()
