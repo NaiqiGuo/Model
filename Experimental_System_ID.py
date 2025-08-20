@@ -38,8 +38,7 @@ from mdof.utilities.config import Config
 
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
-#针对lacy 字体显示白色了话需要在左边打开文件夹
-import cvxpy as cp #print(cvxpy.__version__)用这个可以检查版本号
+import cvxpy as cp 
 import dccp
 
 import pickle
@@ -406,7 +405,7 @@ def analyze(model, output_nodes, nt, dt):
     # Perform nt analysis steps with a time step of dt
     print(f"Analysis Progress ({nt} timesteps)")
     for i in tqdm.tqdm(range(nt)):
-        status = model.analyze(1, dt) #dt控制时间间隔原来是0.01
+        status = model.analyze(1, dt) 
         if status != 0:
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
 
@@ -432,6 +431,7 @@ def get_outputs(displacements):
     return outputs     # shape (6, nt+1)
 
 def stabilize_with_lmi(A_hat, epsilon=1e-10, solver='CVXOPT'):
+
     """
     Only the matrix A_s obtained from algorithms such as SRIM is stabilized by imposing a Lyapunov LMI constraint to obtain a stable A. 
     The matrices B_s, C_s, and D_s are directly used as output. 
@@ -461,11 +461,46 @@ def stabilize_with_lmi(A_hat, epsilon=1e-10, solver='CVXOPT'):
     A_stable = Q.value @ np.linalg.inv(P.value)
     return A_stable
 
+def get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3, solver='-genBandArpack'): #-symmBandLapack -genBandArpack
+    lambdas = model.eigen(n, solver='-genBandArpack')  
+    print(f"[Debug] eigen(n={n}) returned {len(lambdas)} values: {lambdas}")
+    lambdas = np.asarray(lambdas, dtype=float)
+    omega = np.sqrt(np.abs(lambdas))                    # rad/s
+    freqs_hz = omega / (2*np.pi)
+    rows = []
+    for node in floor_nodes:
+        for dof in dofs:
+            rows.append([model.nodeEigenvector(node, k+1, dof) for k in range(n)])
+    Phi_true = np.array(rows, dtype=float)              # (6, nmodes)
+    Phi_true /= (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
+
+    return freqs_hz, Phi_true
+
+def modes_from_state_space(A, C, dt):
+    evals, V = np.linalg.eig(A)               # Eigen-decomposition of A: evals = discrete-time poles, V = eigenvectors (modal vectors)
+    mu = np.log(evals) / dt                   # Convert discrete-time poles to continuous-time poles using μ = log(λ_d) / dt
+    freqs_hz = np.abs(np.imag(mu))/(2*np.pi)
+    zeta = -np.real(mu)/(np.abs(mu) + 1e-12)  # damping ratio
+    Phi = C @ V                               # shape (ny, m)
+    order = np.argsort(freqs_hz)
+    return freqs_hz[order], zeta[order], Phi[:, order]
+
+def realify_modes(Phi, ref_row=0):
+    Phi = Phi.astype(complex)
+    phase = np.angle(Phi[ref_row, :])         
+    Phi = Phi * np.exp(-1j*phase)             
+    return np.real(Phi)
+
+def mac_matrix(Phi_true, Phi_est):
+    T = Phi_true / (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
+    E = Phi_est  / (np.linalg.norm(Phi_est,  axis=0, keepdims=True) + 1e-12)
+    return np.abs(T.T @ E)**2                
+
 if __name__ == "__main__":
     print(cp.__version__)
     print(dccp.__version__)
 
-    base_out = "output_srim_window_channel0103_option_lmi-new-3"  #rename:output_okid-era_zoomin_channel0317_original_A_option按照这个顺序来写
+    base_out = "output_n4sid_nowindow_sine_option_A-new"  #rename:output_okid-era_zoomin_channel0317_original_A_option按照这个顺序来写
     pred_dir = os.path.join(base_out, "predictions")
     data_dir = os.path.join(base_out, "event_data")
     os.makedirs(pred_dir, exist_ok=True)
@@ -475,13 +510,16 @@ if __name__ == "__main__":
     if LOAD_EVENTS:
         events = sorted([
             print(file) or quakeio.read(file, exclusions=["*filter*"])
-            for file in list(Path(f"../uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+            for file in list(Path(f"/Users/guonaiqi/Documents/GitHub/mdof_studies/uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
         ], key=lambda event: abs(event["peak_accel"]))
         with open("events.pkl","wb") as f:
             pickle.dump(events,f)
     else:
         with open("events.pkl","rb") as f:
             events = pickle.load(f)
+    
+    print(f"Total events loaded: {len(events)}")
+
 
     # Choose inputs channels [x,y]
     input_channels = [1,3]
@@ -492,34 +530,41 @@ if __name__ == "__main__":
     num_channels = 6    # 1F X/Y, 2F X/Y, 3F X/Y
     error_matrix = np.zeros((num_channels, num_events))
 
-    for i in range(num_events):
-        # TODO: if earthquake is too strong, change scale to smaller. try 0.3
-        inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
+    USE_SINE_INPUT = True
 
-        print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
-        print(" channel 1 first 5 sample: ", inputs[0, :5])
-        print(" channel 3 first 5 sample: ", inputs[1, :5])
-
+    if USE_SINE_INPUT:
+        dt = 0.01
+        T = 20
+        t = np.arange(0, T, dt)
+        f1 = 1.0
+        f2 = 3.5
+        sin_x = np.sin(1 * np.pi * f1 * t)
+        sin_y = np.sin(1 * np.pi * f2 * t)
+        inputs = np.vstack([sin_x, sin_y])
+        nt = inputs.shape[1]
 
         model = create_model(column="forceBeamColumn",
-                             girder="forceBeamColumn",
-                             inputx=inputs[0],
-                             inputy=inputs[1],
-                             dt=dt)
-        
+                                girder="forceBeamColumn",
+                                inputx=inputs[0],
+                                inputy=inputs[1],
+                                dt=dt)
+            
         nt = inputs.shape[1] # The second axis represents the number of sample points per channel
         try:
             disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
         except RuntimeError:
-            continue
+            print("Simulation failed for sine wave input.")
+            disp = None
         outputs = get_outputs(disp)     # shape (6, nt)
         outputs = outputs[:, 1:]
         assert inputs.shape[1] == outputs.shape[1], "inputs and outputs have different length of time samples."
         time = np.arange(nt) * dt
 
-        i_val = 2 # For n4sid or deterministic methods
-        j_val = 80
-
+        # get true modeshape
+        true_freqs, Phi_true = get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3)
+        print("[Sine Input] True freqs(Hz):", np.round(true_freqs, 3))
+        for mode_idx in range(Phi_true.shape[1]):
+            print(f"  True Mode {mode_idx+1} Shape:", np.round(Phi_true[:, mode_idx], 4))
         # option
         n = 6
         options = Config(
@@ -532,23 +577,65 @@ if __name__ == "__main__":
             pseudo      = True,
             outlook     = 190,
             threads     = 8,
-            chunk       = 200
+            chunk       = 200,
+            i           = 25,
+            j           = 410
         )
 
+        # Run system identification
+        system_srim = sysid(inputs, outputs, method='srim', **options)
+        A_s, B_s, C_s, D_s, *rest = system_srim
+        As_stable = stabilize_discrete(A_s)
+        system_det  = sysid(inputs, outputs, method='deterministic', **options)
+        A_d, B_d, C_d, D_d, *rest = system_det
+        Ad_stable = stabilize_discrete(A_d)
+
+        # Extract modes from state space
+        freqs_srim, zeta_srim, Phi_srim = modes_from_state_space(As_stable, C_s, dt)
+        freqs_det,  zeta_det,  Phi_det  = modes_from_state_space( Ad_stable, C_d,  dt)
+        print("[Sine Input] Phi_srim (raw, possibly complex):\n", Phi_srim)
+        print("[Sine Input] Phi_det  (raw, possibly complex):\n", Phi_det)
+
+        # Realify estimated mode shapes
+        Phi_srim_real = realify_modes(Phi_srim)
+        Phi_det_real  = realify_modes(Phi_det)
+        print("[Sine Input] Phi_srim:\n", Phi_srim_real)
+        print("[Sine Input] Phi_det:\n", Phi_det_real)
+
+        # Normalize true mode shapes
+        Phi_true_norm = Phi_true / (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
+        mac_srim = mac_matrix(Phi_true_norm, Phi_srim_real)
+        mac_det  = mac_matrix(Phi_true_norm, Phi_det_real)
+
+        print(f"[Sine Input] MAC(SRIM):\n", np.round(mac_srim, 3))
+        print(f"[Sine Input] MAC(Det.):\n", np.round(mac_det, 3))
+
+        print(f"[Sine Input] SRIM        freqs(Hz):", np.round(freqs_srim[:3], 3))
+        print(f"[Sine Input] Deterministic freqs(Hz):", np.round(freqs_det[:3], 3))
+
+        for mode_idx in range(3):
+            print(f"\n[Sine Input] Mode {mode_idx+1} Mode Shapes:")
+            print("  True         :", np.round(Phi_true[:, mode_idx], 4))
+            print("  SRIM         :", np.round(Phi_srim_real[:, mode_idx], 4))
+            print("  Deterministic:", np.round(Phi_det_real[:, mode_idx], 4))
+
+        
+        
+
         # **Choose whether to stabilize matrix A and whether to use the LMI method
-        sys_s  = sysid(inputs,  outputs, method='srim', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
+        sys_s  = sysid(inputs,  outputs, method='n4sid', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
         A_s, B_s, C_s, D_s, *rest = sys_s
         A_stable = stabilize_discrete(A_s)
-        A_lmi = stabilize_with_lmi(A_s, epsilon=1e-6, solver='CVXOPT')
+        A_lmi = stabilize_with_lmi(A_s, epsilon=1e-6, solver='SCS') #SCS CVXOPT
         
         print("A_s Eigenvalues:", np.linalg.eigvals(A_s))
         print("A_stable Eigenvalues:", np.linalg.eigvals(A_stable))
         print("A_lmi Eigenvalues:", np.linalg.eigvals(A_lmi))
 
-        pred_s = simulate((A_lmi, B_s, C_s, D_s),  inputs) #A_s, B_s, C_s, D_s
+        pred_s = simulate((A_stable, B_s, C_s, D_s),  inputs) #A_s, B_s, C_s, D_s
         print("C_s:", C_s.shape)
         
-        windowed_plot = True # **True or False
+        windowed_plot = False # **True or False
         
         # Choose whether to do windowplot
         if windowed_plot:
@@ -568,12 +655,16 @@ if __name__ == "__main__":
             num = np.linalg.norm(outputs_trunc[ch] - pred_s_trunc[ch])
             den = np.linalg.norm(outputs_trunc[ch])
             pred_norm = np.linalg.norm(pred_s_trunc[ch])
-            print(f"Event {i+1} Ch {ch}: ‖pred‖={pred_norm:.3e}, ‖diff‖={num:.3e}, ‖true‖={den:.3e}, ratio={num/den:.3f}")
-            error_matrix[ch, i] = num
+            print(f"Ch {ch}: ‖pred‖={pred_norm:.3e}, ‖diff‖={num:.3e}, ‖true‖={den:.3e}, ratio={num/den:.3f}")
+
+        error_matrix = np.zeros((num_channels, 1))  
+        for ch in range(num_channels):
+            num = np.linalg.norm(outputs_trunc[ch] - pred_s_trunc[ch])
+            error_matrix[ch, 0] = num
 
         # Save data
         np.savez(
-            os.path.join(data_dir, f"event_{i+1}.npz"),
+            os.path.join(data_dir, f"[Sine Input].npz"),
             time=time, inputs=inputs, outputs=outputs
         )
         # (Can add CSV saving as needed, like previous examples)
@@ -590,9 +681,9 @@ if __name__ == "__main__":
                     '--', label=f"True Fl{f+1} X")
             ax.plot(time_trunc,           
                     pred_s_trunc[2*f],  
-                    label=f"SRIM Fl{f+1} X")
+                    label=f"srim Fl{f+1} X")
             
-        ax.set(title="SRIM — X direction", xlabel="Time (s)", ylabel="Disp") #SRIM N4SID Deterministic okid-era
+        ax.set(title="srim — X direction", xlabel="Time (s)", ylabel="Disp") #SRIM N4SID Deterministic okid-era
         ax.legend()
 
         # SRIM — Y direction on the right
@@ -603,53 +694,256 @@ if __name__ == "__main__":
                     '--', label=f"True Fl{f+1} Y")
             ax.plot(time_trunc,
                     pred_s_trunc[2*f+1],
-                    label=f"SRIM Fl{f+1} Y")
+                    label=f"srim Fl{f+1} Y")
             
-        ax.set(title="SRIM — Y direction", xlabel="Time (s)", ylabel="Disp")
+        ax.set(title="srim — Y direction", xlabel="Time (s)", ylabel="Disp")
         ax.legend()
 
-        plt.suptitle(f"Event {i+1} ")
-        plt.savefig(os.path.join(pred_dir, f"event_{i+1}_sysid.png"), dpi=300)
+        plt.suptitle(f"Event Sine Input ")
+        plt.savefig(os.path.join(pred_dir, f"event_SineInput_sysid.png"), dpi=300)
         plt.close(fig)
 
-    # heatmap plot
-    if do_plot:
-        
-        fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
-        im = ax.imshow(error_matrix,
-                    vmin=0, vmax=error_matrix.max(),
-                    aspect='auto',
-                    origin='lower',
-                    cmap='viridis')
-        cbar = fig.colorbar(im, ax=ax, extend='max')
-        cbar.set_label("Absolute error norm", fontsize=14) #"Absolute error norm"
+        # heatmap plot
+        if do_plot:
+            
+            fig, ax = plt.subplots(figsize=(6,6), constrained_layout=True)
+            im = ax.imshow(error_matrix,
+                        vmin=0, vmax=error_matrix.max(),
+                        aspect='auto',
+                        origin='lower',
+                        cmap='viridis')
+            cbar = fig.colorbar(im, ax=ax, extend='max')
+            cbar.set_label("Absolute error norm", fontsize=14)
 
-        ax.set_xlabel("Event index", fontsize=14)
-        ax.set_ylabel("Channel", fontsize=14)
-        ax.set_xticks(np.arange(num_events))
-        ax.set_xticklabels(np.arange(1, num_events+1), rotation=45, fontsize=12)
-        channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
-        ax.set_yticks(np.arange(num_channels))
-        ax.set_yticklabels(channel_labels, fontsize=12)
+            ax.set_xlabel("Event", fontsize=14)
+            ax.set_ylabel("Channel", fontsize=14)
+            ax.set_xticks([0])
+            ax.set_xticklabels(["Sine Input"], rotation=0, fontsize=12)
+            channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
+            ax.set_yticks(np.arange(num_channels))
+            ax.set_yticklabels(channel_labels, fontsize=12)
+            ax.set_title("Error heatmap (sine input)", fontsize=16)
 
-        ax.set_title("Error heatmap (windowed part)", fontsize=16) 
-        for ch in range(num_channels):
-            for ev in range(num_events):
-                val = error_matrix[ch, ev]
-                if val <= 9999:
-                    color = 'black' if val > error_matrix.max()/2 else 'white'
-                    ax.text(
-                        ev, ch,
-                        f"{val:.2f}",
-                        ha='center', va='center',
-                        color=color,
-                        fontsize=6
-                    )
+            for ch in range(num_channels):
+                val = error_matrix[ch, 0]
+                color = 'black' if val > error_matrix.max()/2 else 'white'
+                ax.text(
+                    0, ch,
+                    f"{val:.2f}",
+                    ha='center', va='center',
+                    color=color,
+                    fontsize=6
+                )
 
-        heatmap_path = os.path.join(pred_dir, "error_heatmap.png")
-        plt.savefig(heatmap_path, dpi=300)
-        plt.close(fig)
-        print(f"Error heatmap saved to {heatmap_path}")
+            heatmap_path = os.path.join(pred_dir, "error_heatmap_sine.png")
+            plt.savefig(heatmap_path, dpi=300)
+            plt.close(fig)
+            print(f"Error heatmap saved to {heatmap_path}")
 
-    print(f"All outputs have been saved to: {os.path.abspath(base_out)}")
+        print(f"All outputs have been saved to: {os.path.abspath(base_out)}")
 
+    else:
+
+        for i in range(num_events):
+            # TODO: if earthquake is too strong, change scale to smaller. try 0.3
+            inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
+
+            print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
+            print(" channel 1 first 5 sample: ", inputs[0, :5])
+            print(" channel 3 first 5 sample: ", inputs[1, :5])
+
+
+            model = create_model(column="forceBeamColumn",
+                                girder="forceBeamColumn",
+                                inputx=inputs[0],
+                                inputy=inputs[1],
+                                dt=dt)
+            
+            nt = inputs.shape[1] # The second axis represents the number of sample points per channel
+            try:
+                disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
+            except RuntimeError:
+                continue
+            outputs = get_outputs(disp)     # shape (6, nt)
+            outputs = outputs[:, 1:]
+            assert inputs.shape[1] == outputs.shape[1], "inputs and outputs have different length of time samples."
+            time = np.arange(nt) * dt
+
+            # 取“真模态”
+            true_freqs, Phi_true = get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3)
+            print(f"[Event {i+1}] True freqs(Hz):", np.round(true_freqs, 3))
+            for mode_idx in range(Phi_true.shape[1]):
+                print(f"  True Mode {mode_idx+1} Shape:", np.round(Phi_true[:, mode_idx], 4))
+            # option
+            n = 6
+            options = Config(
+                m           = 500,
+                horizon     = 190,
+                nc          = 190,
+                order       = 2*n,
+                period_band = (0.1,0.6),
+                damping     = 0.06,
+                pseudo      = True,
+                outlook     = 190,
+                threads     = 8,
+                chunk       = 200,
+                i           = 250,
+                j           = 4400
+            )
+
+            # Run system identification
+            system_srim = sysid(inputs, outputs, method='srim', **options)
+            A_s, B_s, C_s, D_s, *rest = system_srim
+            system_det  = sysid(inputs, outputs, method='deterministic', **options)
+            A_d, B_d, C_d, D_d, *rest = system_det
+
+            # Extract modes from state space
+            freqs_srim, zeta_srim, Phi_srim = modes_from_state_space(A_s, C_s, dt)
+            freqs_det,  zeta_det,  Phi_det  = modes_from_state_space( A_d, C_d,  dt)
+            print(f"[Event {i+1}] Phi_srim (raw, possibly complex):\n", Phi_srim)
+            print(f"[Event {i+1}] Phi_det  (raw, possibly complex):\n", Phi_det)
+
+            # Realify estimated mode shapes
+            Phi_srim_real = realify_modes(Phi_srim)
+            Phi_det_real  = realify_modes(Phi_det)
+
+            # Normalize true mode shapes
+            Phi_true_norm = Phi_true / (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
+            mac_srim = mac_matrix(Phi_true_norm, Phi_srim_real)
+            mac_det  = mac_matrix(Phi_true_norm, Phi_det_real)
+
+            print(f"[Event {i+1}] MAC(SRIM):\n", np.round(mac_srim, 3))
+            print(f"[Event {i+1}] MAC(Det.):\n", np.round(mac_det, 3))
+
+            # 打印模态频率
+            print(f"[Event {i+1}] SRIM        freqs(Hz):", np.round(freqs_srim[:3], 3))
+            print(f"[Event {i+1}] Deterministic freqs(Hz):", np.round(freqs_det[:3], 3))
+
+            # 打印模态形状
+            for mode_idx in range(3):
+                print(f"\n[Event {i+1}] Mode {mode_idx+1} Mode Shapes:")
+                print("  True         :", np.round(Phi_true[:, mode_idx], 4))
+                print("  SRIM         :", np.round(Phi_srim_real[:, mode_idx], 4))
+                print("  Deterministic:", np.round(Phi_det_real[:, mode_idx], 4))
+
+            
+            
+
+            # **Choose whether to stabilize matrix A and whether to use the LMI method
+            sys_s  = sysid(inputs,  outputs, method='n4sid', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
+            A_s, B_s, C_s, D_s, *rest = sys_s
+            A_stable = stabilize_discrete(A_s)
+            A_lmi = stabilize_with_lmi(A_s, epsilon=1e-6, solver='SCS') #SCS CVXOPT
+            
+            print("A_s Eigenvalues:", np.linalg.eigvals(A_s))
+            print("A_stable Eigenvalues:", np.linalg.eigvals(A_stable))
+            print("A_lmi Eigenvalues:", np.linalg.eigvals(A_lmi))
+
+            pred_s = simulate((A_stable, B_s, C_s, D_s),  inputs) #A_s, B_s, C_s, D_s
+            print("C_s:", C_s.shape)
+            
+            windowed_plot = True # **True or False
+            
+            # Choose whether to do windowplot
+            if windowed_plot:
+                # Use the first response channel to calculate the time bounds of the main energy interval 
+                # (from the 0.01 to 0.99 quantiles)
+                bounds = intensity_bounds(outputs[0], lb=0.01, ub=0.99)
+                outputs_trunc          = truncate_by_bounds(outputs, bounds)
+                pred_s_trunc           = truncate_by_bounds(pred_s,  bounds)
+                time_trunc             = truncate_by_bounds(time,    bounds)
+            else:
+                outputs_trunc          = outputs
+                pred_s_trunc           = pred_s
+                time_trunc             = time
+            
+            # Compute and store the L2 error for the windowed segment
+            for ch in range(num_channels):
+                num = np.linalg.norm(outputs_trunc[ch] - pred_s_trunc[ch])
+                den = np.linalg.norm(outputs_trunc[ch])
+                pred_norm = np.linalg.norm(pred_s_trunc[ch])
+                print(f"Event {i+1} Ch {ch}: ‖pred‖={pred_norm:.3e}, ‖diff‖={num:.3e}, ‖true‖={den:.3e}, ratio={num/den:.3f}")
+                error_matrix[ch, i] = num
+
+            # Save data
+            np.savez(
+                os.path.join(data_dir, f"event_{i+1}.npz"),
+                time=time, inputs=inputs, outputs=outputs
+            )
+            # (Can add CSV saving as needed, like previous examples)
+
+            # Plot 2 figures and save
+            fig, axs = plt.subplots(1, 2, figsize=(12,4), constrained_layout=True)
+            floors = [0,1,2]
+
+            # SRIM — X direction on the left
+            ax = axs[0]
+            for f in floors:
+                ax.plot(time_trunc,
+                        outputs_trunc[2*f],  
+                        '--', label=f"True Fl{f+1} X")
+                ax.plot(time_trunc,           
+                        pred_s_trunc[2*f],  
+                        label=f"srim Fl{f+1} X")
+                
+            ax.set(title="srim — X direction", xlabel="Time (s)", ylabel="Disp") #SRIM N4SID Deterministic okid-era
+            ax.legend()
+
+            # SRIM — Y direction on the right
+            ax = axs[1]
+            for f in floors:
+                ax.plot(time_trunc,
+                        outputs_trunc[2*f+1],
+                        '--', label=f"True Fl{f+1} Y")
+                ax.plot(time_trunc,
+                        pred_s_trunc[2*f+1],
+                        label=f"srim Fl{f+1} Y")
+                
+            ax.set(title="srim — Y direction", xlabel="Time (s)", ylabel="Disp")
+            ax.legend()
+
+            plt.suptitle(f"Event {i+1} ")
+            plt.savefig(os.path.join(pred_dir, f"event_{i+1}_sysid.png"), dpi=300)
+            plt.close(fig)
+
+        # heatmap plot
+        if do_plot:
+            
+            fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
+            im = ax.imshow(error_matrix,
+                        vmin=0, vmax=error_matrix.max(),
+                        aspect='auto',
+                        origin='lower',
+                        cmap='viridis')
+            cbar = fig.colorbar(im, ax=ax, extend='max')
+            cbar.set_label("Absolute error norm", fontsize=14) #"Absolute error norm"
+
+            ax.set_xlabel("Event index", fontsize=14)
+            ax.set_ylabel("Channel", fontsize=14)
+            ax.set_xticks(np.arange(num_events))
+            ax.set_xticklabels(np.arange(1, num_events+1), rotation=45, fontsize=12)
+            channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
+            ax.set_yticks(np.arange(num_channels))
+            ax.set_yticklabels(channel_labels, fontsize=12)
+
+            ax.set_title("Error heatmap (windowed part)", fontsize=16) 
+            for ch in range(num_channels):
+                for ev in range(num_events):
+                    val = error_matrix[ch, ev]
+                    if val <= 9999:
+                        color = 'black' if val > error_matrix.max()/2 else 'white'
+                        ax.text(
+                            ev, ch,
+                            f"{val:.2f}",
+                            ha='center', va='center',
+                            color=color,
+                            fontsize=6
+                        )
+
+            heatmap_path = os.path.join(pred_dir, "error_heatmap.png")
+            plt.savefig(heatmap_path, dpi=300)
+            plt.close(fig)
+            print(f"Error heatmap saved to {heatmap_path}")
+
+        print(f"All outputs have been saved to: {os.path.abspath(base_out)}")
+            
