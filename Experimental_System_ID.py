@@ -44,7 +44,7 @@ import dccp
 import pickle
 import tqdm
 
-LOAD_EVENTS = False
+LOAD_EVENTS = True
 
 def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBars, barArea, nfCoreY, nfCoreZ, nfCoverY, nfCoverZ, GJ):
     r"""
@@ -462,7 +462,7 @@ def stabilize_with_lmi(A_hat, epsilon=1e-10, solver='CVXOPT'):
     return A_stable
 
 def get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3, solver='-genBandArpack'): #-symmBandLapack -genBandArpack
-    lambdas = model.eigen(n, solver='-genBandArpack')  
+    lambdas = model.eigen(n)  
     print(f"[Debug] eigen(n={n}) returned {len(lambdas)} values: {lambdas}")
     lambdas = np.asarray(lambdas, dtype=float)
     omega = np.sqrt(np.abs(lambdas))                    # rad/s
@@ -476,31 +476,56 @@ def get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3, solver='-
 
     return freqs_hz, Phi_true
 
-def modes_from_state_space(A, C, dt):
-    evals, V = np.linalg.eig(A)               # Eigen-decomposition of A: evals = discrete-time poles, V = eigenvectors (modal vectors)
-    mu = np.log(evals) / dt                   # Convert discrete-time poles to continuous-time poles using μ = log(λ_d) / dt
-    freqs_hz = np.abs(np.imag(mu))/(2*np.pi)
-    zeta = -np.real(mu)/(np.abs(mu) + 1e-12)  # damping ratio
-    Phi = C @ V                               # shape (ny, m)
-    order = np.argsort(freqs_hz)
-    return freqs_hz[order], zeta[order], Phi[:, order]
-
-def realify_modes(Phi, ref_row=0):
-    Phi = Phi.astype(complex)
-    phase = np.angle(Phi[ref_row, :])         
-    Phi = Phi * np.exp(-1j*phase)             
-    return np.real(Phi)
-
 def mac_matrix(Phi_true, Phi_est):
+    print(type(Phi_est))
+    print(np.shape(Phi_est))
     T = Phi_true / (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
     E = Phi_est  / (np.linalg.norm(Phi_est,  axis=0, keepdims=True) + 1e-12)
-    return np.abs(T.T @ E)**2                
+    return np.abs(T.T @ E)**2     
+
+def normalize_v(v):
+    """
+    Normalize an individual vector:
+    element-wise signed complex magnitude, unitized
+    i.e.:
+    for each element, multiply the sign of its real part
+    by the square root of the element multiplied by its
+    complex conjugate.
+    then, divide the vector by its Euclidean norm, or the
+    square root of the sum of the elements squared.
+    """
+    vabs = np.abs(v)
+    signed_vabs = np.sign(np.real(v)) * vabs
+    normed_vabs = signed_vabs / np.linalg.norm(signed_vabs)
+    return normed_vabs
+
+def normalize_Psi(Psi):
+    """
+    Normalize a matrix of complex column vectors using
+    `normalize_v` on each vector
+    """
+    normed_Psi = np.zeros(Psi.shape)
+    for i in range(Psi.shape[1]):
+        v = Psi[:,i]
+        normed_Psi[:,i] = normalize_v(v)
+    return normed_Psi
+
+def phi_output(A, C):
+    eigvals, U = np.linalg.eig(np.asarray(A, dtype=complex))
+    idx = np.where(np.imag(eigvals) > -1e-12)[0]
+    eigvals_sel = eigvals[idx]
+    U_sel = U[:, idx]
+    V = C @ U_sel
+    Phi = normalize_Psi(V)  
+    print(Phi)
+    return Phi, eigvals_sel
+       
 
 if __name__ == "__main__":
     print(cp.__version__)
     print(dccp.__version__)
 
-    base_out = "output_n4sid_nowindow_sine_option_A-new"  #rename:output_okid-era_zoomin_channel0317_original_A_option按照这个顺序来写
+    base_out = "output_srim_window_channel0103_option_A-new"  #rename:output_okid-era_zoomin_channel0317_original_A_option按照这个顺序来写
     pred_dir = os.path.join(base_out, "predictions")
     data_dir = os.path.join(base_out, "event_data")
     os.makedirs(pred_dir, exist_ok=True)
@@ -530,7 +555,7 @@ if __name__ == "__main__":
     num_channels = 6    # 1F X/Y, 2F X/Y, 3F X/Y
     error_matrix = np.zeros((num_channels, num_events))
 
-    USE_SINE_INPUT = True
+    USE_SINE_INPUT = False
 
     if USE_SINE_INPUT:
         dt = 0.01
@@ -561,7 +586,7 @@ if __name__ == "__main__":
         time = np.arange(nt) * dt
 
         # get true modeshape
-        true_freqs, Phi_true = get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3)
+        true_freqs, Phi_true = get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=4)
         print("[Sine Input] True freqs(Hz):", np.round(true_freqs, 3))
         for mode_idx in range(Phi_true.shape[1]):
             print(f"  True Mode {mode_idx+1} Shape:", np.round(Phi_true[:, mode_idx], 4))
@@ -591,36 +616,23 @@ if __name__ == "__main__":
         Ad_stable = stabilize_discrete(A_d)
 
         # Extract modes from state space
-        freqs_srim, zeta_srim, Phi_srim = modes_from_state_space(As_stable, C_s, dt)
-        freqs_det,  zeta_det,  Phi_det  = modes_from_state_space( Ad_stable, C_d,  dt)
-        print("[Sine Input] Phi_srim (raw, possibly complex):\n", Phi_srim)
-        print("[Sine Input] Phi_det  (raw, possibly complex):\n", Phi_det)
+        Phi_srim, _ = phi_output(As_stable, C_s)
+        Phi_det, _  = phi_output( Ad_stable, C_d)
+        print("Phi_srim:\n", Phi_srim)
+        print("Phi_det:\n", Phi_det)
 
-        # Realify estimated mode shapes
-        Phi_srim_real = realify_modes(Phi_srim)
-        Phi_det_real  = realify_modes(Phi_det)
-        print("[Sine Input] Phi_srim:\n", Phi_srim_real)
-        print("[Sine Input] Phi_det:\n", Phi_det_real)
-
-        # Normalize true mode shapes
         Phi_true_norm = Phi_true / (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
-        mac_srim = mac_matrix(Phi_true_norm, Phi_srim_real)
-        mac_det  = mac_matrix(Phi_true_norm, Phi_det_real)
+        mac_srim = mac_matrix(Phi_true_norm, Phi_srim)
+        mac_det  = mac_matrix(Phi_true_norm, Phi_det)
 
         print(f"[Sine Input] MAC(SRIM):\n", np.round(mac_srim, 3))
         print(f"[Sine Input] MAC(Det.):\n", np.round(mac_det, 3))
 
-        print(f"[Sine Input] SRIM        freqs(Hz):", np.round(freqs_srim[:3], 3))
-        print(f"[Sine Input] Deterministic freqs(Hz):", np.round(freqs_det[:3], 3))
-
         for mode_idx in range(3):
             print(f"\n[Sine Input] Mode {mode_idx+1} Mode Shapes:")
             print("  True         :", np.round(Phi_true[:, mode_idx], 4))
-            print("  SRIM         :", np.round(Phi_srim_real[:, mode_idx], 4))
-            print("  Deterministic:", np.round(Phi_det_real[:, mode_idx], 4))
-
-        
-        
+            print("  SRIM         :", np.round(Phi_srim[:, mode_idx], 4))
+            print("  Deterministic:", np.round(Phi_det[:, mode_idx], 4))
 
         # **Choose whether to stabilize matrix A and whether to use the LMI method
         sys_s  = sysid(inputs,  outputs, method='n4sid', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
@@ -794,43 +806,36 @@ if __name__ == "__main__":
             # Run system identification
             system_srim = sysid(inputs, outputs, method='srim', **options)
             A_s, B_s, C_s, D_s, *rest = system_srim
+            As_stable = stabilize_discrete(A_s)
             system_det  = sysid(inputs, outputs, method='deterministic', **options)
             A_d, B_d, C_d, D_d, *rest = system_det
+            Ad_stable = stabilize_discrete(A_d)
 
             # Extract modes from state space
-            freqs_srim, zeta_srim, Phi_srim = modes_from_state_space(A_s, C_s, dt)
-            freqs_det,  zeta_det,  Phi_det  = modes_from_state_space( A_d, C_d,  dt)
-            print(f"[Event {i+1}] Phi_srim (raw, possibly complex):\n", Phi_srim)
-            print(f"[Event {i+1}] Phi_det  (raw, possibly complex):\n", Phi_det)
+            Phi_srim, _ = phi_output(As_stable, C_s)
+            Phi_det, _  = phi_output( Ad_stable, C_d)
+            print("Phi_srim:\n", Phi_srim)
+            print("Phi_det:\n", Phi_det)
 
-            # Realify estimated mode shapes
-            Phi_srim_real = realify_modes(Phi_srim)
-            Phi_det_real  = realify_modes(Phi_det)
-
-            # Normalize true mode shapes
             Phi_true_norm = Phi_true / (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
-            mac_srim = mac_matrix(Phi_true_norm, Phi_srim_real)
-            mac_det  = mac_matrix(Phi_true_norm, Phi_det_real)
+            mac_srim = mac_matrix(Phi_true_norm, Phi_srim)
+            mac_det  = mac_matrix(Phi_true_norm, Phi_det)
 
-            print(f"[Event {i+1}] MAC(SRIM):\n", np.round(mac_srim, 3))
-            print(f"[Event {i+1}] MAC(Det.):\n", np.round(mac_det, 3))
+            print(f"MAC(SRIM):\n", np.round(mac_srim, 3))
+            print(f"MAC(Det.):\n", np.round(mac_det, 3))
 
-            # 打印模态频率
-            print(f"[Event {i+1}] SRIM        freqs(Hz):", np.round(freqs_srim[:3], 3))
-            print(f"[Event {i+1}] Deterministic freqs(Hz):", np.round(freqs_det[:3], 3))
-
-            # 打印模态形状
             for mode_idx in range(3):
-                print(f"\n[Event {i+1}] Mode {mode_idx+1} Mode Shapes:")
+                print(f"\nMode {mode_idx+1} Mode Shapes:")
                 print("  True         :", np.round(Phi_true[:, mode_idx], 4))
-                print("  SRIM         :", np.round(Phi_srim_real[:, mode_idx], 4))
-                print("  Deterministic:", np.round(Phi_det_real[:, mode_idx], 4))
+                print("  SRIM         :", np.round(Phi_srim[:, mode_idx], 4))
+                print("  Deterministic:", np.round(Phi_det[:, mode_idx], 4))
+               
 
             
             
 
             # **Choose whether to stabilize matrix A and whether to use the LMI method
-            sys_s  = sysid(inputs,  outputs, method='n4sid', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
+            sys_s  = sysid(inputs,  outputs, method='srim', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
             A_s, B_s, C_s, D_s, *rest = sys_s
             A_stable = stabilize_discrete(A_s)
             A_lmi = stabilize_with_lmi(A_s, epsilon=1e-6, solver='SCS') #SCS CVXOPT
