@@ -44,7 +44,7 @@ import dccp
 import pickle
 import tqdm
 
-LOAD_EVENTS = True
+LOAD_EVENTS = False
 
 def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBars, barArea, nfCoreY, nfCoreZ, nfCoverY, nfCoverZ, GJ):
     r"""
@@ -458,8 +458,23 @@ def stabilize_with_lmi(A_hat, epsilon=1e-10, solver='CVXOPT'):
     prob = cp.Problem(objective, constraints)
     prob.solve(solver=solver)
 
-    A_stable = Q.value @ np.linalg.inv(P.value)
-    return A_stable
+    A_lmi = Q.value @ np.linalg.inv(P.value)
+    return A_lmi
+
+def stabilize_by_radius_clipping(A, alpha=0.995, rmin=None, make_real=True):
+    w, V = np.linalg.eig(A)             
+    r = np.abs(w)
+    w_new = w.copy()
+    over = r > 1.0
+    w_new[over] = alpha * w[over] / r[over]
+    if rmin is not None:
+        under = np.abs(w_new) < rmin
+        w_new[under] = rmin * w_new[under] / (np.abs(w_new[under]) + 1e-15)
+    A_new = V @ np.diag(w_new) @ np.linalg.inv(V)
+    if make_real and np.allclose(A_new.imag, 0, atol=1e-10):
+        A_new = A_new.real
+    return A_new
+
 
 def get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3, solver='-genBandArpack'): #-symmBandLapack -genBandArpack
     lambdas = model.eigen(n)  
@@ -517,7 +532,6 @@ def phi_output(A, C):
     U_sel = U[:, idx]
     V = C @ U_sel
     Phi = normalize_Psi(V)  
-    print(Phi)
     return Phi, eigvals_sel
        
 
@@ -525,7 +539,7 @@ if __name__ == "__main__":
     print(cp.__version__)
     print(dccp.__version__)
 
-    base_out = "output_srim_window_channel0103_option_A-new"  #rename:output_okid-era_zoomin_channel0317_original_A_option按照这个顺序来写
+    base_out = "output_n4sid_window_channel0103_option_A-new"  #rename:output_okid-era_zoomin_channel0317_original_A_option按照这个顺序来写
     pred_dir = os.path.join(base_out, "predictions")
     data_dir = os.path.join(base_out, "event_data")
     os.makedirs(pred_dir, exist_ok=True)
@@ -781,7 +795,7 @@ if __name__ == "__main__":
             assert inputs.shape[1] == outputs.shape[1], "inputs and outputs have different length of time samples."
             time = np.arange(nt) * dt
 
-            # 取“真模态”
+            # get true modeshape
             true_freqs, Phi_true = get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3)
             print(f"[Event {i+1}] True freqs(Hz):", np.round(true_freqs, 3))
             for mode_idx in range(Phi_true.shape[1]):
@@ -810,42 +824,75 @@ if __name__ == "__main__":
             system_det  = sysid(inputs, outputs, method='deterministic', **options)
             A_d, B_d, C_d, D_d, *rest = system_det
             Ad_stable = stabilize_discrete(A_d)
+            system_srim = sysid(inputs, outputs, method='n4sid', **options)
+            A_n, B_n, C_n, D_n, *rest = system_srim
+            An_stable = stabilize_discrete(A_n)
 
             # Extract modes from state space
             Phi_srim, _ = phi_output(As_stable, C_s)
             Phi_det, _  = phi_output( Ad_stable, C_d)
+            Phi_n4sid, _  = phi_output( An_stable, C_n)
             print("Phi_srim:\n", Phi_srim)
             print("Phi_det:\n", Phi_det)
+            print("Phi_n4sid:\n", Phi_n4sid)
 
             Phi_true_norm = Phi_true / (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
             mac_srim = mac_matrix(Phi_true_norm, Phi_srim)
             mac_det  = mac_matrix(Phi_true_norm, Phi_det)
+            mac_n4sid  = mac_matrix(Phi_true_norm, Phi_n4sid)
 
             print(f"MAC(SRIM):\n", np.round(mac_srim, 3))
             print(f"MAC(Det.):\n", np.round(mac_det, 3))
+            print(f"MAC(n4sid):\n", np.round(mac_n4sid, 3))
 
-            for mode_idx in range(3):
-                print(f"\nMode {mode_idx+1} Mode Shapes:")
-                print("  True         :", np.round(Phi_true[:, mode_idx], 4))
-                print("  SRIM         :", np.round(Phi_srim[:, mode_idx], 4))
-                print("  Deterministic:", np.round(Phi_det[:, mode_idx], 4))
-               
-
-            
-            
 
             # **Choose whether to stabilize matrix A and whether to use the LMI method
-            sys_s  = sysid(inputs,  outputs, method='srim', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
-            A_s, B_s, C_s, D_s, *rest = sys_s
+            sys_s  = sysid(inputs,  outputs, method='n4sid', **options) #method= srim, okid-era, okid-era-dc, deterministic , options = options , **option
+            A_s, B_s, C_s, D_s, Qs, Ss, Rs = sys_s
+            #A_s, B_s, C_s, D_s, *rest = sys_s
             A_stable = stabilize_discrete(A_s)
             A_lmi = stabilize_with_lmi(A_s, epsilon=1e-6, solver='SCS') #SCS CVXOPT
+            A_new = stabilize_by_radius_clipping(A_s, alpha=0.995, rmin=None, make_real=True)
             
             print("A_s Eigenvalues:", np.linalg.eigvals(A_s))
             print("A_stable Eigenvalues:", np.linalg.eigvals(A_stable))
             print("A_lmi Eigenvalues:", np.linalg.eigvals(A_lmi))
+            print("A_new Eigenvalues:", np.linalg.eigvals(A_new))
 
-            pred_s = simulate((A_stable, B_s, C_s, D_s),  inputs) #A_s, B_s, C_s, D_s
-            print("C_s:", C_s.shape)
+            
+
+            pred_s = simulate((A_new, B_s, C_s, D_s),  inputs) #A_s, B_s, C_s, D_s
+            print("C_s shape:", C_s.shape)
+
+            # save
+            log_dir = os.path.join(base_out, "logs")
+            os.makedirs(log_dir, exist_ok=True)
+            log_path = os.path.join(log_dir, f"event_{i+1}.txt")
+
+            with open(log_path, "w") as log_file:
+                def logprint(*args, **kwargs):
+                    print(*args, **kwargs)
+                    print(*args, **kwargs, file=log_file)
+
+                logprint(f"[Event {i+1}] True freqs(Hz):", np.round(true_freqs, 3))
+                for mode_idx in range(Phi_true.shape[1]):
+                    logprint(f"  True Mode {mode_idx+1} Shape:", np.round(Phi_true[:, mode_idx], 4))
+
+                logprint("Phi_srim:\n", np.round(Phi_srim, 4))
+                logprint("Phi_det:\n",  np.round(Phi_det,  4))
+                logprint("Phi_n4sid:\n", np.round(Phi_n4sid, 4))
+
+                logprint("MAC(SRIM):\n", np.round(mac_srim, 3))
+                logprint("MAC(Det.):\n",  np.round(mac_det,  3))
+                logprint("MAC(n4sid):\n", np.round(mac_n4sid, 3))
+
+                logprint("A_s Eigenvalues:",      np.round(np.linalg.eigvals(A_s), 5))
+                logprint("A_stable Eigenvalues:", np.round(np.linalg.eigvals(A_stable), 5))
+                logprint("A_lmi Eigenvalues:",    np.round(np.linalg.eigvals(A_lmi), 5))
+
+                logprint("C_s shape:", C_s.shape)
+
+                logprint(f"\n Log saved to: {log_path}")
             
             windowed_plot = True # **True or False
             
