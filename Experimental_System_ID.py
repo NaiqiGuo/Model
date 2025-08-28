@@ -547,8 +547,7 @@ def phi_output(A, C):
     V_normalized = normalize_Psi(V)
     # V_normalized = normalize_Psi(V_modified)
     print(f"{V_normalized=}")
-    Phi = condense_eigvecs(V_normalized)
-    return Phi, eigvals
+    return V_normalized, eigvals
        
 
 if __name__ == "__main__":
