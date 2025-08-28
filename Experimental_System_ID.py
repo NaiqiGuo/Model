@@ -27,6 +27,7 @@ import math
 from pathlib import Path
 import quakeio
 import numpy as np
+import scipy as sp
 from mdof.utilities.config import extract_channels
 import csv
 import os
@@ -525,14 +526,29 @@ def normalize_Psi(Psi):
         normed_Psi[:,i] = normalize_v(v)
     return normed_Psi
 
+def condense_eigvecs(eigvecs):
+    n = eigvecs.shape[0]
+    condensed = np.zeros((n,n))
+    for i in range(n):
+        assert np.allclose(eigvecs[:,2*i],eigvecs[:,2*i+1]), "The columns are not paired. Cannot condense."
+        condensed[:,i] = eigvecs[:,2*i]
+    return condensed
+
 def phi_output(A, C):
-    eigvals, U = np.linalg.eig(np.asarray(A, dtype=complex))
-    idx = np.where(np.imag(eigvals) > -1e-12)[0]
-    eigvals_sel = eigvals[idx]
-    U_sel = U[:, idx]
-    V = C @ U_sel
-    Phi = normalize_Psi(V)  
-    return Phi, eigvals_sel
+    eigvals, U = sp.linalg.eig(A)
+    condition = np.linalg.cond(A)
+    print(f"{condition=}")
+    print(f"{U=}")
+    print(f"{eigvals=}")
+    V = C @ U
+    # get rid of conjugates and duplicates from V. 
+    # use np.allclose(): phi1==phi2 --> np.allclose(phi1,phi2)
+    V_modified = ... 
+    V_normalized = normalize_Psi(V)
+    # V_normalized = normalize_Psi(V_modified)
+    print(f"{V_normalized=}")
+    Phi = condense_eigvecs(V_normalized)
+    return Phi, eigvals
        
 
 if __name__ == "__main__":
