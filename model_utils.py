@@ -530,9 +530,7 @@ def periods_from_A(A, dt):
     omega = np.abs(np.angle(eigvals)) / dt  # rad/s
     freqs = omega / (2 * np.pi)
     periods = 1 / freqs
-    # Sort and take first three 
-    periods = np.sort(periods)[:3]
-    return periods
+    return np.sort(periods)
 
 
 def save_all_methods_to_csv(i, methods_dict):

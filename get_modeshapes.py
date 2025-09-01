@@ -9,6 +9,7 @@ import csv
 import os
 
 output_dir = "event_modes_outputs"
+ABCD_dir = "event_outputs_ABCD" 
 os.makedirs(output_dir, exist_ok=True)
 
 # Load event data
@@ -53,13 +54,25 @@ for event_id in range(1, num_events+1):
     method_modes = {}
     method_macs = {}
     for algo in algos:
-        with open( f"system_{algo}_{event_id:02d}.pkl", "rb") as f:
+        output_dir = "event_modes_outputs"
+        pkl_path = os.path.join(ABCD_dir, f"system_{algo}_{event_id:02d}.pkl")
+        if not os.path.exists(pkl_path):
+            print(f"{pkl_path} pass")
+            continue
+        with open(pkl_path, "rb") as f:
             A, B, C, D = pickle.load(f)
         A_stable = stabilize_discrete(A)
         # Optional: post-process A (choose only one)
         #A_stable = stabilize_with_lmi(A)                
         #A_stable = stabilize_by_radius_clipping(A)
+        eigvals_all, _ = np.linalg.eig(np.asarray(A_stable, dtype=complex))
+        print(f"\nAll eigenvalues of {algo.upper()} for event {event_id}:")
+        print(eigvals_all) #print(np.round(eigvals_all, 6))
         Phi, eigvals = phi_output(A_stable, C)
+        freqs = np.abs(np.angle(eigvals)) / (2 * np.pi * dt)
+        sort_idx = np.argsort(freqs)
+        eigvals = eigvals[sort_idx]
+        Phi = Phi[:, sort_idx]
         mac = mac_matrix(Phi_true_norm, Phi)
         method_modes[algo] = Phi
         method_macs[algo] = mac
@@ -81,12 +94,18 @@ for event_id in range(1, num_events+1):
             writer.writerow([f"True Mode {i+1}"] + list(Phi_true[:, i]))
         # mode shapes
         for algo in algos:
+            if algo not in method_modes:
+                print(f"{algo} no modeshape,pass event {event_id}")
+                continue
             writer.writerow([f"{algo.upper()} Mode Shapes"])
             Phi = method_modes[algo]
             for i in range(Phi.shape[1]):
                 writer.writerow([f"{algo.upper()} Mode {i+1}"] + list(Phi[:, i]))
         # MAC
         for algo in algos:
+            if algo not in method_modes:
+                print(f"{algo} no modeshape, pass event {event_id}")
+                continue
             writer.writerow([f"{algo.upper()} MAC vs True"])
             MAC = method_macs[algo]
             for row in MAC:

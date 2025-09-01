@@ -34,6 +34,7 @@ error_matrix = np.zeros((num_channels, num_algos, num_events))
 for event_id in range(1, num_events+1):
     inputs, dt = get_inputs(event_id-1, events=events, input_channels=input_channels, scale=2.54)
     nt = inputs.shape[1]
+    
     model = create_model(
         column="forceBeamColumn",
         girder="forceBeamColumn",
@@ -41,14 +42,22 @@ for event_id in range(1, num_events+1):
         inputy=inputs[1],
         dt=dt
     )
-    disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
+    try:
+        disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
+    except RuntimeError:
+        continue
     outputs = get_outputs(disp)
     outputs = outputs[:, 1:]
     time = np.arange(nt) * dt
     
+    param_dir = "event_outputs_ABCD"
     for sys_idx, sys_name in enumerate(sys_names):
         # Load identified system parameters for this event and algorithm
-        with open(f"system_{sys_name}_{event_id:02d}.pkl", "rb") as f:
+        pkl_path = os.path.join(param_dir, f"system_{sys_name}_{event_id:02d}.pkl")
+        if not os.path.exists(pkl_path):
+            print(f"{pkl_path} pass")
+            continue
+        with open(pkl_path, "rb") as f:
             A, B, C, D = pickle.load(f)
         # Stabilize A (modify here if you want to try LMI or radius clipping)
         A_stable = stabilize_discrete(A)
@@ -110,39 +119,40 @@ print("Error matrix saved to predictions/error_matrix.npz")
 # Visualize error matrix as heatmap for each algorithm
 os.makedirs("predictions", exist_ok=True)
 channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
+print(error_matrix.shape)
 
-fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
-im = ax.imshow(error_matrix,
-            vmin=0, vmax=error_matrix.max(),
-            aspect='auto',
-            origin='lower',
-            cmap='viridis')
-cbar = fig.colorbar(im, ax=ax, extend='max')
-cbar.set_label("Absolute error norm", fontsize=14)
+algo_names = [name.upper() for name in sys_names]
+for i, algo in enumerate(algo_names):
+    fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
+    im = ax.imshow(error_matrix[:, i, :],
+                   vmin=0, vmax=np.nanmax(error_matrix),
+                   aspect='auto',
+                   origin='lower',
+                   cmap='viridis')
+    cbar = fig.colorbar(im, ax=ax, extend='max')
+    cbar.set_label("Absolute error norm", fontsize=14)
+    ax.set_xlabel("Event index", fontsize=14)
+    ax.set_ylabel("Channel", fontsize=14)
+    ax.set_xticks(np.arange(num_events))
+    ax.set_xticklabels(np.arange(1, num_events+1), rotation=45, fontsize=12)
+    ax.set_yticks(np.arange(len(channel_labels)))
+    ax.set_yticklabels(channel_labels, fontsize=12)
+    ax.set_title(f"{algo} Error heatmap (windowed part)", fontsize=16)
+    for ch in range(len(channel_labels)):
+        for ev in range(num_events):
+            val = error_matrix[ch, i, ev]
+            if val <= 9999:
+                color = 'black' if val > error_matrix.max()/2 else 'white'
+                ax.text(
+                    ev, ch,
+                    f"{val:.2f}",
+                    ha='center', va='center',
+                    color=color,
+                    fontsize=6
+                )
+    plt.savefig(os.path.join("predictions", f"error_heatmap_{algo}.png"), dpi=300)
+    plt.close(fig)
 
-ax.set_xlabel("Event index", fontsize=14)
-ax.set_ylabel("Channel", fontsize=14)
-ax.set_xticks(np.arange(num_events))
-ax.set_xticklabels(np.arange(1, num_events+1), rotation=45, fontsize=12)
-ax.set_yticks(np.arange(num_channels))
-ax.set_yticklabels(channel_labels, fontsize=12)
+print("All error heatmaps for each algorithm have been saved in the predictions folder.")
 
-ax.set_title("Error heatmap (windowed part)", fontsize=16) 
-for ch in range(num_channels):
-    for ev in range(num_events):
-        val = error_matrix[ch, ev]
-        if val <= 9999:
-            color = 'black' if val > error_matrix.max()/2 else 'white'
-            ax.text(
-                ev, ch,
-                f"{val:.2f}",
-                ha='center', va='center',
-                color=color,
-                fontsize=6
-            )
-
-plt.savefig(os.path.join(output_dir, "error_heatmap.png"), dpi=300)
-plt.close(fig)
-    
-print("All prediction plots and error heatmaps saved.")
 

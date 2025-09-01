@@ -31,12 +31,11 @@ input_channels = [1,3]
 output_dir = "event_outputs_ABCD"
 os.makedirs(output_dir, exist_ok=True)
 
-selected_indices = [19, 20, 21]  # 处理第20、21、22个事件（下标从0开始）
+# selected_indices = [19, 20, 21]  # 20、21、22（from 0）
+# for i in selected_indices:
+#     event = events[i]
 
-for i in selected_indices:
-    event = events[i]
-
-#for i, event in enumerate(events):
+for i, event in enumerate(events):
     inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
     print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
     model = create_model(column="forceBeamColumn",
@@ -83,7 +82,7 @@ for i in selected_indices:
     A_n, B_n, C_n, D_n, *rest = system_n4sid
     system_n4sid = (A_n, B_n, C_n, D_n)
     with open(os.path.join(output_dir, f"system_n4sid_{i+1:02d}.pkl"), "wb") as f:
-        pickle.dump(system_srim, f)
+        pickle.dump(system_n4sid, f)
     print(f"Saved system_n4sid_{i+1:02d}.pkl")
 
     # ---- DETERMINISTIC ----
@@ -91,7 +90,7 @@ for i in selected_indices:
     A_d, B_d, C_d, D_d, *rest = system_det
     system_det = (A_d, B_d, C_d, D_d)
     with open(os.path.join(output_dir, f"system_det_{i+1:02d}.pkl"), "wb") as f:
-        pickle.dump(system_srim, f)
+        pickle.dump(system_det, f)
     print(f"Saved system_det_{i+1:02d}.pkl")
 
     # ---- OKID ----
