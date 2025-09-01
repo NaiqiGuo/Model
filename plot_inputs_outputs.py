@@ -30,7 +30,7 @@ if __name__ == "__main__":
     input_labels = ['Channel 1', 'Channel 3']
     output_labels = ['1X', '2X', '3X', '1Y', '2Y', '3Y']
 
-    num_events = min(4, len(events))
+    num_events = min(16, len(events))
     for i in range(num_events):
         print(f"Event {i+1}")
         inputs, dt = get_inputs(i, events, input_channels, scale=2.54)

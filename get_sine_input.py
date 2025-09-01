@@ -13,3 +13,7 @@ if __name__ == "__main__":
     with open("sines.pkl", "wb") as f:
         pickle.dump({'inputs': inputs, 'dt': dt}, f)
     print(f"Saved sine input with shape {inputs.shape} and dt {dt} to sines.pkl")
+
+
+    np.savetxt("sine_inputs.csv", inputs.T, delimiter=",", header="sin_x,sin_y", comments='')
+    print(f"Saved sine input with shape {inputs.shape} and dt {dt} to sine_inputs.csv")

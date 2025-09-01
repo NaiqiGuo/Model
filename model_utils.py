@@ -522,6 +522,7 @@ def phi_output(A, C):
     Phi = normalize_Psi(V)  
     return Phi, eigvals_sel
 
+
 def periods_from_A(A, dt):
     eigvals = np.linalg.eigvals(A)
     idx = np.abs(eigvals) < 1.0 
@@ -532,3 +533,43 @@ def periods_from_A(A, dt):
     # Sort and take first three 
     periods = np.sort(periods)[:3]
     return periods
+
+
+def save_all_methods_to_csv(i, methods_dict):
+    """
+    methods_dict: {'srim': (A,B,C,D), 'n4sid': (A,B,C,D), ...}
+    """
+    out_dir = "event_outputs_ABCD"
+    os.makedirs(out_dir, exist_ok=True)
+    filename = os.path.join(out_dir, f"event_modes_{i+1:02d}.csv")
+    with open(filename, "w") as f:
+        for method, (A, B, C, D) in methods_dict.items():
+            for matrix_name, M in zip(['A','B','C','D'], [A, B, C, D]):
+                f.write(f"# {method.upper()}-{matrix_name}\n")
+                np.savetxt(f, M, delimiter=",", fmt="%.8e")
+                f.write("\n")  # Add an empty line for readability
+    print(f"Saved all system matrices for event {i+1} to {filename}")
+
+
+def save_event_modes_to_csv(event_id, Phi_true, method_modes, method_macs, algos, filename):
+    # method_modes: {'srim': Phi_srim, ...}  每个方法的Phi, shape=(dof, n_modes)
+    # method_macs:  {'srim': MAC_srim, ...}  每个方法的MAC,  shape=(n_modes, n_modes)
+    with open(filename, "w", newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([f"Event {event_id} True Mode Shapes"])
+        for i in range(Phi_true.shape[1]):
+            writer.writerow([f"True Mode {i+1}"] + list(Phi_true[:, i]))
+
+        for algo in algos:
+            writer.writerow([f"{algo.upper()} Mode Shapes"])
+            Phi = method_modes[algo]
+            for i in range(Phi.shape[1]):
+                writer.writerow([f"{algo.upper()} Mode {i+1}"] + list(Phi[:, i]))
+
+        for algo in algos:
+            writer.writerow([f"{algo.upper()} MAC vs True"])
+            MAC = method_macs[algo]
+            for row in MAC:
+                writer.writerow([""] + list(row))
+        
+        writer.writerow([])  
