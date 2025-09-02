@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from model_utils import (
-get_inputs, create_model, analyze, get_outputs,
+get_inputs, create_model, analyze, get_outputs, stabilize_with_lmi,stabilize_by_radius_clipping,
 simulate, stabilize_discrete, intensity_bounds, truncate_by_bounds
 )
 
