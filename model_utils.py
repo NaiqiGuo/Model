@@ -472,7 +472,9 @@ def get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3, solver='-
             rows.append([model.nodeEigenvector(node, k+1, dof) for k in range(n)])
     Phi_true = np.array(rows, dtype=float)              # (6, nmodes)
     Phi_true /= (np.linalg.norm(Phi_true, axis=0, keepdims=True) + 1e-12)
-
+    idx = np.argsort(freqs_hz)         
+    freqs_hz = freqs_hz[idx]
+    Phi_true = Phi_true[:, idx]       
     return freqs_hz, Phi_true
 
 

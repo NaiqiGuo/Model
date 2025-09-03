@@ -8,7 +8,7 @@ simulate, stabilize_discrete, intensity_bounds, truncate_by_bounds
 )
 
 num_events = 21
-sys_names = ["srim", "n4sid", "det"]
+sys_names = ["srim"] #, "det", "n4sid", "det"
 num_algos = len(sys_names)
 windowed_plot = True  # Set True for windowed L2 error, False for all samples
 
@@ -50,7 +50,7 @@ for event_id in range(1, num_events+1):
     outputs = outputs[:, 1:]
     time = np.arange(nt) * dt
     
-    param_dir = "event_outputs_ABCD"
+    param_dir = "event_outputs_ABCDk"
     for sys_idx, sys_name in enumerate(sys_names):
         # Load identified system parameters for this event and algorithm
         pkl_path = os.path.join(param_dir, f"system_{sys_name}_{event_id:02d}.pkl")
@@ -60,9 +60,9 @@ for event_id in range(1, num_events+1):
         with open(pkl_path, "rb") as f:
             A, B, C, D = pickle.load(f)
         # Stabilize A (modify here if you want to try LMI or radius clipping)
-        A_stable = stabilize_discrete(A)
+        #A_stable = stabilize_discrete(A)
         # Optional: post-process A (choose only one)
-        #A_stable = stabilize_with_lmi(A)                
+        A_stable = stabilize_with_lmi(A)                
         #A_stable = stabilize_by_radius_clipping(A)
         # Simulate predicted outputs
         pred = simulate((A_stable, B, C, D), inputs)
@@ -91,7 +91,7 @@ for event_id in range(1, num_events+1):
         fig, axs = plt.subplots(1, 2, figsize=(12,4), constrained_layout=True)
         floors = [0,1,2]  # 1F, 2F, 3F
 
-        # X方向
+        # X
         ax = axs[0]
         for f in floors:
             ax.plot(time_trunc, outputs_trunc[2*f],  '--', label=f"True Fl{f+1} X")
@@ -99,7 +99,7 @@ for event_id in range(1, num_events+1):
         ax.set(title=f"{sys_name.upper()} — X direction", xlabel="Time (s)", ylabel="Disp")
         ax.legend()
 
-        # Y方向
+        # Y
         ax = axs[1]
         for f in floors:
             ax.plot(time_trunc, outputs_trunc[2*f+1], '--', label=f"True Fl{f+1} Y")

@@ -68,14 +68,16 @@ for i, event in enumerate(events):
         i           = 250,
         j           = 4400
     )
+    # i           = 250,
+    # j           = 4400
 
     # ---- SRIM ----
-    system_srim = sysid(inputs, outputs, method='srim', **options)
-    A_s, B_s, C_s, D_s, *rest = system_srim
-    system_srim = (A_s, B_s, C_s, D_s)
-    with open(os.path.join(output_dir, f"system_srim_{i+1:02d}.pkl"), "wb") as f:
-        pickle.dump(system_srim, f)
-    print(f"Saved system_srim_{i+1:02d}.pkl")
+    # system_srim = sysid(inputs, outputs, method='srim', **options)
+    # A_s, B_s, C_s, D_s, *rest = system_srim
+    # system_srim = (A_s, B_s, C_s, D_s)
+    # with open(os.path.join(output_dir, f"system_srim_{i+1:02d}.pkl"), "wb") as f:
+    #     pickle.dump(system_srim, f)
+    # print(f"Saved system_srim_{i+1:02d}.pkl")
 
     # ---- N4SID ----
     system_n4sid = sysid(inputs, outputs, method='n4sid', **options)
@@ -86,12 +88,12 @@ for i, event in enumerate(events):
     print(f"Saved system_n4sid_{i+1:02d}.pkl")
 
     # ---- DETERMINISTIC ----
-    system_det = sysid(inputs, outputs, method='deterministic', **options)
-    A_d, B_d, C_d, D_d, *rest = system_det
-    system_det = (A_d, B_d, C_d, D_d)
-    with open(os.path.join(output_dir, f"system_det_{i+1:02d}.pkl"), "wb") as f:
-        pickle.dump(system_det, f)
-    print(f"Saved system_det_{i+1:02d}.pkl")
+    # system_det = sysid(inputs, outputs, method='deterministic', **options)
+    # A_d, B_d, C_d, D_d, *rest = system_det
+    # system_det = (A_d, B_d, C_d, D_d)
+    # with open(os.path.join(output_dir, f"system_det_{i+1:02d}.pkl"), "wb") as f:
+    #     pickle.dump(system_det, f)
+    # print(f"Saved system_det_{i+1:02d}.pkl")
 
     # ---- OKID ----
     # system_okid = sysid(inputs, outputs, method='okid-era', **options)
@@ -102,9 +104,9 @@ for i, event in enumerate(events):
     # print(f"Saved system_okid_{i+1:02d}.pkl")
 
     methods_dict = {
-    'srim': (A_s, B_s, C_s, D_s),
+    #'srim': (A_s, B_s, C_s, D_s),
     'n4sid': (A_n, B_n, C_n, D_n),
-    'det': (A_d, B_d, C_d, D_d),
+    #'det': (A_d, B_d, C_d, D_d),
     #'okid': (A_o, B_o, C_o, D_o)
     }
     save_all_methods_to_csv(i, methods_dict)

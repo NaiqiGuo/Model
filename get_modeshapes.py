@@ -9,7 +9,7 @@ import csv
 import os
 
 output_dir = "event_modes_outputs"
-ABCD_dir = "event_outputs_ABCD" 
+ABCD_dir = "event_outputs_ABCDk" 
 os.makedirs(output_dir, exist_ok=True)
 
 # Load event data
@@ -53,6 +53,7 @@ for event_id in range(1, num_events+1):
     print(f"\n===== Event {event_id} =====")
     method_modes = {}
     method_macs = {}
+    method_freqs = {}
     for algo in algos:
         output_dir = "event_modes_outputs"
         pkl_path = os.path.join(ABCD_dir, f"system_{algo}_{event_id:02d}.pkl")
@@ -71,11 +72,13 @@ for event_id in range(1, num_events+1):
         Phi, eigvals = phi_output(A_stable, C)
         freqs = np.abs(np.angle(eigvals)) / (2 * np.pi * dt)
         sort_idx = np.argsort(freqs)
+        freqs = freqs[sort_idx]   
         eigvals = eigvals[sort_idx]
         Phi = Phi[:, sort_idx]
         mac = mac_matrix(Phi_true_norm, Phi)
         method_modes[algo] = Phi
         method_macs[algo] = mac
+        method_freqs[algo] = freqs
         print(f"\n{algo.upper()} MAC:\n", np.round(mac, 3))
         for mode_idx in range(Phi_true.shape[1]):
             print(f"Event {event_id} Mode {mode_idx+1}:")
@@ -88,6 +91,9 @@ for event_id in range(1, num_events+1):
     filename = os.path.join(output_dir, f"event_modes_{event_id:02d}.csv")
     with open(filename, "w", newline='') as f:
         writer = csv.writer(f)
+        #True freqs
+        writer.writerow(["True Natural Frequencies"])
+        writer.writerow([""] + list(true_freqs))
         # True mode shapes
         writer.writerow([f"Event {event_id} True Mode Shapes"])
         for i in range(Phi_true.shape[1]):
@@ -101,6 +107,10 @@ for event_id in range(1, num_events+1):
             Phi = method_modes[algo]
             for i in range(Phi.shape[1]):
                 writer.writerow([f"{algo.upper()} Mode {i+1}"] + list(Phi[:, i]))
+            freqs = method_freqs[algo]
+            writer.writerow([f"{algo.upper()} Natural Frequencies"])
+            writer.writerow([""] + list(freqs))
+
         # MAC
         for algo in algos:
             if algo not in method_modes:
