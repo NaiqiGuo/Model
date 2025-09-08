@@ -252,7 +252,6 @@ def create_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None
 
     # Define beam elements
     # --------------------
-
     # Geometric transformation for beams
     beamTransf = 2
     model.geomTransf("Linear", beamTransf, 1.0, 1.0, 0.0)
@@ -293,6 +292,201 @@ def create_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None
     model.mass(14, (m, m, 0.0, 0.0, 0.0, i))
     model.mass(19, (m, m, 0.0, 0.0, 0.0, i))
 
+    # Define gravity loads
+    # create a Plain load pattern with Constant scaling
+    model.pattern("Plain", 1, "Constant")
+
+    for i in [5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18]:
+        model.load(i, (0.0, 0.0, -p, 0.0, 0.0, 0.0), pattern=1)
+
+    # set rayleigh damping factors
+    model.rayleigh(0.0, 0.0, 0.0, 0.0018)
+
+    # Define earthquake excitation
+    # ----------------------------
+    # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
+    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
+
+    # Define the excitation using the given ground motion records
+    #                         tag dir         accel series args
+    model.pattern("UniformExcitation", 2, 1, accel=2)
+    model.pattern("UniformExcitation", 3, 2, accel=3)
+
+    return model
+
+def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None, dt=None):
+    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
+        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
+
+    if column is None:
+        column = "forceBeamColumn"
+
+    # create Model in three-dimensions with 6 DOF/node
+    model = xara.Model(ndm=3, ndf=6)
+
+    # Geometry
+    # ---------------
+
+    # Set parameters for model geometry
+    h  = 144.0;      # Story height
+    by = 240.0;      # Bay width in Y-direction
+    bx = 240.0;      # Bay width in X-direction
+
+    # Create nodes
+    #            tag    X        Y       Z 
+    model.node( 1, (-bx/2.0,  by/2.0,   0.0))
+    model.node( 2, ( bx/2.0,  by/2.0,   0.0))
+    model.node( 3, ( bx/2.0, -by/2.0,   0.0))
+    model.node( 4, (-bx/2.0, -by/2.0,   0.0))
+
+    model.node( 5, (-bx/2.0,  by/2.0,     h))
+    model.node( 6, ( bx/2.0,  by/2.0,     h))
+    model.node( 7, ( bx/2.0, -by/2.0,     h))
+    model.node( 8, (-bx/2.0, -by/2.0,     h))
+
+    model.node(10, (-bx/2.0,  by/2.0, 2.0*h))
+    model.node(11, ( bx/2.0,  by/2.0, 2.0*h))
+    model.node(12, ( bx/2.0, -by/2.0, 2.0*h))
+    model.node(13, (-bx/2.0, -by/2.0, 2.0*h))
+
+    model.node(15, (-bx/2.0,  by/2.0, 3.0*h))
+    model.node(16, ( bx/2.0,  by/2.0, 3.0*h))
+    model.node(17, ( bx/2.0, -by/2.0, 3.0*h))
+    model.node(18, (-bx/2.0, -by/2.0, 3.0*h))
+
+
+    # Set base constraints
+    #      tag DX DY DZ RX RY RZ
+    model.fix(1, (1, 1, 1, 1, 1, 1))
+    model.fix(2, (1, 1, 1, 1, 1, 1))
+    model.fix(3, (1, 1, 1, 1, 1, 1))
+    model.fix(4, (1, 1, 1, 1, 1, 1))
+
+    # Define materials for nonlinear columns
+    # --------------------------------------
+    # CONCRETE
+    fc = 4.0
+    Ec = 57000.0*math.sqrt(fc*1000.0)/1000.0
+
+    # Core concrete (confined)
+    #                                 tag  f'c   epsc0  f'cu  epscu
+    model.uniaxialMaterial("Concrete01", 1, -5.0, -0.005, -3.5, -0.02)
+
+    # Cover concrete (unconfined)
+    #                                 tag  f'c   epsc0  f'cu  epscu
+    model.uniaxialMaterial("Concrete01", 2, -fc, -0.002, 0.0, -0.006)
+
+    # STEEL
+    fy = 60.0;       # Yield stress
+    Es = 30000.0;    # Young's modulus
+    # Reinforcing steel 
+    #                                tag fy  E0  b
+    model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
+
+    # Column parameters
+    h  = 18.0
+    GJ = 1.0E10
+    colSec = 1
+    beamSec = 2
+
+    # Call the RCsection procedure to generate the column section
+    #                              id  h  b cover core cover steel nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
+    ReinforcedRectangle(model, colSec, h, h, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
+
+    # Define material properties for elastic beams
+    # Using beam depth of 24 and width of 18
+    Abeam = 18.0*24.0
+    # "Cracked" second moments of area
+    Ibeamzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
+    Ibeamyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
+
+    # Define elastic section for beams
+    #                       tag     E    A      Iz       Iy     G    J
+    model.section("Elastic", beamSec, Ec, Abeam, Ibeamzz, Ibeamyy, GJ, 1.0)
+
+    # Define column elements
+    # ----------------------
+    # Geometric transformation for columns
+    colTransf = 1
+    model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
+
+    # Number of column integration points (sections)
+    itg_col = 1
+    npts_col = 4
+    model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
+
+
+    #                   tag ndI ndJ transfTag integrationTag
+    model.element(column,  1, ( 1,  5), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  2, ( 2,  6), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  3, ( 3,  7), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  4, ( 4,  8), transform=colTransf, section=colSec, shear=0)
+
+    model.element(column,  5, ( 5, 10), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  6, ( 6, 11), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  7, ( 7, 12), transform=colTransf, section=colSec, shear=0)
+    model.element(column,  8, ( 8, 13), transform=colTransf, section=colSec, shear=0)
+
+    model.element(column,  9, (10, 15), transform=colTransf, section=colSec, shear=0)
+    model.element(column, 10, (11, 16), transform=colTransf, section=colSec, shear=0)
+    model.element(column, 11, (12, 17), transform=colTransf, section=colSec, shear=0)
+    model.element(column, 12, (13, 18), transform=colTransf, section=colSec, shear=0)
+
+    # Define beam elements
+    # --------------------
+
+    # Geometric transformation for beams
+    beamTransf = 2
+    model.geomTransf("Linear", beamTransf, 1.0, 1.0, 0.0)
+
+
+    # Create the beam elements
+    #                   tag (ndI ndJ) transfTag integrationTag
+    model.element(girder, 13, ( 5,  6), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 14, ( 6,  7), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 15, ( 7,  8), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 16, ( 8,  5), transform=beamTransf, section=beamSec, shear=0)
+
+    model.element(girder, 17, (10, 11), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 18, (11, 12), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 19, (12, 13), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 20, (13, 10), transform=beamTransf, section=beamSec, shear=0)
+
+    model.element(girder, 21, (15, 16), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 22, (16, 17), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 23, (17, 18), transform=beamTransf, section=beamSec, shear=0)
+    model.element(girder, 24, (18, 15), transform=beamTransf, section=beamSec, shear=0)
+
+    # Define gravity loads
+    # --------------------
+    # Gravity load applied at each corner node
+    # 10% of column capacity
+    p = 0.1*fc*h*h
+
+    # Mass lumped at retained nodes
+    m = (4.0*p)/units.gravity
+
+    # Rotary inertia of floor about retained node
+    i = m*(bx*bx + by*by)/12.0
+
+
+    # Set mass at the nodes
+    #         tag   MX MY MZ   RX   RY   RZ
+    model.mass( 5, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 6, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 7, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 8, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+
+    model.mass( 10, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 11, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 12, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 13, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+
+    model.mass( 15, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 16, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 17, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 18, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
     # Define gravity loads
     # create a Plain load pattern with Constant scaling
     model.pattern("Plain", 1, "Constant")
@@ -403,7 +597,7 @@ def get_outputs(displacements):
     Returns outputs: ndarray, shape=(6, nt), row order:
       [1F X, 1F Y, 2F X, 2F Y, 3F X, 3F Y]
     """
-    floors = [9, 14, 19]
+    floors = [5, 10, 15] #[9, 14, 19]
     rows = []
     for node in floors:
         arr = np.array(displacements[node])  # shape (nt+1, 6)
@@ -517,7 +711,13 @@ def normalize_Psi(Psi):
 
 def phi_output(A, C):
     eigvals, U = np.linalg.eig(np.asarray(A, dtype=complex))
-    idx = np.where(np.imag(eigvals) > -1e-12)[0]
+    angles = np.abs(np.angle(eigvals))
+    idx = np.where(
+        (np.abs(eigvals) < 1 - 1e-10) & 
+        #(np.abs(eigvals) > 0.05) & 
+        (np.imag(eigvals) > -1e-12)&
+        (angles > 0.02)
+        )[0]
     eigvals_sel = eigvals[idx]
     U_sel = U[:, idx]
     V = C @ U_sel

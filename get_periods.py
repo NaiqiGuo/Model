@@ -3,7 +3,7 @@ import numpy as np
 import csv
 import os
 from model_utils import create_model, get_true_modes_xara, get_inputs, get_outputs
-from model_utils import stabilize_discrete, periods_from_A, analyze, phi_output
+from model_utils import stabilize_discrete, periods_from_A, analyze, phi_output, create_frame_model
 
 # get true frequency
 with open("events.pkl", "rb") as f:
@@ -12,14 +12,26 @@ input_channels = [1, 3]
 inputs, dt = get_inputs(0, events=events, input_channels=input_channels, scale=2.54)
 nt = inputs.shape[1]
 
-model = create_model(column="forceBeamColumn", girder="forceBeamColumn", inputx=inputs[0], inputy=inputs[1], dt=dt)
-disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
+# model = create_model(column="forceBeamColumn", girder="forceBeamColumn", inputx=inputs[0], inputy=inputs[1], dt=dt)
+# disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
+# outputs = get_outputs(disp)
+# outputs = outputs[:, 1:]
+# freqs_true, _ = get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3)
+# periods_true = 1 / freqs_true
+# print("True structure periods (s):", np.round(periods_true, 4))
+
+model = create_frame_model(column="elasticBeamColumn",
+                                girder="elasticBeamColumn",
+                                inputx=inputs[0],
+                                inputy=inputs[1],
+                                dt=dt)
+disp = analyze(model, output_nodes=[5, 10, 15], nt=nt, dt=dt)
 outputs = get_outputs(disp)
 outputs = outputs[:, 1:]
-
-freqs_true, _ = get_true_modes_xara(model, floor_nodes=(9,14,19), dofs=(1,2), n=3)
+freqs_true, _ = get_true_modes_xara(model, floor_nodes=(5,10,15), dofs=(1,2), n=3)
 periods_true = 1 / freqs_true
 print("True structure periods (s):", np.round(periods_true, 4))
+
 
 num_events = 21
 sys_names = ["srim", "n4sid", "det"]
@@ -44,8 +56,11 @@ for event_id in range(1, num_events+1):
         # Optional: post-process A (choose only one)
         #A_stable = stabilize_with_lmi(A)                
         #A_stable = stabilize_by_radius_clipping(A)     
-        A_stable = stabilize_discrete(A)                
+        A_stable, indices = stabilize_discrete(A, verbose=False, list_filtered_modes=True)                
         Phi, eigvals = phi_output(A_stable, C)
+        # real_mode_indices = np.unique([i//2 for i in indices]).tolist()
+        # Phi = Phi[:,real_mode_indices] 
+        # eigvals = eigvals[real_mode_indices]
         freqs = np.abs(np.angle(eigvals)) / (2 * np.pi * dt)
         sort_idx = np.argsort(freqs)
         Phi = Phi[:, sort_idx]
