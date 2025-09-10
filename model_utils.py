@@ -325,6 +325,14 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     # create Model in three-dimensions with 6 DOF/node
     model = xara.Model(ndm=3, ndf=6)
 
+    # Geometry and Material Properties
+        # Nodes(location)
+        # Boundary conditions(nodes)
+        # Elements(nodes, material properties,                             geometric transformation)
+                          # non-fiber section elastic (linear)              # linear
+                          # fiber section (linear elastic OR inelastic)     # PDelta
+                                                                            # corotational
+
     # Geometry
     # ---------------
 
@@ -390,9 +398,18 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     colSec = 1
     beamSec = 2
 
-    # Call the RCsection procedure to generate the column section
-    #                              id  h  b cover core cover steel nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
-    ReinforcedRectangle(model, colSec, h, h, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
+    # # Call the RCsection procedure to generate the column section
+    # #                              id  h  b cover core cover steel nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
+    # ReinforcedRectangle(model, colSec, h, h, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
+    # Define material properties for elastic columns
+    # Using column depth of 24 and width of 18
+    Acol = 18.0*24.0
+    # "Cracked" second moments of area
+    Icolzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
+    Icolyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
+    # Define elastic section for columns
+    #                       tag     E    A      Iz       Iy     G    J
+    model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, GJ, 1.0)
 
     # Define material properties for elastic beams
     # Using beam depth of 24 and width of 18
