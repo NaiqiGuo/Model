@@ -516,7 +516,7 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
         model.load(i, (0.0, 0.0, -p, 0.0, 0.0, 0.0), pattern=1)
 
     # set rayleigh damping factors
-    model.rayleigh(0.0, 0.0, 0.0, 0.0018)
+    model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
 
     # Define earthquake excitation
     # ----------------------------
@@ -618,7 +618,7 @@ def get_outputs(displacements):
     Returns outputs: ndarray, shape=(6, nt), row order:
       [1F X, 1F Y, 2F X, 2F Y, 3F X, 3F Y]
     """
-    floors = [5, 10, 15] #[9, 14, 19]
+    floors = [9, 14, 19] #[9, 14, 19]  [5, 10, 15]
     rows = []
     for node in floors:
         arr = np.array(displacements[node])  # shape (nt+1, 6)
