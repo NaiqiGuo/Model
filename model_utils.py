@@ -25,6 +25,8 @@ import dccp
 import pickle
 import tqdm
 
+import warnings
+
 LOAD_EVENTS = False
 
 def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBars, barArea, nfCoreY, nfCoreZ, nfCoverY, nfCoverZ, GJ):
@@ -457,6 +459,8 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     beamTransf = 2
     model.geomTransf("Linear", beamTransf, 1.0, 1.0, 0.0)
 
+    if girder == "forceBeamColumn":
+        warnings.warn("warning: forceBeamColumn specified for girder but section type is elastic.")
 
     # Create the beam elements
     #                   tag (ndI ndJ) transfTag integrationTag
