@@ -10,6 +10,8 @@ from mdof.prediction import get_error_new
 from mdof.utilities.testing import align_signals
 import scienceplots
 plt.style.use(["science"])
+from scipy.signal import correlate, correlation_lags
+
 
 num_events = 21
 sys_names = ["srim"] #, "det", "n4sid", "det"
@@ -93,9 +95,34 @@ for event_id in range(1, num_events+1):
         #     error_matrix[ch, sys_idx, event_id-1] = num
         #     print(f"Event {event_id} {sys_name.upper()} Ch {ch}: ‖pred‖={pred_norm:.3e}, ‖diff‖={num:.3e}, ‖true‖={den:.3e}, ratio={ratio:.3f}")
 
-        _, ytrue_aln, ypred_aln, time_aln = align_signals(
+        max_lag_samp_global, ytrue_aln, ypred_aln, time_aln = align_signals(
             outputs_trunc, pred_trunc, times=time_trunc, verbose=False, max_lag_allowed=None
         )
+
+        lags_samp = np.empty(num_channels, dtype=int)
+        for ch in range(num_channels):
+            s1 = outputs_trunc[ch]
+            s2 = pred_trunc[ch]
+            corr = correlate(s1, s2, mode='full')
+            lags = correlation_lags(len(s1), len(s2), mode='full')
+            lags_samp[ch] = int(lags[np.argmax(corr)])
+
+        max_lag_allowed_sec = 1.0
+        for ch in range(num_channels):
+            max_lag_samp = int(lags_samp[ch])
+            lag_sec = max_lag_samp * dt
+            ch_name = f"Ch{ch}" 
+            if abs(lag_sec) > max_lag_allowed_sec:
+                print(f"[ALIGN] E{event_id:02d} {ch_name}: LARGE LAG {lag_sec:+.3f}s "
+                    f"({max_lag_samp:+d} samples) — exceeds ±{max_lag_allowed_sec:.1f}s limit. NO ALIGN APPLIED.")
+            elif max_lag_samp == 0:
+                print(f"[ALIGN] E{event_id:02d} {ch_name}: no shift (already aligned).")
+            else:
+                direction = "ypred originally lagged ytrue" if max_lag_samp > 0 else "ypred originally led ytrue"
+                print(f"[ALIGN] E{event_id:02d} {ch_name}: shifted {max_lag_samp:+d} samples "
+                    f"({lag_sec:+.4f} s) → {direction}")
+        
+                
         for ch in range(num_channels):
             y_t = ytrue_aln[ch]
             y_p = ypred_aln[ch]
@@ -104,7 +131,7 @@ for event_id in range(1, num_events+1):
                     y_true=y_t,
                     y_pred=y_p,
                     normalized=True,
-                    denominator_norm=2,
+                    denominator_norm='infinity',
                     numerator_norm=2,
                     averaged=True,
                     averaging_mode='mean'
@@ -165,7 +192,7 @@ for i, algo in enumerate(algo_names):
     ax.set_xticklabels(np.arange(1, num_events+1), rotation=45, fontsize=12)
     ax.set_yticks(np.arange(len(channel_labels)))
     ax.set_yticklabels(channel_labels, fontsize=12)
-    ax.set_title(f"{algo} Error heatmap (windowed part)", fontsize=16)
+    #ax.set_title(f"{algo} Error heatmap (windowed part)", fontsize=16)
     half = np.nanmax(data_display) / 2.0
     for ch in range(len(channel_labels)):
         for ev in range(num_events):
@@ -183,57 +210,67 @@ channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
 print("error_matrix shape:", error_matrix.shape)
 
 algo_names = [name.upper() for name in sys_names]
-DROP10 = False  # 改成 True 可跳过第10事件标签
+DROP10 = False  
 
-# 统一色条范围（忽略 NaN）
+# Unified colorbar range (ignore NaN)
 vmax_global = np.nanmax(error_matrix)
 print(f"Global color scale vmax = {vmax_global:.4f}")
 
 for i, algo in enumerate(algo_names):
     fig, ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
 
-    # 替换 NaN → 0（仅显示）
+    # Replace NaN with 0 (for visualization only)
     data = np.nan_to_num(error_matrix[:, i, :], nan=0.0)
 
-    # 绘制热图
+    # Plot heatmap
     im = ax.imshow(
         data,
-        vmin=0, vmax=vmax_global,   # 统一色条范围
-        aspect='equal',             # 方块比例
+        #vmin=0, vmax=vmax_global, 
+        vmin=0, vmax=1.2,  
+        aspect='equal',             
         origin='lower',
         cmap='viridis'
     )
 
-    # 色条设置
-    cbar = fig.colorbar(im, ax=ax, extend='max', fraction=0.02, pad=0.04)
+    # Colorbar settings
+    cbar = fig.colorbar(im, 
+                        ax=ax, 
+                        extend='max', 
+                        fraction=0.02, 
+                        pad=0.04
+                        )
     cbar.set_label(
         "$\\epsilon$:$L_2$ Error (mean) \n(normalized)",
         fontsize=20, fontname='serif'
     )
     cbar.ax.tick_params(labelsize=15)
 
-    # 坐标轴与字体
+    # Axis labels and font
     ax.set_xlabel("Event index", fontsize=22)
     ax.set_ylabel("Channel", fontsize=22)
     ax.set_xticks(np.arange(num_events))
     ax.set_yticks(np.arange(len(channel_labels)))
     ax.set_yticklabels(channel_labels, fontsize=15)
 
-    # X轴标签
+    # X-axis labels
     if DROP10:
         ax.set_xticklabels(np.delete(np.arange(1, num_events + 2), 9),
                            rotation=45, fontsize=15)
     else:
         ax.set_xticklabels(np.arange(1, num_events + 1),
                            rotation=45, fontsize=15)
-    # Tick 样式
+
+    # Tick style
     ax.tick_params(axis='both', which='major',
                    direction='out', length=3, width=0.8,
                    top=False, right=False, pad=6)
     ax.tick_params(which='minor', direction='out', length=0)
-    # 标题
+
+    # Title (optional)
     # ax.set_title(f"{algo} Error heatmap (windowed part)",
     #              fontsize=18, fontname='serif')
+
+    # Save figure
     if DROP10:
         fig.savefig(os.path.join("predictions", f"{algo}_heatmap_drop10.png"), dpi=300)
     else:
@@ -242,5 +279,3 @@ for i, algo in enumerate(algo_names):
     plt.close(fig)
 
 print("All error heatmaps for each algorithm have been saved in the predictions folder.")
-
-
