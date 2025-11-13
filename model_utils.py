@@ -117,7 +117,7 @@ def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBar
 
 
 
-def create_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None, dt=None):
+def create_model(column=None, girder="elasticBeamColumn", inputx=None, inputy=None, dt=None):
     if np.all(inputx is None) or np.all(inputy is None) or dt is None:
         raise ValueError("Missing inputx, inputy, or dt. Exiting.")
 
@@ -204,14 +204,14 @@ def create_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None
     model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
 
     # Column parameters
-    h  = 18.0
+    h_col  = 18.0
     GJ = 1.0E10
     colSec = 1
     beamSec = 2
 
     # Call the RCsection procedure to generate the column section
-    #                              id  h  b cover core cover steel nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
-    ReinforcedRectangle(model, colSec, h, h, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
+    #                              id    h     b  cover coreid coverid steelid nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
+    ReinforcedRectangle(model, colSec, h_col, h_col, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
 
     # Define material properties for elastic beams
     # Using beam depth of 24 and width of 18
@@ -317,15 +317,45 @@ def create_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None
 
     return model
 
-def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, inputy=None, dt=None):
+def J_rect(b, h):
+    b, h = float(b), float(h)
+    if b > h:
+        b, h = h, b
+    return b * h**3 * (1/3 - 0.21*b/h * (1 - b**4/(12*h**4)))
+
+def cosine_taper(arr, dt, T_ramp=0.4):
+    arr = np.asarray(arr, dtype=float).copy()
+    n = max(1, int(T_ramp / dt))
+    w = 0.5 * (1 - np.cos(np.linspace(0, np.pi, n)))
+    arr[:n] *= w
+    return arr
+
+def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inputy=None, dt=None):
     if np.all(inputx is None) or np.all(inputy is None) or dt is None:
         raise ValueError("Missing inputx, inputy, or dt. Exiting.")
+    
+    if girder != "elasticBeamColumn":
+        raise ValueError("Only elasticBeamColumn allowed for girders")
 
     if column is None:
         column = "forceBeamColumn"
 
     # create Model in three-dimensions with 6 DOF/node
     model = xara.Model(ndm=3, ndf=6)
+
+    try:
+        # If model.meta is already a dictionary, use it directly
+        if not isinstance(getattr(model, "meta", None), dict):
+            model.meta = {}
+    except Exception:
+        # If the meta is a property or a partial and cannot be directly assigned a value, a new dictionary will be forcibly attached
+        try:
+            object.__setattr__(model, "meta", {})
+        except Exception:
+            object.__setattr__(model, "_chrystal_meta", {})
+            model.meta = model._chrystal_meta
+
+    model.meta["column_elems"] = []
 
     # Geometry and Material Properties
         # Nodes(location)
@@ -373,6 +403,7 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     model.fix(3, (1, 1, 1, 1, 1, 1))
     model.fix(4, (1, 1, 1, 1, 1, 1))
 
+
     # Define materials for nonlinear columns
     # --------------------------------------
     # CONCRETE
@@ -394,47 +425,50 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     #                                tag fy  E0  b
     model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
 
+
+    # Define column elements
+    # ----------------------
+
     # Column parameters
-    h  = 18.0
+    h_col  = 18.0
     GJ = 1.0E10
     colSec = 1
     beamSec = 2
 
-    # # Call the RCsection procedure to generate the column section
-    # #                              id  h  b cover core cover steel nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
-    # ReinforcedRectangle(model, colSec, h, h, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
-    # Define material properties for elastic columns
-    # Using column depth of 24 and width of 18
-    Acol = 18.0*24.0
-    # "Cracked" second moments of area
-    Icolzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
-    Icolyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
-    # Define elastic section for columns
-    #                       tag     E    A      Iz       Iy     G    J
-    model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, GJ, 1.0)
+    if column == "forceBeamColumn":
+        # # Call the RCsection procedure to generate the column section
+        # #                              id  h    b    cover coreid coverid steelid nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
+        ReinforcedRectangle(model, colSec, h_col, h_col, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
+        # Number of column integration points (sections)
+        itg_col = 1
+        npts_col = 4
+        model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
 
-    # Define material properties for elastic beams
-    # Using beam depth of 24 and width of 18
-    Abeam = 18.0*24.0
-    # "Cracked" second moments of area
-    Ibeamzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
-    Ibeamyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
+    elif column == "elasticBeamColumn":
+        # Define material properties for elastic columns
+        # Using column depth of 24 and width of 18
+        Acol = h_col*h_col
+        # "Cracked" second moments of area
+        # Icolzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
+        # Icolyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
+        Icolzz = 0.5*1.0/12.0*18.0*pow(18.0,3)
+        Icolyy = 0.5*1.0/12.0*18.0*pow(18.0,3)
+        
+        nu = 0.2
+        Gc = Ec / (2 * (1 + nu))  # shear modulus
 
-    # Define elastic section for beams
-    #                       tag     E    A      Iz       Iy     G    J
-    model.section("Elastic", beamSec, Ec, Abeam, Ibeamzz, Ibeamyy, GJ, 1.0)
+        Jcol = J_rect(18.0, 18.0)
 
-    # Define column elements
-    # ----------------------
+        # Define elastic section for columns
+        #                       tag     E    A      Iz       Iy     G    J
+        model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, Gc, Jcol)
+        #model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, GJ, 1.0)
+    else:
+        raise ValueError("Only elasticBeamColumn or forceBeamColumn allowed for columns")
+
     # Geometric transformation for columns
     colTransf = 1
     model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
-
-    # Number of column integration points (sections)
-    itg_col = 1
-    npts_col = 4
-    model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
-
 
     #                   tag ndI ndJ transfTag integrationTag
     model.element(column,  1, ( 1,  5), transform=colTransf, section=colSec, shear=0)
@@ -452,15 +486,31 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     model.element(column, 11, (12, 17), transform=colTransf, section=colSec, shear=0)
     model.element(column, 12, (13, 18), transform=colTransf, section=colSec, shear=0)
 
+    # === <<< ADD: 把“柱单元 tag”登记到列表（1~12 就是上面这些柱） ===
+    for ele_tag in range(1, 13):
+        model.meta["column_elems"].append(ele_tag)
+
     # Define beam elements
     # --------------------
 
+    # Define material properties for elastic beams
+    # Using beam depth of 24 and width of 18
+    Abeam = 18.0*24.0
+    # "Cracked" second moments of area
+    Ibeamzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
+    Ibeamyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
+
+    nu = 0.2
+    Gb = Ec / (2 * (1 + nu))
+
+    Jbeam = J_rect(18.0, 24.0)
+    # Define elastic section for beams
+    #                       tag     E    A      Iz       Iy     G    J
+    model.section("Elastic", beamSec, Ec, Abeam, Ibeamzz, Ibeamyy, Gb, Jbeam)
+
     # Geometric transformation for beams
     beamTransf = 2
-    model.geomTransf("Linear", beamTransf, 1.0, 1.0, 0.0)
-
-    if girder == "forceBeamColumn":
-        warnings.warn("warning: forceBeamColumn specified for girder but section type is elastic.")
+    model.geomTransf("Linear", beamTransf, 0.0, 0.0, 1.0)
 
     # Create the beam elements
     #                   tag (ndI ndJ) transfTag integrationTag
@@ -479,11 +529,91 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     model.element(girder, 23, (17, 18), transform=beamTransf, section=beamSec, shear=0)
     model.element(girder, 24, (18, 15), transform=beamTransf, section=beamSec, shear=0)
 
+
+    # ================== helpers (ADD THIS BLOCK) ==================
+    # meta: Column element list, end nodes, geometric information (for eps0/kappa and fiber queries)
+    model.meta = getattr(model, "meta", {})
+    model.meta["column_elems"] = list(range(1, 13))  # 1~12
+
+    column_conn = {
+        1:(1,5),  2:(2,6),  3:(3,7),  4:(4,8),
+        5:(5,10), 6:(6,11), 7:(7,12), 8:(8,13),
+        9:(10,15),10:(11,16),11:(12,17),12:(13,18)
+    }
+    model.meta["column_conn"] = column_conn
+    model.meta["column_len"]  = {ele: h for ele in model.meta["column_elems"]}  
+    model.meta["section_depth"] = float(h_col)  # Section height (for edge strain eps_edge = eps0 ± kappa*h/2）
+
+    # ---- elastic query: Approximate eps0, kappa ---- using end node displacement/rotation Angle
+    # Agreement: The axial direction of the column is Z (UZ), and the curvature is calculated as the difference in rotation angles at the end nodes divided by the length.
+    # Note: For vertical components, bending in the X-direction corresponds to "rotation around the Y-axis (RY)", and bending in the Y-direction corresponds to "rotation around the X-axis (RX)" (if replacement is needed, simply change the idx mapping).
+    def _query_section_eps0(ele):
+        ni, nj = model.meta["column_conn"][ele]
+        uzi = model.nodeDisp(ni)[2]   # UZ at i
+        uzj = model.nodeDisp(nj)[2]   # UZ at j
+        L   = model.meta["column_len"][ele]
+        return (uzj - uzi) / L
+
+    def _query_section_kappa(ele, axis='x'):
+        # To match the common conventions of vertical columns: 
+        # X-direction displacement dominant → bending around the Y-axis; Y-direction displacement dominance → bending around the X-axis
+        # Therefore, here we map axis='x' to RY and axis='y' to RX (if your local coordinates are different, you can switch them as needed).
+        idx_map = {'x':4, 'y':3, 'z':5}  # RX=3, RY=4, RZ=5（0-based）
+        idx = idx_map[axis]
+        ni, nj = model.meta["column_conn"][ele]
+        thi = model.nodeDisp(ni)[idx]
+        thj = model.nodeDisp(nj)[idx]
+        L   = model.meta["column_len"][ele]
+        return (thj - thi) / L
+
+    model.query_section_eps0  = _query_section_eps0
+    model.query_section_kappa = _query_section_kappa
+
+    # elastic query
+    def _query_fiber_strain(ele, sec_idx, y, z):
+        try:
+            return float(model.eleResponse(ele, "section", int(sec_idx), "fiber",
+                                           float(y), float(z), "strain"))
+        except Exception:
+            return None
+
+    def _query_material_strain(ele, sec_idx, mat_tag):
+        try:
+            return float(model.eleResponse(ele, "section", int(sec_idx), "material",
+                                           int(mat_tag), "strain"))
+        except Exception:
+            return None
+
+    model.query_fiber_strain    = _query_fiber_strain
+    model.query_material_strain = _query_material_strain
+
+    # start strain_record record_strain_step
+    sr = {
+        "enabled": True,
+        "inelastic": bool(column == "forceBeamColumn"),
+        "section_depth": model.meta["section_depth"],
+        "time": [],
+        "eps0":  {ele: [] for ele in model.meta["column_elems"]},
+        "kappa": {ele: [] for ele in model.meta["column_elems"]},
+        "conc_edge_max": {ele: [] for ele in model.meta["column_elems"]},
+        "steel_max":     {ele: [] for ele in model.meta["column_elems"]},
+        "edge_fibers": {},
+        "steel_mats":  {},
+    }
+    if sr["inelastic"]:
+        hsec = model.meta["section_depth"]
+        for ele in model.meta["column_elems"]:
+            sr["edge_fibers"][ele] = [(0, +hsec/2.0, 0.0),
+                                      (0, -hsec/2.0, 0.0)]
+            sr["steel_mats"][ele] = []
+    model.meta["strain_record"] = sr
+    # ================== END helpers (ADD THIS BLOCK) ==================
+
     # Define gravity loads
     # --------------------
     # Gravity load applied at each corner node
     # 10% of column capacity
-    p = 0.1*fc*h*h
+    p = 0.1*fc*h_col*h_col /4.0
 
     # Mass lumped at retained nodes
     m = (4.0*p)/units.gravity
@@ -521,13 +651,38 @@ def create_frame_model(column=None, girder="forceBeamColumn", inputx=None, input
     # Define earthquake excitation
     # ----------------------------
     # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
-    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
+    inputx_t = cosine_taper(inputx, dt, T_ramp=0.4)
+    inputy_t = cosine_taper(inputy, dt, T_ramp=0.4)
+    model.timeSeries("Path", 2, values=inputx_t.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy_t.tolist(), dt=dt, factor=1.0)
+    
+    # model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    # model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
 
     # Define the excitation using the given ground motion records
     #                         tag dir         accel series args
     model.pattern("UniformExcitation", 2, 1, accel=2)
     model.pattern("UniformExcitation", 3, 2, accel=3)
+
+    
+    # 最小化：总是开启记录；是否为非线性取决于 column 类型
+    sr = {
+        "enabled": True,
+        "inelastic": bool(column == "forceBeamColumn"),
+        "section_depth": float(h_col),   # 用于 elastic: eps_edge = eps0 + kappa*h/2
+        "time": [],
+        "eps0":          {ele: [] for ele in model.meta["column_elems"]},  # elastic
+        "kappa":         {ele: [] for ele in model.meta["column_elems"]},  # elastic
+        "conc_edge_max": {ele: [] for ele in model.meta["column_elems"]},  # inelastic
+        "steel_max":     {ele: [] for ele in model.meta["column_elems"]},  # inelastic
+        "edge_fibers": {},   # ele -> [(sec_idx, y, z)] 
+        "steel_mats": {},    # ele -> [(sec_idx, steel_mat_tag)]  
+    }
+    if sr["inelastic"]:
+        for ele in model.meta["column_elems"]:
+            sr["edge_fibers"][ele] = [(0, +h_col/2.0, 0.0), (0, -h_col/2.0, 0.0)]
+            sr["steel_mats"][ele] = []   
+    model.meta["strain_record"] = sr
 
     return model
 
@@ -559,9 +714,56 @@ def save_event_io(i, inputs, outputs, dt, out_dir="event_data"):
         for idx in range(nt):
             row = [time[idx]] + [outputs[r,idx] for r in range(6)]
             writer.writerow(row)
+
+
+def record_strain_step(model, t):
+    """
+    Use it once per time rhythm
+    - elasticBeamColumn: Record eps0 and kappa (then use eps_edge=eps0+kappa*h/2)
+    - Nonlinearity (forceBeamColumn+fiber) : Record the "maximum strain of edge concrete fibers" and the "maximum strain of reinforcing bar fibers"
+    """
+    sr = getattr(model, "meta", {}).get("strain_record", None)
+    if not sr or not sr.get("enabled", False):
+        return
+
+    # record time
+    sr["time"].append(float(t))
+
+    # elastic/inelastic
+    if not sr.get("inelastic", False):
+        # ---- elastic：eps0, kappa ----
+        for ele in model.meta["column_elems"]:
+            eps0  = getattr(model, "query_section_eps0",  lambda e: np.nan)(ele)
+            kappa = getattr(model, "query_section_kappa", lambda e, axis='x': np.nan)(ele, axis='x')
+            sr["eps0"][ele].append(float(eps0)  if eps0  is not None else np.nan)
+            sr["kappa"][ele].append(float(kappa) if kappa is not None else np.nan)
+        return
+
+    # ---- Nonlinearity: take the maximum strain ---- for the edge concrete and reinforcing bars
+    for ele in model.meta["column_elems"]:
+        # Concrete edge fibers (±h/2,z=0)
+        max_conc = None
+        for (sec_idx, y, z) in sr.get("edge_fibers", {}).get(ele, []):
+            val = getattr(model, "query_fiber_strain", lambda *a, **k: None)(
+                ele, sec_idx=sec_idx, y=y, z=z
+            )
+            if val is not None:
+                max_conc = val if max_conc is None else max(max_conc, val)
+        sr["conc_edge_max"][ele].append(float(max_conc) if max_conc is not None else np.nan)
+
+        # Reinforcing bar material fiber
+        max_steel = None
+        for (sec_idx, mat_tag) in sr.get("steel_mats", {}).get(ele, []):
+            val = getattr(model, "query_material_strain", lambda *a, **k: None)(
+                ele, sec_idx=sec_idx, mat_tag=mat_tag
+            )
+            if val is not None:
+                max_steel = val if max_steel is None else max(max_steel, val)
+        sr["steel_max"][ele].append(float(max_steel) if max_steel is not None else np.nan)
+
     
 
-def analyze(model, output_nodes, nt, dt):
+def analyze(model, output_nodes, nt, dt, step_callback=None):
     # ----------------------------
     # 1. Configure the analysis
     # ----------------------------
@@ -598,6 +800,10 @@ def analyze(model, output_nodes, nt, dt):
         node: [model.nodeDisp(node)] for node in output_nodes
     }
 
+    if callable(step_callback):
+        step_callback(model, 0.0)
+
+
     # Perform nt analysis steps with a time step of dt
     print(f"Analysis Progress ({nt} timesteps)")
     for i in tqdm.tqdm(range(nt)):
@@ -608,6 +814,10 @@ def analyze(model, output_nodes, nt, dt):
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))
+
+        if callable(step_callback):
+           
+            step_callback(model, float(model.getTime()))
            
     return displacements
 
@@ -618,7 +828,7 @@ def get_outputs(displacements):
     Returns outputs: ndarray, shape=(6, nt), row order:
       [1F X, 1F Y, 2F X, 2F Y, 3F X, 3F Y]
     """
-    floors = [9, 14, 19] #[9, 14, 19]  [5, 10, 15]
+    floors = [5, 10, 15] #[9, 14, 19]  [5, 10, 15]
     rows = []
     for node in floors:
         arr = np.array(displacements[node])  # shape (nt+1, 6)
@@ -773,8 +983,8 @@ def save_all_methods_to_csv(i, methods_dict):
 
 
 def save_event_modes_to_csv(event_id, Phi_true, method_modes, method_macs, algos, filename):
-    # method_modes: {'srim': Phi_srim, ...}  每个方法的Phi, shape=(dof, n_modes)
-    # method_macs:  {'srim': MAC_srim, ...}  每个方法的MAC,  shape=(n_modes, n_modes)
+    # method_modes: {'srim': Phi_srim, ...}  Phi, shape=(dof, n_modes)
+    # method_macs:  {'srim': MAC_srim, ...}  MAC,  shape=(n_modes, n_modes)
     with open(filename, "w", newline='') as f:
         writer = csv.writer(f)
         writer.writerow([f"Event {event_id} True Mode Shapes"])
@@ -794,3 +1004,95 @@ def save_event_modes_to_csv(event_id, Phi_true, method_modes, method_macs, algos
                 writer.writerow([""] + list(row))
         
         writer.writerow([])  
+
+
+def plot_q4_max_strain(sr, model, title, html_base, PLOTLY_OK=True):
+    """
+    sr = model.meta["strain_record"]
+    Generate the time history curve of the maximum edge concrete strain/reinforcement strain (nonlinear) or edge strain (elastic).
+    """
+    if not PLOTLY_OK:
+        return
+    import numpy as np, plotly.graph_objects as go, os
+
+    t = np.asarray(sr["time"], float)
+    cols = model.meta["column_elems"]
+
+    if not sr.get("inelastic", False):
+        # ELASTIC: eps_edge = eps0 + kappa*h/2
+        h = float(sr.get("section_depth", np.nan))
+        stack = []
+        for ele in cols:
+            eps0  = np.asarray(sr["eps0"][ele],  float)
+            kappa = np.asarray(sr["kappa"][ele], float)
+            edge  = eps0 + kappa * (h/2.0)
+            stack.append(edge)
+        edge_max = np.nanmax(np.vstack(stack), axis=0) if stack else np.full_like(t, np.nan)
+
+        fig = go.Figure()
+        fig.add_scatter(x=t, y=edge_max, mode="lines", name="Max Edge Strain (elastic)")
+        fig.update_layout(title=title, xaxis_title="Time (s)", yaxis_title="Strain")
+        fig.write_html(html_base + "_elastic_edge.html", include_plotlyjs="cdn")
+        return
+
+    # INELASTIC: concrete edge max & steel max
+    conc_stack, steel_stack = [], []
+    for ele in cols:
+        conc_stack.append(np.asarray(sr["conc_edge_max"][ele], float))
+        steel_stack.append(np.asarray(sr["steel_max"][ele],     float))
+    conc_max  = np.nanmax(np.vstack(conc_stack),  axis=0) if conc_stack  else np.full_like(t, np.nan)
+    steel_max = np.nanmax(np.vstack(steel_stack), axis=0) if steel_stack else np.full_like(t, np.nan)
+
+    f1 = go.Figure(); f2 = go.Figure()
+    f1.add_scatter(x=t, y=conc_max,  mode="lines", name="Max Concrete Edge Strain")
+    f2.add_scatter(x=t, y=steel_max, mode="lines", name="Max Steel Strain")
+    f1.update_layout(title=title+" — Concrete", xaxis_title="Time (s)", yaxis_title="Strain")
+    f2.update_layout(title=title+" — Steel",    xaxis_title="Time (s)", yaxis_title="Strain")
+    f1.write_html(html_base + "_inelastic_conc.html",  include_plotlyjs="cdn")
+    f2.write_html(html_base + "_inelastic_steel.html", include_plotlyjs="cdn")
+
+
+def get_natural_periods(model, nmodes=3):
+    """
+    Return a periodic array T (in s) of length nmodes.
+    Suppose the eigen/modal interface returns the eigenvalue λ = ω^2 (OpenSees style).
+    If your interface directly returns ω (rad/s), simply change the sqrt line below to not take sqrt.
+    """
+    import numpy as np
+
+    evals = None
+    for api in ("modal_eigenvalues", "eigenvalues", "eigen"):
+        if hasattr(model, api):
+            try:
+                evals = getattr(model, api)(nmodes)
+                break
+            except Exception:
+                pass
+    if evals is None:
+        raise RuntimeError("No modal eigenvalue API found on model (tried modal_eigenvalues/eigenvalues/eigen).")
+
+    evals = np.asarray(evals, float)            # λ = ω^2
+    omegas = np.sqrt(np.clip(evals, 0.0, None)) # ω
+    T = 2*np.pi / np.where(omegas > 1e-12, omegas, np.nan)
+    return T
+
+
+def plot_deltaT_across_events(event_ids, dT_pct_list, plotly_dir, title="ΔT/T after EQ (Inelastic)"):
+    """
+    Draw the "percentage change of each event period" of the nonlinear model (by default, the first mode is taken, or any sequence you pass in).
+    """
+    import os
+    if not event_ids or not dT_pct_list:
+        return
+    try:
+        import plotly.graph_objects as go
+    except Exception:
+        return
+    fig = go.Figure()
+    fig.add_bar(x=[f"E{e:02d}" for e in event_ids], y=dT_pct_list, name="ΔT/T (%)")
+    fig.update_layout(title=title, xaxis_title="Event", yaxis_title="Change (%)")
+    os.makedirs(plotly_dir, exist_ok=True)
+    outp = os.path.join(plotly_dir, "q5_dT_mode1_across_events.html")
+    fig.write_html(outp, include_plotlyjs="cdn")
+    print("[Q5] Saved →", outp)
+
