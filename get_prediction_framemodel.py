@@ -38,6 +38,7 @@ os.makedirs(output_dir, exist_ok=True)
 
 inputs, dt = get_inputs(0, events=events, input_channels=input_channels, scale=2.54)
 nt = inputs.shape[1]
+print(inputs.shape)
 model = create_frame_model(
     column="elasticBeamColumn",
     girder="elasticBeamColumn",
@@ -55,7 +56,7 @@ num_channels = outputs.shape[0]
 error_matrix = np.full((num_channels, num_algos, num_events), np.nan)
 
 DO_Q5 = True
-DO_INELASTIC = True  
+DO_INELASTIC = False  
 dT_mode1_inel = []   # Collect the first mode’s ΔT/T (%) and plot it across events
 ev_ids_inel  = []
 
