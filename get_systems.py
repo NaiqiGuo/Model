@@ -29,7 +29,7 @@ print(f"Total events loaded: {len(events)}")
 # Choose inputs channels [x,y]
 input_channels = [1,3]
 
-output_dir = "event_outputs_ABCD_frame_model"
+output_dir = "event_outputs_ABCD_frame_model_elastic"
 os.makedirs(output_dir, exist_ok=True)
 
 # selected_indices = [19, 20, 21]  # 20、21、22（from 0）
@@ -39,8 +39,8 @@ os.makedirs(output_dir, exist_ok=True)
 for i, event in enumerate(events):
     inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
     print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
-    # model = create_model(column="forceBeamColumn",
-    #                             girder="forceBeamColumn",
+    # model = create_frame_model(column="forceBeamColumn",
+    #                             girder="elasticBeamColumn",
     #                             inputx=inputs[0],
     #                             inputy=inputs[1],
     #                             dt=dt)

@@ -437,7 +437,7 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
         itg_col = 1
         npts_col = 4
         model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
-
+        
     elif column == "elasticBeamColumn":
         # Define material properties for elastic columns
         # Using column depth of 24 and width of 18
@@ -459,7 +459,7 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
         #model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, GJ, 1.0)
     else:
         raise ValueError("Only elasticBeamColumn or forceBeamColumn allowed for columns")
-
+    print('111 passed')
     # Geometric transformation for columns
     colTransf = 1
     model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
@@ -480,7 +480,7 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     model.element(column, 11, (12, 17), transform=colTransf, section=colSec, shear=0)
     model.element(column, 12, (13, 18), transform=colTransf, section=colSec, shear=0)
 
-    # === <<< ADD: 把“柱单元 tag”登记到列表（1~12 就是上面这些柱） ===
+    
     for ele_tag in range(1, 13):
         model.meta["column_elems"].append(ele_tag)
 
@@ -656,25 +656,7 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     model.pattern("UniformExcitation", 2, 1, accel=2)
     model.pattern("UniformExcitation", 3, 2, accel=3)
 
-    
-    # 最小化：总是开启记录；是否为非线性取决于 column 类型
-    sr = {
-        "enabled": True,
-        "inelastic": bool(column == "forceBeamColumn"),
-        "section_depth": float(h_col),   # 用于 elastic: eps_edge = eps0 + kappa*h/2
-        "time": [],
-        "eps0":          {ele: [] for ele in model.meta["column_elems"]},  # elastic
-        "kappa":         {ele: [] for ele in model.meta["column_elems"]},  # elastic
-        "conc_edge_max": {ele: [] for ele in model.meta["column_elems"]},  # inelastic
-        "steel_max":     {ele: [] for ele in model.meta["column_elems"]},  # inelastic
-        "edge_fibers": {},   # ele -> [(sec_idx, y, z)] 
-        "steel_mats": {},    # ele -> [(sec_idx, steel_mat_tag)]  
-    }
-    if sr["inelastic"]:
-        for ele in model.meta["column_elems"]:
-            sr["edge_fibers"][ele] = [(0, +h_col/2.0, 0.0), (0, -h_col/2.0, 0.0)]
-            sr["steel_mats"][ele] = []   
-    model.meta["strain_record"] = sr
+
 
     return model
 
@@ -772,7 +754,7 @@ def analyze(model, output_nodes, nt, dt, step_callback=None):
     # Configure the analysis such that iterations are performed until either:
     # 1. the energy increment is less than 1.0e-14 (success)
     # 2. the number of iterations surpasses 20 (failure)
-    model.test("EnergyIncr", 1.0e-14, 20)
+    model.test("EnergyIncr", 1.0e-14, 40)
 
     # Perform iterations with the Newton-Raphson algorithm
     model.algorithm("Newton")
