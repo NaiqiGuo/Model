@@ -22,7 +22,7 @@ sys_names = ["srim"]
 num_algos = len(sys_names)
 windowed_plot = True
 
-DO_Q5 = True
+DO_Q5 = False
 DO_ELASTIC   = True
 DO_INELASTIC = False
 
@@ -32,7 +32,7 @@ inelastic_output_dir = os.path.join(root_output_dir, "inelastic")
 os.makedirs(elastic_output_dir, exist_ok=True)
 os.makedirs(inelastic_output_dir, exist_ok=True)
 
-# 对应的 Plotly 子目录（分别用来存 elastic / inelastic 的 strain 图和交互图）
+#plotly
 plotly_elastic_dir   = os.path.join(elastic_output_dir, "plotly_html")
 plotly_inelastic_dir = os.path.join(inelastic_output_dir, "plotly_html")
 os.makedirs(plotly_elastic_dir, exist_ok=True)
@@ -72,7 +72,7 @@ error_matrix_inel = np.full((num_channels, num_algos, num_events), np.nan)
 dT_mode1_inel = []   # Collect the first mode’s ΔT/T (%) and plot it across events
 ev_ids_inel  = []
 
-param_dir = "event_outputs_ABCD_frame_model"
+#param_dir = "event_outputs_ABCD_frame_model"
 
 for event_id in range(1, num_events+1):
     inputs, dt = get_inputs(event_id-1, events=events, input_channels=input_channels, scale=2.54)
@@ -142,7 +142,7 @@ for event_id in range(1, num_events+1):
             have_aligned = True
             last_sys_name = sys_name
 
-            # 打印每个通道的 lag（保持原逻辑）
+            
             lags_samp = np.empty(num_channels, dtype=int)
             for ch in range(num_channels):
                 s1 = outputs_trunc[ch]
@@ -184,7 +184,7 @@ for event_id in range(1, num_events+1):
                 error_matrix[ch, sys_idx, event_id - 1] = float(val)
 
             # ---------------------------------------------------------
-            # (8) Qualitative comparison PNG (原封不动)
+            # (8) Qualitative comparison PNG 
             # ---------------------------------------------------------
             fig, axs = plt.subplots(1, 2, figsize=(12,4), constrained_layout=True)
             floors = [0,1,2]
@@ -212,7 +212,7 @@ for event_id in range(1, num_events+1):
             plt.close(fig)
 
         # ---------------------------------------------------------
-        # (9) Q4 Elastic Strain (完全不动)
+        # (9) Q4 Elastic Strain
         # ---------------------------------------------------------
         sr_el = model.meta["strain_record"]
         plot_q4_max_strain(
@@ -223,7 +223,7 @@ for event_id in range(1, num_events+1):
         )
 
         # ---------------------------------------------------------
-        # (11) Interactive Plotly time series （原封不动）
+        # (11) Interactive Plotly time series 
         # ---------------------------------------------------------
         if have_aligned:
             floors = [0, 1, 2]
@@ -554,7 +554,7 @@ if DO_ELASTIC:
         plt.close(fig)
 
     # ---------------------------------------------------------
-    # (13) Heatmap 版本2（统一色条）
+    # (13) Heatmap version2
     # ---------------------------------------------------------
     vmax_global = np.nanmax(error_matrix)
     DROP10 = False

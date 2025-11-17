@@ -9,7 +9,7 @@ import csv
 import os
 
 output_dir = "event_modes_outputs"
-ABCD_dir = "event_outputs_ABCDk" 
+ABCD_dir = "event_outputs_ABCD_frame_model_elastic" 
 os.makedirs(output_dir, exist_ok=True)
 
 # Load event data
@@ -24,8 +24,8 @@ nt = inputs.shape[1]
 
 # Construct the true (reference) structural model
 model = create_model(
-    column="forceBeamColumn",
-    girder="forceBeamColumn",
+    column="elasticBeamColumn",
+    girder="elasticBeamColumn",
     inputx=np.zeros(nt),
     inputy=np.zeros(nt),
     dt=dt

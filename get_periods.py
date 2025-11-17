@@ -46,7 +46,7 @@ with open("system_periods_all.csv", "w", newline="") as f:
 for event_id in range(1, num_events+1):
     print(f"\n===== Event {event_id} =====")
     for sys_name in sys_names:
-        output_dir = "event_outputs_ABCDk"
+        output_dir = "event_outputs_ABCD_frame_model_elastic"
         pkl_path = os.path.join(output_dir, f"system_{sys_name}_{event_id:02d}.pkl")
         if not os.path.exists(pkl_path):
             print(f"{pkl_path} pass")

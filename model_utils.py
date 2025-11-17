@@ -424,7 +424,8 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     # ----------------------
 
     # Column parameters
-    h_col  = 24.0
+    h_col  = 28.0
+    b_col = 28.0
     GJ = 1.0E10
     colSec = 1
     beamSec = 2
@@ -432,7 +433,7 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     if column == "forceBeamColumn":
         # # Call the RCsection procedure to generate the column section
         # #                              id  h    b    cover coreid coverid steelid nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
-        ReinforcedRectangle(model, colSec, h_col, h_col, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
+        ReinforcedRectangle(model, colSec, h_col, b_col, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
         # Number of column integration points (sections)
         itg_col = 1
         npts_col = 4
@@ -441,17 +442,17 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     elif column == "elasticBeamColumn":
         # Define material properties for elastic columns
         # Using column depth of 24 and width of 18
-        Acol = h_col*h_col
+        Acol = b_col * h_col
         # "Cracked" second moments of area
         # Icolzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
         # Icolyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
-        Icolzz = 0.5*1.0/12.0*24.0*pow(24.0,3)
-        Icolyy = 0.5*1.0/12.0*24.0*pow(24.0,3)
+        Icolzz = 0.5 * (b_col * h_col**3) / 12.0
+        Icolyy = 0.5 * (h_col * b_col**3) / 12.0
         
         nu = 0.2
         Gc = Ec / (2 * (1 + nu))  # shear modulus
 
-        Jcol = J_rect(24.0, 24.0)
+        Jcol = J_rect(b_col, h_col)
 
         # Define elastic section for columns
         #                       tag     E    A      Iz       Iy     G    J
@@ -459,7 +460,6 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
         #model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, GJ, 1.0)
     else:
         raise ValueError("Only elasticBeamColumn or forceBeamColumn allowed for columns")
-    print('111 passed')
     # Geometric transformation for columns
     colTransf = 1
     model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
@@ -605,7 +605,7 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     # --------------------
     # Gravity load applied at each corner node
     # 10% of column capacity
-    p = 0.1*fc*h_col*h_col /4.0
+    p = 0.1*fc*b_col*h_col /4.0
 
     # Mass lumped at retained nodes
     m = (4.0*p)/units.gravity
@@ -656,7 +656,7 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     model.pattern("UniformExcitation", 2, 1, accel=2)
     model.pattern("UniformExcitation", 3, 2, accel=3)
 
-
+    print('111 passed')
 
     return model
 
@@ -754,10 +754,12 @@ def analyze(model, output_nodes, nt, dt, step_callback=None):
     # Configure the analysis such that iterations are performed until either:
     # 1. the energy increment is less than 1.0e-14 (success)
     # 2. the number of iterations surpasses 20 (failure)
-    model.test("EnergyIncr", 1.0e-14, 40)
+    #model.test("EnergyIncr", 1.0e-14, 40)
+    model.test("NormDispIncr", 1.0e-6, 40)
 
     # Perform iterations with the Newton-Raphson algorithm
-    model.algorithm("Newton")
+    #model.algorithm("Newton")
+    model.algorithm("NewtonLineSearch")
 
     # define the integration scheme, the Newmark with gamma=0.5 and beta=0.25
     model.integrator("Newmark", 0.5, 0.25)
