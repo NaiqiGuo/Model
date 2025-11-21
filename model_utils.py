@@ -784,7 +784,7 @@ def analyze(model, output_nodes, nt, dt, n_modes=3):
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))
-        print(model.elements)
+        # print(model.elements)
 
     lambdas_after = model.eigen(n_modes) 
     omega_after = np.sqrt(np.abs(lambdas_after))      

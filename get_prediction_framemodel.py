@@ -57,7 +57,7 @@ model = create_frame_model(
     inputy=inputs[1],
     dt=dt
 )
-disp = analyze(model, output_nodes=[5, 10, 15], nt=nt, dt=dt, step_callback=record_strain_step)
+disp = analyze(model, output_nodes=[5, 10, 15], nt=nt, dt=dt)
 outputs = get_outputs(disp)
 outputs = outputs[:, 1:]
 num_channels = outputs.shape[0]
@@ -93,7 +93,7 @@ for event_id in range(1, num_events+1):
         T_before_el = get_natural_periods(model, nmodes=3) if DO_Q5 else None  
 
         try:
-            disp = analyze(model, output_nodes=[5, 10, 15], nt=nt, dt=dt, step_callback=record_strain_step)
+            disp = analyze(model, output_nodes=[5, 10, 15], nt=nt, dt=dt)
         except RuntimeError:
             continue
 
@@ -214,13 +214,13 @@ for event_id in range(1, num_events+1):
         # ---------------------------------------------------------
         # (9) Q4 Elastic Strain
         # ---------------------------------------------------------
-        sr_el = model.meta["strain_record"]
-        plot_q4_max_strain(
-            sr_el, model,
-            title=f"Event {event_id:02d} — Max Strain (Elastic)",
-            html_base=os.path.join(plotly_elastic_dir, f"event_{event_id:02d}_strain_elastic"),
-            PLOTLY_OK=True
-        )
+        # sr_el = model.meta["strain_record"]
+        # plot_q4_max_strain(
+        #     sr_el, model,
+        #     title=f"Event {event_id:02d} — Max Strain (Elastic)",
+        #     html_base=os.path.join(plotly_elastic_dir, f"event_{event_id:02d}_strain_elastic"),
+        #     PLOTLY_OK=True
+        # )
 
         # ---------------------------------------------------------
         # (11) Interactive Plotly time series 
