@@ -10,13 +10,15 @@ from mdof.utilities.config import Config
 from model_utils import( create_model, get_inputs, analyze, get_outputs, stabilize_with_lmi,
                          stabilize_by_radius_clipping, save_all_methods_to_csv, create_frame_model)
 
+ELASTIC = False
 
 # Load events
 LOAD_EVENTS = False
 if LOAD_EVENTS:
     events = sorted([
         print(file) or quakeio.read(file, exclusions=["*filter*"])
-        for file in list(Path(f"/Users/guonaiqi/Documents/GitHub/mdof_studies/uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+        # for file in list(Path(f"/Users/guonaiqi/Documents/GitHub/mdof_studies/uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+        for file in list(Path(f"../uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
     ], key=lambda event: abs(event["peak_accel"]))
     with open("events.pkl","wb") as f:
         pickle.dump(events,f)
@@ -29,7 +31,10 @@ print(f"Total events loaded: {len(events)}")
 # Choose inputs channels [x,y]
 input_channels = [1,3]
 
-output_dir = "event_outputs_ABCD_frame_model_elastic"
+if ELASTIC:
+    output_dir = "event_outputs_ABCD_frame_model_elastic"
+else:
+    output_dir = "event_outputs_ABCD_frame_model"
 os.makedirs(output_dir, exist_ok=True)
 
 # selected_indices = [19, 20, 21]  # 20、21、22（from 0）
@@ -39,22 +44,25 @@ os.makedirs(output_dir, exist_ok=True)
 for i, event in enumerate(events):
     inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
     print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
-    # model = create_frame_model(column="forceBeamColumn",
-    #                             girder="elasticBeamColumn",
-    #                             inputx=inputs[0],
-    #                             inputy=inputs[1],
-    #                             dt=dt)
-    
-    model = create_frame_model(column="elasticBeamColumn",
-                                girder="elasticBeamColumn",
-                                inputx=inputs[0],
-                                inputy=inputs[1],
-                                dt=dt)
+    if ELASTIC:
+        model = create_frame_model(column="elasticBeamColumn",
+                                    girder="elasticBeamColumn",
+                                    inputx=inputs[0],
+                                    inputy=inputs[1],
+                                    dt=dt)
+    else:
+        model = create_frame_model(column="forceBeamColumn",
+                                    girder="elasticBeamColumn",
+                                    inputx=inputs[0],
+                                    inputy=inputs[1],
+                                    dt=dt)
     
     nt = inputs.shape[1]
     try:
         disp = analyze(model, output_nodes = [5, 10, 15], nt=nt, dt=dt)
-    except RuntimeError:
+    except RuntimeError as e:
+        print(f"error for event {i}:")
+        print(e)
         continue
     outputs = get_outputs(disp)
     outputs = outputs[:, 1:] 

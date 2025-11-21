@@ -424,8 +424,8 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     # ----------------------
 
     # Column parameters
-    h_col  = 28.0
-    b_col = 28.0
+    h_col  = 20.0
+    b_col = 20.0
     GJ = 1.0E10
     colSec = 1
     beamSec = 2
@@ -527,78 +527,58 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     # ================== helpers (ADD THIS BLOCK) ==================
     
 
-    column_conn = {
-        1:(1,5),  2:(2,6),  3:(3,7),  4:(4,8),
-        5:(5,10), 6:(6,11), 7:(7,12), 8:(8,13),
-        9:(10,15),10:(11,16),11:(12,17),12:(13,18)
-    }
-    model.meta["column_conn"] = column_conn
-    model.meta["column_len"]  = {ele: h for ele in model.meta["column_elems"]}  
-    model.meta["section_depth"] = float(h_col)  # Section height (for edge strain eps_edge = eps0 ± kappa*h/2）
+    # column_conn = {
+    #     1:(1,5),  2:(2,6),  3:(3,7),  4:(4,8),
+    #     5:(5,10), 6:(6,11), 7:(7,12), 8:(8,13),
+    #     9:(10,15),10:(11,16),11:(12,17),12:(13,18)
+    # }
+    # model.meta["column_conn"] = column_conn
+    # model.meta["column_len"]  = {ele: h for ele in model.meta["column_elems"]}  
+    # model.meta["section_depth"] = float(h_col)  # Section height (for edge strain eps_edge = eps0 ± kappa*h/2）
 
-    # ---- elastic query: Approximate eps0, kappa ---- using end node displacement/rotation Angle
-    # Agreement: The axial direction of the column is Z (UZ), and the curvature is calculated as the difference in rotation angles at the end nodes divided by the length.
-    # Note: For vertical components, bending in the X-direction corresponds to "rotation around the Y-axis (RY)", and bending in the Y-direction corresponds to "rotation around the X-axis (RX)" (if replacement is needed, simply change the idx mapping).
-    def _query_section_eps0(ele):
-        ni, nj = model.meta["column_conn"][ele]
-        uzi = model.nodeDisp(ni)[2]   # UZ at i
-        uzj = model.nodeDisp(nj)[2]   # UZ at j
-        L   = model.meta["column_len"][ele]
-        return (uzj - uzi) / L
+    # # ---- elastic query: Approximate eps0, kappa ---- using end node displacement/rotation Angle
+    # # Agreement: The axial direction of the column is Z (UZ), and the curvature is calculated as the difference in rotation angles at the end nodes divided by the length.
+    # # Note: For vertical components, bending in the X-direction corresponds to "rotation around the Y-axis (RY)", and bending in the Y-direction corresponds to "rotation around the X-axis (RX)" (if replacement is needed, simply change the idx mapping).
+    # def _query_section_eps0(ele):
+    #     ni, nj = model.meta["column_conn"][ele]
+    #     uzi = model.nodeDisp(ni)[2]   # UZ at i
+    #     uzj = model.nodeDisp(nj)[2]   # UZ at j
+    #     L   = model.meta["column_len"][ele]
+    #     return (uzj - uzi) / L
 
-    def _query_section_kappa(ele, axis='x'):
-        # To match the common conventions of vertical columns: 
-        # X-direction displacement dominant → bending around the Y-axis; Y-direction displacement dominance → bending around the X-axis
-        # Therefore, here we map axis='x' to RY and axis='y' to RX (if your local coordinates are different, you can switch them as needed).
-        idx_map = {'x':4, 'y':3, 'z':5}  # RX=3, RY=4, RZ=5（0-based）
-        idx = idx_map[axis]
-        ni, nj = model.meta["column_conn"][ele]
-        thi = model.nodeDisp(ni)[idx]
-        thj = model.nodeDisp(nj)[idx]
-        L   = model.meta["column_len"][ele]
-        return (thj - thi) / L
+    # def _query_section_kappa(ele, axis='x'):
+    #     # To match the common conventions of vertical columns: 
+    #     # X-direction displacement dominant → bending around the Y-axis; Y-direction displacement dominance → bending around the X-axis
+    #     # Therefore, here we map axis='x' to RY and axis='y' to RX (if your local coordinates are different, you can switch them as needed).
+    #     idx_map = {'x':4, 'y':3, 'z':5}  # RX=3, RY=4, RZ=5（0-based）
+    #     idx = idx_map[axis]
+    #     ni, nj = model.meta["column_conn"][ele]
+    #     thi = model.nodeDisp(ni)[idx]
+    #     thj = model.nodeDisp(nj)[idx]
+    #     L   = model.meta["column_len"][ele]
+    #     return (thj - thi) / L
 
-    model.query_section_eps0  = _query_section_eps0
-    model.query_section_kappa = _query_section_kappa
 
-    # elastic query
-    def _query_fiber_strain(ele, sec_idx, y, z):
-        try:
-            return float(model.eleResponse(ele, "section", int(sec_idx), "fiber",
-                                           float(y), float(z), "strain"))
-        except Exception:
-            return None
-
-    def _query_material_strain(ele, sec_idx, mat_tag):
-        try:
-            return float(model.eleResponse(ele, "section", int(sec_idx), "material",
-                                           int(mat_tag), "strain"))
-        except Exception:
-            return None
-
-    model.query_fiber_strain    = _query_fiber_strain
-    model.query_material_strain = _query_material_strain
-
-    # start strain_record record_strain_step
-    sr = {
-        "enabled": True,
-        "inelastic": bool(column == "forceBeamColumn"),
-        "section_depth": model.meta["section_depth"],
-        "time": [],
-        "eps0":  {ele: [] for ele in model.meta["column_elems"]},
-        "kappa": {ele: [] for ele in model.meta["column_elems"]},
-        "conc_edge_max": {ele: [] for ele in model.meta["column_elems"]},
-        "steel_max":     {ele: [] for ele in model.meta["column_elems"]},
-        "edge_fibers": {},
-        "steel_mats":  {},
-    }
-    if sr["inelastic"]:
-        hsec = model.meta["section_depth"]
-        for ele in model.meta["column_elems"]:
-            sr["edge_fibers"][ele] = [(0, +hsec/2.0, 0.0),
-                                      (0, -hsec/2.0, 0.0)]
-            sr["steel_mats"][ele] = []
-    model.meta["strain_record"] = sr
+    # # start strain_record record_strain_step
+    # sr = {
+    #     "enabled": True,
+    #     "inelastic": bool(column == "forceBeamColumn"),
+    #     "section_depth": model.meta["section_depth"],
+    #     "time": [],
+    #     "eps0":  {ele: [] for ele in model.meta["column_elems"]},
+    #     "kappa": {ele: [] for ele in model.meta["column_elems"]},
+    #     "conc_edge_max": {ele: [] for ele in model.meta["column_elems"]},
+    #     "steel_max":     {ele: [] for ele in model.meta["column_elems"]},
+    #     "edge_fibers": {},
+    #     "steel_mats":  {},
+    # }
+    # if sr["inelastic"]:
+    #     hsec = model.meta["section_depth"]
+    #     for ele in model.meta["column_elems"]:
+    #         sr["edge_fibers"][ele] = [(0, +hsec/2.0, 0.0),
+    #                                   (0, -hsec/2.0, 0.0)]
+    #         sr["steel_mats"][ele] = []
+    # model.meta["strain_record"] = sr
     # ================== END helpers (ADD THIS BLOCK) ==================
 
     # Define gravity loads
@@ -655,8 +635,6 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     #                         tag dir         accel series args
     model.pattern("UniformExcitation", 2, 1, accel=2)
     model.pattern("UniformExcitation", 3, 2, accel=3)
-
-    print('111 passed')
 
     return model
 
@@ -736,8 +714,21 @@ def record_strain_step(model, t):
         sr["steel_max"][ele].append(float(max_steel) if max_steel is not None else np.nan)
 
     
+def get_fiber_strain(model, ele, sec_tag, mat_tag, y, z):
+    try:
+        return model.eleResponse(ele, "section", sec_tag, "fiber", y, z, "material", mat_tag, "strain")
+    except Exception as e:
+        print(e)
+        return None
 
-def analyze(model, output_nodes, nt, dt, step_callback=None):
+def get_material_strain(model, ele, mat_tag):
+    try:
+        return model.eleResponse(ele, "material", mat_tag, "strain")
+    except Exception as e:
+        print(e)
+        return None
+
+def analyze(model, output_nodes, nt, dt, n_modes=3):
     # ----------------------------
     # 1. Configure the analysis
     # ----------------------------
@@ -775,10 +766,13 @@ def analyze(model, output_nodes, nt, dt, step_callback=None):
     displacements = {
         node: [model.nodeDisp(node)] for node in output_nodes
     }
+    strains = []
+    stresses = []
 
-    if callable(step_callback):
-        step_callback(model, 0.0)
-
+    # get modes
+    lambdas = model.eigen(n_modes) 
+    omega = np.sqrt(np.abs(lambdas)) 
+    print(omega) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
 
     # Perform nt analysis steps with a time step of dt
     print(f"Analysis Progress ({nt} timesteps)")
@@ -790,10 +784,12 @@ def analyze(model, output_nodes, nt, dt, step_callback=None):
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))
+        print(model.elements)
 
-        if callable(step_callback):
-           
-            step_callback(model, float(model.getTime()))
+    lambdas_after = model.eigen(n_modes) 
+    omega_after = np.sqrt(np.abs(lambdas_after))      
+    print(omega_after) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
+    # TODO: Find a way to plot the natural frequency before and after each earthquake on the same plot
            
     return displacements
 
