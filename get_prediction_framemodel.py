@@ -298,7 +298,7 @@ for event_id in range(1, num_events+1):
         T0_inel = get_natural_periods(model_inel, nmodes=3) if DO_Q5 else None
 
         try:
-            disp_inel = analyze(model_inel, output_nodes=[5, 10, 15], nt=nt, dt=dt, step_callback=record_strain_step)
+            disp_inel = analyze(model_inel, output_nodes=[5, 10, 15], nt=nt, dt=dt)
         except RuntimeError:
             pass
         else:
