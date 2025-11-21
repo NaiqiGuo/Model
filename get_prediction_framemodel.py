@@ -23,7 +23,7 @@ num_algos = len(sys_names)
 windowed_plot = True
 
 DO_Q5 = False
-DO_ELASTIC   = False
+DO_ELASTIC   = True
 DO_INELASTIC = True
 
 root_output_dir     = "predictions_framemodel"
@@ -31,6 +31,13 @@ elastic_output_dir  = os.path.join(root_output_dir, "elastic")
 inelastic_output_dir = os.path.join(root_output_dir, "inelastic")
 os.makedirs(elastic_output_dir, exist_ok=True)
 os.makedirs(inelastic_output_dir, exist_ok=True)
+
+# save y_true, y_pred
+ts_root_dir       = os.path.join(root_output_dir, "aligned_timeseries")
+elastic_ts_dir    = os.path_dir = os.path.join(ts_root_dir, "elastic")
+inelastic_ts_dir  = os.path.join(ts_root_dir, "inelastic")
+os.makedirs(elastic_ts_dir, exist_ok=True)
+os.makedirs(inelastic_ts_dir, exist_ok=True)
 
 #plotly
 plotly_elastic_dir   = os.path.join(elastic_output_dir, "plotly_html")
@@ -170,6 +177,18 @@ for event_id in range(1, num_events+1):
             for ch in range(num_channels):
                 y_t = ytrue_aln[ch]
                 y_p = ypred_aln[ch]
+
+                data = np.column_stack([time_aln, y_t, y_p])
+                fname = f"event_{event_id:02d}_ch{ch}_{sys_name}_elastic.csv"
+                fpath = os.path.join(elastic_ts_dir, fname)
+                np.savetxt(
+                    fpath,
+                    data,
+                    delimiter=",",
+                    header="time,y_true,y_pred",
+                    comments=""
+                )
+
                 try:
                     val = _get_error(
                         ytrue=y_t,
@@ -396,6 +415,18 @@ for event_id in range(1, num_events+1):
                 for ch in range(num_channels):
                     y_t = ytrue_aln[ch]
                     y_p = ypred_aln[ch]
+
+                    data = np.column_stack([time_aln, y_t, y_p])
+                    fname = f"event_{event_id:02d}_ch{ch}_{sys_name}_inelastic.csv"
+                    fpath = os.path.join(inelastic_ts_dir, fname)
+                    np.savetxt(
+                        fpath,
+                        data,
+                        delimiter=",",
+                        header="time,y_true,y_pred",
+                        comments=""
+                    )
+
                     try:
                         val = _get_error(
                         ytrue=y_t,
