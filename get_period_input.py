@@ -13,7 +13,7 @@ from model_utils import (
 # -----------------------------
 # Configuration
 # -----------------------------
-EVENT_ID = 4               # Only process Event 4
+EVENT_ID = 20               
 INPUT_CHANNELS = [1, 3]    # The two input channels you used before
 SCALE = 2.54               # Scale factor used in get_inputs
 OUTDIR = os.path.join("predictions_framemodel", "q6_event04")
@@ -100,33 +100,76 @@ def print_compare(dom_pairs, Tn, tag):
 
 def plot_psd_with_markers(f, Pxx, dom_pairs, Tn, title, outfile):
     """
-    Plot PSD (log scale) and mark dominant and modal periods.
+    Plot PSD (log scale) with midpoint annotations for:
+      - strongest dominant period
+      - closest modal period
+    X-axis: Period (s)
     """
-    plt.figure(figsize=(10,5))
-    plt.semilogy(f, Pxx, label="PSD (Welch)")
+    # frequency → period
+    mask = f > 0.0
+    T = np.zeros_like(f)
+    T[mask] = 1.0 / f[mask]
 
-    # Dominant peaks
-    for (ff, pp) in dom_pairs:
-        plt.axvline(ff, linestyle="--")
-        plt.text(ff, np.max(Pxx)*0.6, f"T={pp:.2f}s", rotation=90,
-                 va='bottom', ha='center')
+    plt.figure(figsize=(10, 5))
+    plt.semilogy(T[mask], Pxx[mask], label="PSD (Welch)")
 
-    # Modal periods (convert to frequencies)
-    for i, Ti in enumerate(Tn[:3], 1):
-        if Ti > 0:
-            fi = 1.0 / Ti
-            plt.axvline(fi)
-            plt.text(fi, np.max(Pxx)*0.3, f"T{i}={Ti:.2f}s",
-                     rotation=90, va='bottom', ha='center')
+    ymax = np.max(Pxx[mask])
+    y_mid1 = ymax * 0.40  
+    y_mid2 = ymax * 0.20 
 
-    plt.xlabel("Frequency (Hz)")
+    # --- Only draw 1 dominant peak ---
+    if dom_pairs:
+        main_f, main_T = dom_pairs[0]
+
+        # Dominant peak line
+        plt.axvline(main_T, linestyle="--", color="blue", linewidth=1)
+
+        # Annotation in the middle
+        plt.text(
+            main_T,
+            y_mid1,
+            f"T={main_T:.2f}s",
+            rotation=90,
+            va='center',
+            ha='center',
+            fontsize=10,
+            bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=2)
+        )
+
+        # --- Closest modal period ---
+        diffs = np.abs(Tn - main_T)
+        j = int(np.argmin(diffs))
+        Ti = Tn[j]
+
+        plt.axvline(Ti, color="black", linewidth=1.2)
+
+        plt.text(
+            Ti,
+            y_mid2,
+            f"T{j+1}={Ti:.2f}s",
+            rotation=90,
+            va='center',
+            ha='center',
+            fontsize=10,
+            bbox=dict(facecolor="white", alpha=0.8, edgecolor="none", pad=2)
+        )
+
+    plt.xlabel("Period (s)")
     plt.ylabel("PSD")
     plt.title(title)
     plt.grid(True, which='both', ls=':')
     plt.legend()
+
+    plt.gca().invert_xaxis()  
+    plt.xlim(2.0, 0.1)
+
     plt.tight_layout()
     plt.savefig(outfile, dpi=300)
     plt.close()
+
+
+
+
 
 # -----------------------------
 # Main Routine

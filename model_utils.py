@@ -1,5 +1,6 @@
 #import opensees.openseespy as ops
 import xara
+
 #import openseespy.opensees as ops
 import xara.units.iks as units
 import math
@@ -729,6 +730,13 @@ def get_material_strain(model, ele, mat_tag):
         return None
 
 def analyze(model, output_nodes, nt, dt, n_modes=3):
+
+    if not hasattr(analyze, "call_count"):
+        analyze.call_count = 0
+
+    analyze.call_count += 1
+    event_id = analyze.call_count
+
     # ----------------------------
     # 1. Configure the analysis
     # ----------------------------
@@ -771,8 +779,10 @@ def analyze(model, output_nodes, nt, dt, n_modes=3):
 
     # get modes
     lambdas = model.eigen(n_modes) 
-    omega = np.sqrt(np.abs(lambdas)) 
-    print(omega) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
+    omega = np.sqrt(np.abs(lambdas))
+    freqs_before = omega / (2 * np.pi) 
+    periods_before = 2 * np.pi / omega
+    #print(omega) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
 
     # Perform nt analysis steps with a time step of dt
     print(f"Analysis Progress ({nt} timesteps)")
@@ -787,9 +797,24 @@ def analyze(model, output_nodes, nt, dt, n_modes=3):
         # print(model.elements)
 
     lambdas_after = model.eigen(n_modes) 
-    omega_after = np.sqrt(np.abs(lambdas_after))      
-    print(omega_after) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
+    omega_after = np.sqrt(np.abs(lambdas_after))   
+    #print(omega_after) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
     # TODO: Find a way to plot the natural frequency before and after each earthquake on the same plot
+    freqs_after = omega_after / (2 * np.pi)
+    periods_after = 2 * np.pi / omega_after   
+
+    csv_path = "natural_frequencies.csv" 
+    file_exists = os.path.exists(csv_path)
+
+    with open(csv_path, "a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            header = ["event_id"]
+            header += [f"f{i+1}_before_s" for i in range(n_modes)] #Hz
+            header += [f"f{i+1}_after_s" for i in range(n_modes)]
+            writer.writerow(header)
+        row = [event_id] + list(periods_before) + list(periods_after)
+        writer.writerow(row)
            
     return displacements
 

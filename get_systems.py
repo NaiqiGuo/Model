@@ -10,7 +10,7 @@ from mdof.utilities.config import Config
 from model_utils import( create_model, get_inputs, analyze, get_outputs, stabilize_with_lmi,
                          stabilize_by_radius_clipping, save_all_methods_to_csv, create_frame_model)
 
-ELASTIC = True
+ELASTIC = False
 
 # Load events
 LOAD_EVENTS = False
