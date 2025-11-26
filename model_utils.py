@@ -712,8 +712,7 @@ def record_strain_step(model, t):
         sr["steel_max"][ele].append(float(max_steel) if max_steel is not None else np.nan)
 
     
-def get_material_response(model, element, sec_tag, mat_tag, y, z):
-    print(element, sec_tag, y, z)
+def get_material_response(model, element, sec_tag, y, z):
     try:
         strain =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "strain")
         stress =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "stress")
@@ -722,12 +721,6 @@ def get_material_response(model, element, sec_tag, mat_tag, y, z):
         print(e)
         return None
 
-def get_section_response(model, ele, mat_tag):
-    try:
-        return model.eleResponse(ele, "section", mat_tag, "strain")
-    except Exception as e:
-        print(e)
-        return None
 
 def analyze(model, output_nodes, nt, dt, n_modes=3,
             output_elements=[1,5,9],
@@ -797,23 +790,22 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
         status = model.analyze(1, dt) 
         if status != 0:
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
-        
-        print(get_material_response(model, 1, 1, None, 0.0, 0.0))
-        import sys
-        sys.exit()
+
+        # TODO: use this line to debug        
+        # print(get_material_response(model, 1, 1, 0.0, 0.0))
+        # import sys
+        # sys.exit()
 
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))
         
         for element in output_elements:
-            strains[element].append(get_material_response(model, element, 1, None, yFiber, zFiber)[0])
-            stresses[element].append(get_material_response(model, element, 1, None, yFiber, zFiber)[1])
+            strains[element].append(get_material_response(model, element, 1, yFiber, zFiber)[0])
+            stresses[element].append(get_material_response(model, element, 1, yFiber, zFiber)[1])
 
     lambdas_after = model.eigen(n_modes) 
     omega_after = np.sqrt(np.abs(lambdas_after))   
-    #print(omega_after) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
-    # TODO: Find a way to plot the natural frequency before and after each earthquake on the same plot
     freqs_after = omega_after / (2 * np.pi)
     periods_after = 2 * np.pi / omega_after   
 
