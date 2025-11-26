@@ -44,18 +44,11 @@ os.makedirs(output_dir, exist_ok=True)
 for i, event in enumerate(events):
     inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
     print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
-    if ELASTIC:
-        model = create_frame_model(column="elasticBeamColumn",
-                                    girder="elasticBeamColumn",
-                                    inputx=inputs[0],
-                                    inputy=inputs[1],
-                                    dt=dt)
-    else:
-        model = create_frame_model(column="forceBeamColumn",
-                                    girder="elasticBeamColumn",
-                                    inputx=inputs[0],
-                                    inputy=inputs[1],
-                                    dt=dt)
+
+    model = create_frame_model(elastic=ELASTIC,
+                                inputx=inputs[0],
+                                inputy=inputs[1],
+                                dt=dt)
     
     nt = inputs.shape[1]
     try:

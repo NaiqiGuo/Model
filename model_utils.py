@@ -332,15 +332,14 @@ def cosine_taper(arr, dt, T_ramp=0.4):
     return arr
 
 
-def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inputy=None, dt=None):
+def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, inputy=None, dt=None):
     if np.all(inputx is None) or np.all(inputy is None) or dt is None:
         raise ValueError("Missing inputx, inputy, or dt. Exiting.")
     
     if girder != "elasticBeamColumn":
         raise ValueError("Only elasticBeamColumn allowed for girders")
 
-    if column is None:
-        column = "forceBeamColumn"
+    column = "forceBeamColumn"
 
     # create Model in three-dimensions with 6 DOF/node
     model = xara.Model(ndm=3, ndf=6)
@@ -404,21 +403,28 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     # CONCRETE
     fc = 4.0
     Ec = 57000.0*math.sqrt(fc*1000.0)/1000.0
-
-    # Core concrete (confined)
-    #                                 tag  f'c   epsc0  f'cu  epscu
-    model.uniaxialMaterial("Concrete01", 1, -5.0, -0.005, -3.5, -0.02)
-
-    # Cover concrete (unconfined)
-    #                                 tag  f'c   epsc0  f'cu  epscu
-    model.uniaxialMaterial("Concrete01", 2, -fc, -0.002, 0.0, -0.006)
+    if not elastic:
+        # Core concrete (confined)
+        #                                 tag  f'c   epsc0  f'cu  epscu
+        model.uniaxialMaterial("Concrete01", 1, -5.0, -0.005, -3.5, -0.02)
+        # Cover concrete (unconfined)
+        #                                 tag  f'c   epsc0  f'cu  epscu
+        model.uniaxialMaterial("Concrete01", 2, -fc, -0.002, 0.0, -0.006)
+    else:
+        # Core concrete
+        model.uniaxialMaterial("Elastic", 1, Ec)
+        # Cover concrete
+        model.uniaxialMaterial("Elastic", 2, Ec)
 
     # STEEL
     fy = 60.0;       # Yield stress
     Es = 30000.0;    # Young's modulus
     # Reinforcing steel 
-    #                                tag fy  E0  b
-    model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
+    if not elastic:
+        #                                tag fy  E0  b
+        model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
+    else:
+        model.uniaxialMaterial("Elastic", 3, Es)
 
 
     # Define column elements
@@ -431,36 +437,27 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     colSec = 1
     beamSec = 2
 
-    if column == "forceBeamColumn":
+    if True:
         # # Call the RCsection procedure to generate the column section
-        # #                              id  h    b    cover coreid coverid steelid nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
-        ReinforcedRectangle(model, colSec, h_col, b_col, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
+        ReinforcedRectangle(model, colSec,
+                            h=h_col, 
+                            b=b_col,
+                            cover=2.5, 
+                            coreID=1,
+                            coverID=2,
+                            steelID=3,
+                            numBars=3,
+                            barArea=0.79,
+                            nfCoreY=8,      
+                            nfCoreZ=8,      
+                            nfCoverY=10,      
+                            nfCoverZ=10,
+                            GJ=GJ)
         # Number of column integration points (sections)
         itg_col = 1
         npts_col = 4
         model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
         
-    elif column == "elasticBeamColumn":
-        # Define material properties for elastic columns
-        # Using column depth of 24 and width of 18
-        Acol = b_col * h_col
-        # "Cracked" second moments of area
-        # Icolzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
-        # Icolyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
-        Icolzz = 0.5 * (b_col * h_col**3) / 12.0
-        Icolyy = 0.5 * (h_col * b_col**3) / 12.0
-        
-        nu = 0.2
-        Gc = Ec / (2 * (1 + nu))  # shear modulus
-
-        Jcol = J_rect(b_col, h_col)
-
-        # Define elastic section for columns
-        #                       tag     E    A      Iz       Iy     G    J
-        model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, Gc, Jcol)
-        #model.section("Elastic", colSec, Ec, Acol, Icolzz, Icolyy, GJ, 1.0)
-    else:
-        raise ValueError("Only elasticBeamColumn or forceBeamColumn allowed for columns")
     # Geometric transformation for columns
     colTransf = 1
     model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
@@ -491,12 +488,12 @@ def create_frame_model(column=None, girder="elasticBeamColumn", inputx=None, inp
     # Define material properties for elastic beams
     # Using beam depth of 24 and width of 18
     Abeam = 18.0*24.0
-    # "Cracked" second moments of area
-    Ibeamzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
-    Ibeamyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
+    # Second moments of area
+    Ibeamzz = 1.0/12.0*18.0*pow(24.0,3)
+    Ibeamyy = 1.0/12.0*24.0*pow(18.0,3)
 
     nu = 0.2
-    Gb = Ec / (2 * (1 + nu))
+    Gb = Ec/(2 * (1 + nu))
 
     Jbeam = J_rect(18.0, 24.0)
     # Define elastic section for beams
@@ -715,21 +712,27 @@ def record_strain_step(model, t):
         sr["steel_max"][ele].append(float(max_steel) if max_steel is not None else np.nan)
 
     
-def get_fiber_strain(model, ele, sec_tag, mat_tag, y, z):
+def get_material_response(model, element, sec_tag, mat_tag, y, z):
+    print(element, sec_tag, y, z)
     try:
-        return model.eleResponse(ele, "section", sec_tag, "fiber", y, z, "material", mat_tag, "strain")
+        strain =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "strain")
+        stress =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "stress")
+        return stress, strain
     except Exception as e:
         print(e)
         return None
 
-def get_material_strain(model, ele, mat_tag):
+def get_section_response(model, ele, mat_tag):
     try:
-        return model.eleResponse(ele, "material", mat_tag, "strain")
+        return model.eleResponse(ele, "section", mat_tag, "strain")
     except Exception as e:
         print(e)
         return None
 
-def analyze(model, output_nodes, nt, dt, n_modes=3):
+def analyze(model, output_nodes, nt, dt, n_modes=3,
+            output_elements=[1,5,9],
+            yFiber=8.0,
+            zFiber=0.0):
 
     if not hasattr(analyze, "call_count"):
         analyze.call_count = 0
@@ -774,8 +777,12 @@ def analyze(model, output_nodes, nt, dt, n_modes=3):
     displacements = {
         node: [model.nodeDisp(node)] for node in output_nodes
     }
-    strains = []
-    stresses = []
+    strains = {
+        element: [get_material_response(model, 1, 1, None, yFiber, zFiber)[1] for element in output_elements]
+    }
+    stresses = {
+        element: [get_material_response(model, 1, 1, None, yFiber, zFiber)[0] for element in output_elements]
+    }
 
     # get modes
     lambdas = model.eigen(n_modes) 
@@ -790,11 +797,18 @@ def analyze(model, output_nodes, nt, dt, n_modes=3):
         status = model.analyze(1, dt) 
         if status != 0:
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
+        
+        print(get_material_response(model, 1, 1, None, 0.0, 0.0))
+        import sys
+        sys.exit()
 
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))
-        # print(model.elements)
+        
+        for element in output_elements:
+            strains[element].append(get_material_response(model, element, 1, None, yFiber, zFiber)[0])
+            stresses[element].append(get_material_response(model, element, 1, None, yFiber, zFiber)[1])
 
     lambdas_after = model.eigen(n_modes) 
     omega_after = np.sqrt(np.abs(lambdas_after))   
@@ -816,7 +830,7 @@ def analyze(model, output_nodes, nt, dt, n_modes=3):
         row = [event_id] + list(periods_before) + list(periods_after)
         writer.writerow(row)
            
-    return displacements
+    return displacements, stresses, strains
 
 
 def get_outputs(displacements):
