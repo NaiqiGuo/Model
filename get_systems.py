@@ -8,7 +8,14 @@ from mdof import sysid
 from mdof.validation import stabilize_discrete
 from mdof.utilities.config import Config
 from model_utils import( create_model, get_inputs, analyze, get_outputs, stabilize_with_lmi,
-                         stabilize_by_radius_clipping, save_all_methods_to_csv, create_frame_model)
+                         stabilize_by_radius_clipping, save_all_methods_to_csv, create_frame_model,
+                         save_event_disp, save_event_strain_stress
+                         )
+
+# Overwrite the natural frequency file once at the beginning
+# csv_path = "natural_frequencies.csv"
+# with open(csv_path, "w") as f:
+#     f.write("") 
 
 ELASTIC = False
 
@@ -52,7 +59,7 @@ for i, event in enumerate(events):
     
     nt = inputs.shape[1]
     try:
-        disp = analyze(model, output_nodes = [5, 10, 15], nt=nt, dt=dt)
+        disp, stresses, strains = analyze(model, output_nodes = [5, 10, 15], nt=nt, dt=dt)
     except RuntimeError as e:
         print(f"error for event {i}:")
         print(e)
@@ -61,6 +68,21 @@ for i, event in enumerate(events):
     outputs = outputs[:, 1:] 
     assert inputs.shape[1] == outputs.shape[1], "inputs and outputs have different length of time samples."
     time = np.arange(nt) * dt
+
+    event_id = i + 1
+    if ELASTIC:
+        disp_dir = "event_disp_elastic"
+        ss_dir   = "event_strain_stress_elastic"
+    else:
+        disp_dir = "event_disp_inelastic"
+        ss_dir   = "event_strain_stress_inelastic"
+
+    os.makedirs(disp_dir, exist_ok=True)
+    os.makedirs(ss_dir, exist_ok=True)
+
+    # Save files into separate folders
+    save_event_disp(event_id, disp, dt, out_dir=disp_dir)
+    save_event_strain_stress(event_id, stresses, strains, dt, out_dir=ss_dir)
 
     n = 6
     options = Config(

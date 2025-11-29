@@ -716,7 +716,7 @@ def get_material_response(model, element, sec_tag, y, z):
     try:
         strain =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "strain")
         stress =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "stress")
-        return stress, strain
+        return strain, stress
     except Exception as e:
         print(e)
         return None
@@ -771,10 +771,10 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
         node: [model.nodeDisp(node)] for node in output_nodes
     }
     strains = {
-        element: [get_material_response(model, 1, 1, None, yFiber, zFiber)[1] for element in output_elements]
+        element: [get_material_response(model, 1, 1, yFiber, zFiber)[0]] for element in output_elements
     }
     stresses = {
-        element: [get_material_response(model, 1, 1, None, yFiber, zFiber)[0] for element in output_elements]
+        element: [get_material_response(model, 1, 1, yFiber, zFiber)[1]] for element in output_elements
     }
 
     # get modes
@@ -819,7 +819,7 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
             header += [f"f{i+1}_before_s" for i in range(n_modes)] #Hz
             header += [f"f{i+1}_after_s" for i in range(n_modes)]
             writer.writerow(header)
-        row = [event_id] + list(periods_before) + list(periods_after)
+        row = [event_id] + list(freqs_before) + list(freqs_after)
         writer.writerow(row)
            
     return displacements, stresses, strains
@@ -1099,3 +1099,68 @@ def plot_deltaT_across_events(event_ids, dT_pct_list, plotly_dir, title="ΔT/T a
     fig.write_html(outp, include_plotlyjs="cdn")
     print("[Q5] Saved →", outp)
 
+
+def save_event_disp(event_id, displacements, dt, out_dir="event_disp"):
+    os.makedirs(out_dir, exist_ok=True)
+
+    first_node = next(iter(displacements.keys()))
+    nt = len(displacements[first_node])  
+    time = np.arange(nt) * dt
+
+    nodes = sorted(displacements.keys())
+
+    filename = os.path.join(out_dir, f"event_{event_id:02d}_disp.csv")
+
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+
+        # sheet tital: time + each node 6 dof
+        dof_labels = ["UX", "UY", "UZ", "RX", "RY", "RZ"]
+        header = ["time"]
+        for n in nodes:
+            for lbl in dof_labels:
+                header.append(f"node{n}_{lbl}")
+        writer.writerow(header)
+
+        # each line: t_k + each node 6DOF
+        for k in range(nt):
+            row = [time[k]]
+            for n in nodes:
+                u = displacements[n][k]  # 6
+                row.extend(u)
+            writer.writerow(row)
+
+    print(f"[save_event_disp] Saved displacements for event {event_id:02d} to {filename}")
+
+
+def save_event_strain_stress(event_id, stresses, strains, dt,
+                             out_dir="event_strain_stress"):
+    os.makedirs(out_dir, exist_ok=True)
+
+    first_ele = next(iter(stresses.keys()))
+    nt = len(stresses[first_ele])  
+    time = np.arange(nt) * dt
+
+    elems = sorted(stresses.keys())
+
+    filename = os.path.join(out_dir, f"event_{event_id:02d}_strain_stress.csv")
+
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+
+        # sheet tital: time + stress + strain
+        header = ["time"]
+        header += [f"ele{e}_stress" for e in elems]
+        header += [f"ele{e}_strain" for e in elems]
+        writer.writerow(header)
+
+        # each line: t_k + stress + strain
+        for k in range(nt):
+            row = [time[k]]
+            for e in elems:
+                row.append(stresses[e][k])
+            for e in elems:
+                row.append(strains[e][k])
+            writer.writerow(row)
+
+    print(f"[save_event_strain_stress] Saved strain/stress for event {event_id:02d} to {filename}")
