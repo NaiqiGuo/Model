@@ -34,7 +34,7 @@ os.makedirs(inelastic_output_dir, exist_ok=True)
 
 # save y_true, y_pred
 ts_root_dir       = os.path.join(root_output_dir, "aligned_timeseries")
-elastic_ts_dir    = os.path_dir = os.path.join(ts_root_dir, "elastic")
+elastic_ts_dir    = os.path.join(ts_root_dir, "elastic")
 inelastic_ts_dir  = os.path.join(ts_root_dir, "inelastic")
 os.makedirs(elastic_ts_dir, exist_ok=True)
 os.makedirs(inelastic_ts_dir, exist_ok=True)
@@ -226,7 +226,7 @@ for event_id in range(1, num_events+1):
 
             plt.suptitle(f"Event {event_id} {sys_name.upper()} (aligned, windowed={windowed_plot})")
 
-            # 保存到 elastic_output_dir
+            # elastic_output_dir
             plt.savefig(os.path.join(elastic_output_dir, f"event_{event_id:02d}_{sys_name}.png"), dpi=300)
             plt.close(fig)
 
@@ -545,9 +545,7 @@ for event_id in range(1, num_events+1):
 
 
 if DO_ELASTIC:
-    # ---------------------------------------------------------
-    # (12) Heatmap 版本1（所有代码原封不动）
-    # ---------------------------------------------------------
+    # (12) Heatmap (version 1)
     channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
     algo_names = [name.upper() for name in sys_names]
 
@@ -580,7 +578,7 @@ if DO_ELASTIC:
                 color = 'black' if val > half else 'white'
                 ax.text(ev, ch, f"{val:.2f}", ha='center', va='center', color=color, fontsize=6)
 
-        # 保存到 elastic_output_dir
+        # elastic_output_dir
         plt.savefig(os.path.join(elastic_output_dir, f"error_heatmap_{algo}.png"), dpi=300)
         plt.close(fig)
 
@@ -620,7 +618,7 @@ if DO_ELASTIC:
 
         ax.tick_params(axis='both', direction='out', length=3, width=0.8, pad=6)
 
-        # 保存到 elastic_output_dir
+        # elastic_output_dir
         if DROP10:
             fig.savefig(os.path.join(elastic_output_dir, f"{algo}_heatmap_drop10.png"), dpi=300)
         else:

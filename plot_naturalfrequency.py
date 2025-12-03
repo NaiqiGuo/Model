@@ -6,9 +6,7 @@ def plot_natural_frequencies(csv_path, title, output_png):
     Load a natural frequency CSV file (already in Hz),
     and plot before/after values for all modes versus event ID.
     """
-    # ============================
     # Load CSV data
-    # ============================
     data = np.genfromtxt(csv_path, delimiter=",", names=True)
 
     # Event IDs
@@ -33,9 +31,7 @@ def plot_natural_frequencies(csv_path, title, output_png):
         print("Warning: no mode columns detected. Check the column names in the CSV.")
         return
 
-    # ============================
     # Plot
-    # ============================
     plt.figure(figsize=(10, 6))
 
     for k in range(n_modes):
@@ -71,9 +67,7 @@ def plot_natural_frequencies(csv_path, title, output_png):
     print(f"Saved: {output_png}")
 
 
-# ============================
 # Call the function for elastic and inelastic
-# ============================
 
 plot_natural_frequencies(
     csv_path="natural_frequencies_elastic.csv",
