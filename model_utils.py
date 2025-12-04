@@ -401,15 +401,16 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
     # Define materials for nonlinear columns
     # --------------------------------------
     # CONCRETE
-    fc = 4.0
+    fc = 4.0 # unconfined
+    fpc = 5.0 # confined
     Ec = 57000.0*math.sqrt(fc*1000.0)/1000.0
     if not elastic:
         # Core concrete (confined)
         #                                 tag  f'c   epsc0  f'cu  epscu
-        model.uniaxialMaterial("Concrete01", 1, -5.0, -0.005, -3.5, -0.02)
+        model.uniaxialMaterial("Concrete01", 1, -fpc, -2*fpc/Ec, -3.5, -0.02)
         # Cover concrete (unconfined)
         #                                 tag  f'c   epsc0  f'cu  epscu
-        model.uniaxialMaterial("Concrete01", 2, -fc, -0.002, 0.0, -0.006)
+        model.uniaxialMaterial("Concrete01", 2, -fc, -2*fc/Ec, 0.0, -0.006)
     else:
         # Core concrete
         model.uniaxialMaterial("Elastic", 1, Ec)
