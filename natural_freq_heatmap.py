@@ -22,7 +22,7 @@ def load_dT_over_T(csv_path):
     # return data["event_id"], dT_over_T
 
     # Δf/f
-    df_over_f = (f_after - f_before) / f_before
+    df_over_f = (f_before - f_after) / f_before
 
     return data["event_id"], df_over_f
 
@@ -33,7 +33,7 @@ mode1_el = dT_el[:, 0]     # modeshape1（0）
 plt.figure(figsize=(12, 2.5))
 plt.imshow(mode1_el[np.newaxis, :], 
            aspect="auto",
-           cmap="Blues_r",
+           cmap="Blues",
            vmin=-0.3, vmax=0.3)        
 plt.colorbar(label="Δf/f_before")
 plt.xticks(range(len(event_el)), event_el, rotation=90)
@@ -51,7 +51,7 @@ mode1_in = dT_in[:, 0]
 plt.figure(figsize=(12, 2.5))
 plt.imshow(mode1_in[np.newaxis, :], 
            aspect="auto",
-           cmap="Blues_r",
+           cmap="Blues",
            vmin=-0.3, vmax=0.3)
 plt.colorbar(label="Δf/f_before")
 plt.xticks(range(len(event_in)), event_in, rotation=90)

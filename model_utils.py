@@ -638,6 +638,185 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
     return model
 
 
+def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn", inputx=None, inputy=None, dt=None):
+    
+    #input check
+    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
+        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
+
+    if girder != "elasticBeamColumn":
+        raise ValueError("Only elasticBeamColumn allowed for girders.")
+    
+    model = xara.Model(ndm=3, ndf=6)
+
+    if not hasattr(model, "meta") or not isinstance(model.meta, dict):
+        model.meta = {}
+    model.meta["column_elems"] = []
+
+    # Nodes: (tag, (x, y, z))
+    model.node(0, (0.0,                   320.0,                  0.0))
+    model.node(1, (3180.0,                320.0,                  0.0))
+    model.node(2, (1752.0,                320.0,                  0.0))
+    model.node(3, (1641.4628263430573,    320.0,         199.41297159396336))
+    model.node(4, (1641.4628263430573,      0.0,         199.41297159396336))
+    model.node(5, (1862.5371736569432,    320.0,        -199.41297159396336))
+    model.node(6, (1862.5371736569432,      0.0,        -199.41297159396336))
+
+    # Boundary conditions, fully fixed at 0, 1, 4, 6
+    # fix(tag, (DX, DY, DZ, RX, RY, RZ))
+    model.fix(0, (1, 1, 1, 1, 1, 1))
+    model.fix(1, (1, 1, 1, 1, 1, 1))
+    model.fix(4, (1, 1, 1, 1, 1, 1))
+    model.fix(6, (1, 1, 1, 1, 1, 1))
+
+    # Materials: concrete and steel
+
+    # Concrete strengths (ksi)
+    fc_unconf = 4.0   # unconfined concrete
+    fc_conf   = 5.0   # confined concrete
+
+    # Concrete modulus (ksi), same formula as your frame model
+    Ec = 57000.0 * math.sqrt(fc_unconf * 1000.0) / 1000.0
+
+    # Steel properties
+    fy = 60.0   # ksi
+    Es = 30000.0
+
+    if not elastic:
+        # Nonlinear concrete (core and cover) using Concrete01
+        #                    tag  f'c       epsc0         f'cu   epscu
+        model.uniaxialMaterial("Concrete01", 1, -fc_conf,   -2*fc_conf/Ec,  -3.5,  -0.02)
+        model.uniaxialMaterial("Concrete01", 2, -fc_unconf, -2*fc_unconf/Ec, 0.0,  -0.006)
+
+        # Nonlinear reinforcing steel
+        #                    tag fy   E0   b
+        model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
+    else:
+        # Elastic concrete for both core and cover
+        model.uniaxialMaterial("Elastic", 1, Ec)
+        model.uniaxialMaterial("Elastic", 2, Ec)
+
+        # Elastic steel
+        model.uniaxialMaterial("Elastic", 3, Es)
+
+    
+    # Section properties: 5 ft circular section
+    # Geometry of circular section
+    D_total = 60.0        # total diameter in inches (5 ft)
+    cover   = 2.0         # concrete cover in inches
+    R_ext   = D_total / 2.0
+    R_core  = R_ext - cover  # approximate core radius
+
+    # mesh subdivisions for nonlinear fiber section
+    numSubdivCirc = 32
+    numSubdivRad  = 5
+    divs = (numSubdivCirc, numSubdivRad)
+
+    # tags
+    colSec_elastic = 1
+    colSec_fiber   = 2
+    beamSec_elastic = 3   # beams stay elastic
+
+    # ELASTIC SECTION (for elasticBeamColumn model)
+    A_el = math.pi * R_ext**2
+    I_el = math.pi * R_ext**4 / 4.0
+    J_el = math.pi * R_ext**4 / 2.0
+    nu = 0.2
+    Gc = Ec / (2*(1+nu))
+    
+
+    model.section("Elastic", colSec_elastic,  Ec, A_el, I_el, I_el, Gc, J_el)
+    model.section("Elastic", beamSec_elastic, Ec, A_el, I_el, I_el, Gc, J_el)
+
+    # NONLINEAR FIBER SECTION (for forceBeamColumn)
+
+    if not elastic:
+        
+        GJ = Gc * J_el
+        model.section("Fiber", colSec_fiber, "-GJ", GJ)
+        numSubdivCirc, numSubdivRad = divs
+
+        # core concrete
+        model.patch("circ", 1,                 # matTag = 1
+                    numSubdivCirc, numSubdivRad,
+                    0.0, 0.0,                  # yCenter, zCenter
+                    0.0, R_core,               # intRad, extRad
+                    0.0, 2 * math.pi)         # startAng, endAng
+
+        # cover concrete
+        model.patch("circ", 2,                 # matTag = 2
+                    numSubdivCirc, numSubdivRad,
+                    0.0, 0.0,
+                    R_core, R_ext,
+                    0.0, 2 * math.pi)
+
+        # longitudinal steel
+        numBars = 36
+        barArea = 1.56
+        model.layer("circ", 3, numBars, barArea,
+                    0.0, 0.0,                  # yCenter, zCenter
+                    R_core,                    # radius
+                    0.0, 2 * math.pi)
+
+    # Transformations and elements
+    colTransf  = 1
+    beamTransf = 2
+    model.geomTransf("Linear", colTransf,  (0.0, 0.0, 1.0))
+    model.geomTransf("Linear", beamTransf, (0.0, 0.0, 1.0))
+
+    # columns: elastic vs nonlinear
+    if elastic:
+        # columns as elasticBeamColumn with elastic section
+        col_type = "elasticBeamColumn"
+        sec_col  = colSec_elastic
+
+        model.element(col_type, 2, (4, 3), transform=colTransf, section=sec_col, shear=0)
+        model.element(col_type, 3, (6, 5), transform=colTransf, section=sec_col, shear=0)
+    else:
+        # columns as forceBeamColumn with fiber section
+        col_type = "forceBeamColumn"
+        sec_col  = colSec_fiber
+
+        model.element(col_type, 2, (4, 3), transform=colTransf, section=sec_col, shear=0)
+        model.element(col_type, 3, (6, 5), transform=colTransf, section=sec_col, shear=0)
+
+    model.meta["column_elems"] = [2, 3]
+
+    # beams always elastic
+    beam_type = "elasticBeamColumn"
+    sec_beam  = beamSec_elastic
+
+    model.element(beam_type, 1, (0, 2), transform=beamTransf, section=sec_beam, shear=0)
+    model.element(beam_type, 4, (2, 1), transform=beamTransf, section=sec_beam, shear=0)
+    model.element(beam_type, 5, (3, 2), transform=beamTransf, section=sec_beam, shear=0)
+    model.element(beam_type, 6, (5, 2), transform=beamTransf, section=sec_beam, shear=0)
+
+    # Mass, damping and earthquake excitation
+    lump_mass = 1.0  # placeholder, adjust based on test data
+    for nd in [2, 3, 5]:
+        # mass(tag, (MX, MY, MZ, RX, RY, RZ))
+        model.mass(nd, (lump_mass, lump_mass, 0.0, 0.0, 0.0, 0.0))
+
+    # Rayleigh damping (same coefficients as frame model for now)
+    # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
+    model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
+
+    # Ground motion: fault normal (x) and fault parallel (y) components
+    inputx_t = cosine_taper(inputx, dt, T_ramp=0.4)
+    inputy_t = cosine_taper(inputy, dt, T_ramp=0.4)
+
+    # Time series for the two components
+    model.timeSeries("Path", 2, values=inputx_t.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy_t.tolist(), dt=dt, factor=1.0)
+
+    # Uniform excitation patterns in global X and Y directions
+    # pattern("UniformExcitation", tag, dof, accel=seriesTag)
+    model.pattern("UniformExcitation", 2, 1, accel=2)   # dof 1 = global X
+    model.pattern("UniformExcitation", 3, 2, accel=3)   # dof 2 = global Y
+
+    return model
+
+
 def get_inputs(i, events, input_channels, scale=1):
     event = events[i]
     inputs, dt = extract_channels(event, input_channels)
@@ -832,7 +1011,7 @@ def get_outputs(displacements):
     Returns outputs: ndarray, shape=(6, nt), row order:
       [1F X, 1F Y, 2F X, 2F Y, 3F X, 3F Y]
     """
-    floors = [5, 10, 15] #[9, 14, 19]  [5, 10, 15]
+    floors = [2, 3, 5] #[9, 14, 19]  [5, 10, 15]  [2, 3, 5]
     rows = []
     for node in floors:
         arr = np.array(displacements[node])  # shape (nt+1, 6)
