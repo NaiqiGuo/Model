@@ -654,13 +654,13 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     model.meta["column_elems"] = []
 
     # Nodes: (tag, (x, y, z))
-    model.node(0, (0.0,                   320.0,                  0.0))
-    model.node(1, (3180.0,                320.0,                  0.0))
-    model.node(2, (1752.0,                320.0,                  0.0))
-    model.node(3, (1641.4628263430573,    320.0,         199.41297159396336))
-    model.node(4, (1641.4628263430573,      0.0,         199.41297159396336))
-    model.node(5, (1862.5371736569432,    320.0,        -199.41297159396336))
-    model.node(6, (1862.5371736569432,      0.0,        -199.41297159396336))
+    model.node(0, (0.0,                                  0.0,                  320.0))
+    model.node(1, (3180.0,                               0.0,                  320.0))
+    model.node(2, (1752.0,                               0.0,                  320.0))
+    model.node(3, (1641.4628263430573,    199.41297159396336,                  320.0))
+    model.node(4, (1641.4628263430573,    199.41297159396336,                    0.0))
+    model.node(5, (1862.5371736569432,   -199.41297159396336,                  320.0))
+    model.node(6, (1862.5371736569432,   -199.41297159396336,                    0.0))
 
     # Boundary conditions, fully fixed at 0, 1, 4, 6
     # fix(tag, (DX, DY, DZ, RX, RY, RZ))
@@ -713,9 +713,9 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     divs = (numSubdivCirc, numSubdivRad)
 
     # tags
-    colSec_elastic = 1
-    colSec_fiber   = 2
-    beamSec_elastic = 3   # beams stay elastic
+    
+    colSec_fiber   = 1
+    beamSec_elastic = 2   # beams stay elastic
 
     # ELASTIC SECTION (for elasticBeamColumn model)
     A_el = math.pi * R_ext**2
@@ -723,62 +723,63 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     J_el = math.pi * R_ext**4 / 2.0
     nu = 0.2
     Gc = Ec / (2*(1+nu))
+    GJ   = Gc * J_el
     
+    model.section("Fiber", colSec_fiber, "-GJ", GJ)
 
-    model.section("Elastic", colSec_elastic,  Ec, A_el, I_el, I_el, Gc, J_el)
-    model.section("Elastic", beamSec_elastic, Ec, A_el, I_el, I_el, Gc, J_el)
+    numSubdivCirc, numSubdivRad = divs
 
-    # NONLINEAR FIBER SECTION (for forceBeamColumn)
+    # core concrete
+    model.patch("circ",
+                1,                      # matTag = 1
+                numSubdivCirc, numSubdivRad,
+                0.0, 0.0,               # yCenter, zCenter
+                0.0, R_core,            # intRad, extRad
+                0.0, 2 * math.pi)
 
-    if not elastic:
-        
-        GJ = Gc * J_el
-        model.section("Fiber", colSec_fiber, "-GJ", GJ)
-        numSubdivCirc, numSubdivRad = divs
+    # cover concrete
+    model.patch("circ",
+                2,                      # matTag = 2
+                numSubdivCirc, numSubdivRad,
+                0.0, 0.0,
+                R_core, R_ext,
+                0.0, 2 * math.pi)
 
-        # core concrete
-        model.patch("circ", 1,                 # matTag = 1
-                    numSubdivCirc, numSubdivRad,
-                    0.0, 0.0,                  # yCenter, zCenter
-                    0.0, R_core,               # intRad, extRad
-                    0.0, 2 * math.pi)         # startAng, endAng
+    # longitudinal steel
+    numBars = 36
+    barArea = 1.56                    # #11 bar area
+    model.layer("circ",
+                3,                    # steel matTag
+                numBars, barArea,
+                0.0, 0.0,            # yCenter, zCenter
+                R_core,              # radius
+                0.0, 2 * math.pi)
+   
 
-        # cover concrete
-        model.patch("circ", 2,                 # matTag = 2
-                    numSubdivCirc, numSubdivRad,
-                    0.0, 0.0,
-                    R_core, R_ext,
-                    0.0, 2 * math.pi)
 
-        # longitudinal steel
-        numBars = 36
-        barArea = 1.56
-        model.layer("circ", 3, numBars, barArea,
-                    0.0, 0.0,                  # yCenter, zCenter
-                    R_core,                    # radius
-                    0.0, 2 * math.pi)
+    A_beam = 864.0          # 24in × 36in = 864 in^2
+    I_beam = 9.33e4         # in^4  (strong axis)
+    J_beam = 3.73e5         # in^4  approximate torsion
+
+    model.section("Elastic", beamSec_elastic, Ec, A_beam, I_beam, I_beam, Gc, J_beam)
+
+    
 
     # Transformations and elements
     colTransf  = 1
     beamTransf = 2
-    model.geomTransf("Linear", colTransf,  (0.0, 0.0, 1.0))
+    model.geomTransf("Linear", colTransf,  (1.0, 0.0, 0.0))
     model.geomTransf("Linear", beamTransf, (0.0, 0.0, 1.0))
 
     # columns: elastic vs nonlinear
-    if elastic:
-        # columns as elasticBeamColumn with elastic section
-        col_type = "elasticBeamColumn"
-        sec_col  = colSec_elastic
+    
+    # columns as elasticBeamColumn with elastic section
+    col_type = "forceBeamColumn"
+    sec_col  = colSec_fiber
 
-        model.element(col_type, 2, (4, 3), transform=colTransf, section=sec_col, shear=0)
-        model.element(col_type, 3, (6, 5), transform=colTransf, section=sec_col, shear=0)
-    else:
-        # columns as forceBeamColumn with fiber section
-        col_type = "forceBeamColumn"
-        sec_col  = colSec_fiber
-
-        model.element(col_type, 2, (4, 3), transform=colTransf, section=sec_col, shear=0)
-        model.element(col_type, 3, (6, 5), transform=colTransf, section=sec_col, shear=0)
+    model.element(col_type, 2, (4, 3), transform=colTransf, section=sec_col, shear=0)
+    model.element(col_type, 3, (6, 5), transform=colTransf, section=sec_col, shear=0)
+    
 
     model.meta["column_elems"] = [2, 3]
 
@@ -792,12 +793,11 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     model.element(beam_type, 6, (5, 2), transform=beamTransf, section=sec_beam, shear=0)
 
     # Mass, damping and earthquake excitation
-    lump_mass = 1.0  # placeholder, adjust based on test data
+    lump_mass = 1.0  # placeholder
     for nd in [2, 3, 5]:
         # mass(tag, (MX, MY, MZ, RX, RY, RZ))
         model.mass(nd, (lump_mass, lump_mass, 0.0, 0.0, 0.0, 0.0))
 
-    # Rayleigh damping (same coefficients as frame model for now)
     # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
 

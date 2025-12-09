@@ -14,10 +14,8 @@ from model_utils import (
     create_painter_bridge_model,     # make sure this is defined in model_utils
 )
 
-# --------------------------------------------------------
 # Global switch for bridge model
-# --------------------------------------------------------
-ELASTIC = False      # True = elastic bridge, False = inelastic bridge
+ELASTIC = True    # True = elastic bridge, False = inelastic bridge
 
 # --------------------------------------------------------
 # Load events
@@ -38,9 +36,10 @@ else:
 
 print(f"Total events loaded: {len(events)}")
 
-# --------------------------------------------------------
+START_EVENT_ID = 3
+END_EVENT_ID   = 22
+
 # Input channels [x, y]
-# --------------------------------------------------------
 input_channels = [1, 3]
 
 # --------------------------------------------------------
@@ -57,6 +56,11 @@ os.makedirs(output_dir, exist_ok=True)
 # Main loop over events
 # --------------------------------------------------------
 for i, event in enumerate(events):
+    event_id = i + 1   
+
+    if event_id < START_EVENT_ID or event_id > END_EVENT_ID:
+        continue
+
     # inputs has shape (2, nt) for [x, y] components
     inputs, dt = get_inputs(
         i,
@@ -142,13 +146,13 @@ for i, event in enumerate(events):
     A_s, B_s, C_s, D_s, *rest = system_srim
     system_srim = (A_s, B_s, C_s, D_s)
 
-    with open(os.path.join(output_dir, f"system_srim_bridge_{i+1:02d}.pkl"), "wb") as f:
+    with open(os.path.join(output_dir, f"system_srim_bridge_{event_id:02d}.pkl"), "wb") as f:
         pickle.dump(system_srim, f)
-    print(f"Saved system_srim_bridge_{i+1:02d}.pkl")
+    print(f"Saved system_srim_bridge_{event_id:02d}.pkl")
 
     methods_dict = {
         'srim': (A_s, B_s, C_s, D_s),
         # you can enable other methods here if needed
     }
     # save methods to CSV, with event index i and method dict
-    save_all_methods_to_csv(i, methods_dict)
+    save_all_methods_to_csv(event_id - 1, methods_dict)
