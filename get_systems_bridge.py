@@ -15,7 +15,7 @@ from model_utils import (
 )
 
 # Global switch for bridge model
-ELASTIC = True    # True = elastic bridge, False = inelastic bridge
+ELASTIC = True   # True = elastic bridge, False = inelastic bridge
 
 # --------------------------------------------------------
 # Load events
@@ -36,7 +36,7 @@ else:
 
 print(f"Total events loaded: {len(events)}")
 
-START_EVENT_ID = 3
+START_EVENT_ID = 19
 END_EVENT_ID   = 22
 
 # Input channels [x, y]
@@ -128,37 +128,37 @@ for i, event in enumerate(events):
 
 
     # System identification options
-    n = 6
-    options = Config(
-        m           = 500,
-        horizon     = 190,
-        nc          = 190,
-        order       = 2*n,
-        period_band = (0.1, 0.6),
-        damping     = 0.06,
-        pseudo      = True,
-        outlook     = 190,
-        threads     = 8,
-        chunk       = 200,
-        i           = 250,
-        j           = 4400
-    )
-
-    # n = 4  
+    # n = 6
     # options = Config(
-    #     m           = 300,       
-    #     horizon     = 100,       
-    #     nc          = 100,
-    #     order       = 2*n,       
-    #     period_band = (0.1, 1.0),
-    #     damping     = 0.05,
+    #     m           = 500,
+    #     horizon     = 190,
+    #     nc          = 190,
+    #     order       = 2*n,
+    #     period_band = (0.1, 0.6),
+    #     damping     = 0.06,
     #     pseudo      = True,
-    #     outlook     = 100,
-    #     threads     = 4,       
+    #     outlook     = 190,
+    #     threads     = 8,
     #     chunk       = 200,
     #     i           = 250,
-    #     j           = 3500    
+    #     j           = 4400
     # )
+
+    n = 4  
+    options = Config(
+        m           = 300,       
+        horizon     = 100,       
+        nc          = 100,
+        order       = 2*n,       
+        period_band = (0.1, 1.0),
+        damping     = 0.05,
+        pseudo      = True,
+        outlook     = 100,
+        threads     = 4,       
+        chunk       = 200,
+        i           = 250,
+        j           = 3500    
+    )
 
     # ---- SRIM ----
     system_srim = sysid(inputs, outputs, method='srim', **options)

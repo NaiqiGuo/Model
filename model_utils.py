@@ -804,7 +804,7 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     # ---------- Gravity load and mass: template style ----------
 
     fc_unconf = 4.0      # ksi
-    D_total   = 60.0     # in 
+    D_total   = 30.0     # in 
     A_col     = math.pi * (D_total/2.0)**2 
 
     #  fc * A

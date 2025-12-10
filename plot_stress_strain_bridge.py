@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-DATA_DIR = "event_strain_stress_bridge_elastic"   # Folder containing event_XX_strain_stress.csv
+DATA_DIR = "event_strain_stress_bridge_inelastic"   # Folder containing event_XX_strain_stress.csv
 ELEMENT_ID = 2  
 
 
