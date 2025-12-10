@@ -102,6 +102,8 @@ for i, event in enumerate(events):
     # i           = 250,
     # j           = 4400
 
+    
+
     # ---- SRIM ----
     system_srim = sysid(inputs, outputs, method='srim', **options)
     A_s, B_s, C_s, D_s, *rest = system_srim

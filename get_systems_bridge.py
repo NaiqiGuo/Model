@@ -94,7 +94,10 @@ for i, event in enumerate(events):
             model,
             output_nodes=output_nodes,
             nt=nt,
-            dt=dt
+            dt=dt,
+            output_elements=[2,3],
+            yFiber=8.0,
+            zFiber=0.0
         )
     except RuntimeError as e:
         print(f"Error for event {i+1}:")
@@ -140,6 +143,22 @@ for i, event in enumerate(events):
         i           = 250,
         j           = 4400
     )
+
+    # n = 4  
+    # options = Config(
+    #     m           = 300,       
+    #     horizon     = 100,       
+    #     nc          = 100,
+    #     order       = 2*n,       
+    #     period_band = (0.1, 1.0),
+    #     damping     = 0.05,
+    #     pseudo      = True,
+    #     outlook     = 100,
+    #     threads     = 4,       
+    #     chunk       = 200,
+    #     i           = 250,
+    #     j           = 3500    
+    # )
 
     # ---- SRIM ----
     system_srim = sysid(inputs, outputs, method='srim', **options)

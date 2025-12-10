@@ -702,7 +702,7 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     
     # Section properties: 5 ft circular section
     # Geometry of circular section
-    D_total = 60.0        # total diameter in inches (5 ft)
+    D_total = 30 #60.0        # total diameter in inches (5 ft)
     cover   = 2.0         # concrete cover in inches
     R_ext   = D_total / 2.0
     R_core  = R_ext - cover  # approximate core radius
@@ -726,6 +726,9 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     GJ   = Gc * J_el
     
     model.section("Fiber", colSec_fiber, "-GJ", GJ)
+    itg_col = 1
+    npts_col = 4
+    model.beamIntegration("Lobatto", itg_col, colSec_fiber, npts_col)
 
     numSubdivCirc, numSubdivRad = divs
 
@@ -746,8 +749,8 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
                 0.0, 2 * math.pi)
 
     # longitudinal steel
-    numBars = 36
-    barArea = 1.56                    # #11 bar area
+    numBars = 18 # 36
+    barArea = 0.79 #1.56                    # #11 bar area
     model.layer("circ",
                 3,                    # steel matTag
                 numBars, barArea,
@@ -769,7 +772,7 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     colTransf  = 1
     beamTransf = 2
     model.geomTransf("Linear", colTransf,  (1.0, 0.0, 0.0))
-    model.geomTransf("Linear", beamTransf, (0.0, 0.0, 1.0))
+    model.geomTransf("Linear", beamTransf, 0.0, 0.0, 1.0)
 
     # columns: elastic vs nonlinear
     
@@ -793,10 +796,41 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     model.element(beam_type, 6, (5, 2), transform=beamTransf, section=sec_beam, shear=0)
 
     # Mass, damping and earthquake excitation
-    lump_mass = 1.0  # placeholder
+    # lump_mass = 1.0  # placeholder
+    # for nd in [2, 3, 5]:
+    #     # mass(tag, (MX, MY, MZ, RX, RY, RZ))
+    #     model.mass(nd, (lump_mass, lump_mass, 0.0, 0.0, 0.0, 0.0))
+
+    # ---------- Gravity load and mass: template style ----------
+
+    fc_unconf = 4.0      # ksi
+    D_total   = 60.0     # in 
+    A_col     = math.pi * (D_total/2.0)**2 
+
+    #  fc * A
+    P_col_cap = fc_unconf * A_col   #  kips
+
+    # 10% 
+    P_grav_total = 0.1 * P_col_cap         # kips
+    P_per_col    = P_grav_total / 2.0      # kips
+
+    # 
+    g = units.gravity   # in/s^2
+    m_per_node = P_per_col / g             # kip / (in/s^2) 
+
+    # 
+    for nd in [3, 5]:
+        # mass(MX, MY, MZ, RX, RY, RZ)
+        model.mass(nd, (m_per_node, m_per_node, 0.0, 0.0, 0.0, 0.0))
+
+    #
+    model.mass(2, (m_per_node, m_per_node, 0.0, 0.0, 0.0, 0.0))
+
+    # Plain + Constant
+    model.pattern("Plain", 1, "Constant")
     for nd in [2, 3, 5]:
-        # mass(tag, (MX, MY, MZ, RX, RY, RZ))
-        model.mass(nd, (lump_mass, lump_mass, 0.0, 0.0, 0.0, 0.0))
+        model.load(nd, (0.0, 0.0, -P_per_col/2.0, 0.0, 0.0, 0.0), pattern=1)
+
 
     # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
@@ -951,10 +985,10 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
         node: [model.nodeDisp(node)] for node in output_nodes
     }
     strains = {
-        element: [get_material_response(model, 1, 1, yFiber, zFiber)[0]] for element in output_elements
+        element: [get_material_response(model, element, 1, yFiber, zFiber)[0]] for element in output_elements
     }
     stresses = {
-        element: [get_material_response(model, 1, 1, yFiber, zFiber)[1]] for element in output_elements
+        element: [get_material_response(model, element, 1, yFiber, zFiber)[1]] for element in output_elements
     }
 
     # get modes
