@@ -595,20 +595,20 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
 
     # Set mass at the nodes
     #         tag   MX MY MZ   RX   RY   RZ
-    model.mass( 5, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 6, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 7, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 8, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 5, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 6, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 7, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 8, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
 
-    model.mass( 10, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 11, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 12, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 13, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 10, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 11, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 12, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 13, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
 
-    model.mass( 15, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 16, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 17, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
-    model.mass( 18, (m/4, m/4, 0.0, 0.0, 0.0, 0.0))
+    model.mass( 15, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 16, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 17, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 18, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
     # Define gravity loads
     # create a Plain load pattern with Constant scaling
     model.pattern("Plain", 1, "Constant")
@@ -672,8 +672,8 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     # Materials: concrete and steel
 
     # Concrete strengths (ksi)
-    fc_unconf = 4.0   # unconfined concrete
-    fc_conf   = 5.0   # confined concrete
+    fc_unconf = 3.0   # unconfined concrete
+    fc_conf   = 3.5  # confined concrete
 
     # Concrete modulus (ksi), same formula as your frame model
     Ec = 57000.0 * math.sqrt(fc_unconf * 1000.0) / 1000.0
@@ -702,7 +702,7 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     
     # Section properties: 5 ft circular section
     # Geometry of circular section
-    D_total = 30 #60.0        # total diameter in inches (5 ft)
+    D_total = 60 #60.0        # total diameter in inches (5 ft)
     cover   = 2.0         # concrete cover in inches
     R_ext   = D_total / 2.0
     R_core  = R_ext - cover  # approximate core radius
@@ -749,8 +749,8 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
                 0.0, 2 * math.pi)
 
     # longitudinal steel
-    numBars = 18 # 36
-    barArea = 0.79 #1.56                    # #11 bar area
+    numBars = 36 # 36
+    barArea = 1.56 #1.56                    # #11 bar area
     model.layer("circ",
                 3,                    # steel matTag
                 numBars, barArea,
@@ -803,15 +803,15 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
 
     # ---------- Gravity load and mass: template style ----------
 
-    fc_unconf = 4.0      # ksi
-    D_total   = 30.0     # in 
+    
+    
     A_col     = math.pi * (D_total/2.0)**2 
 
     #  fc * A
-    P_col_cap = fc_unconf * A_col   #  kips
+    P_col_cap = fc_conf * A_col   #  kips
 
     # 10% 
-    P_grav_total = 0.1 * P_col_cap         # kips
+    P_grav_total = 0.05 * P_col_cap         # kips
     P_per_col    = P_grav_total / 2.0      # kips
 
     # 
@@ -819,12 +819,9 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     m_per_node = P_per_col / g             # kip / (in/s^2) 
 
     # 
-    for nd in [3, 5]:
+    for nd in [2, 3, 5]:
         # mass(MX, MY, MZ, RX, RY, RZ)
-        model.mass(nd, (m_per_node, m_per_node, 0.0, 0.0, 0.0, 0.0))
-
-    #
-    model.mass(2, (m_per_node, m_per_node, 0.0, 0.0, 0.0, 0.0))
+        model.mass(nd, (m_per_node, m_per_node, m_per_node, 0.0, 0.0, 0.0))
 
     # Plain + Constant
     model.pattern("Plain", 1, "Constant")
@@ -992,7 +989,7 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
     }
 
     # get modes
-    lambdas = model.eigen(n_modes) 
+    lambdas = model.eigen(n_modes, "fullGenLapack")  
     omega = np.sqrt(np.abs(lambdas))
     freqs_before = omega / (2 * np.pi) 
     periods_before = 2 * np.pi / omega
@@ -1018,7 +1015,7 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
             strains[element].append(get_material_response(model, element, 1, yFiber, zFiber)[0])
             stresses[element].append(get_material_response(model, element, 1, yFiber, zFiber)[1])
 
-    lambdas_after = model.eigen(n_modes) 
+    lambdas_after = model.eigen(n_modes, "fullGenLapack") 
     omega_after = np.sqrt(np.abs(lambdas_after))   
     freqs_after = omega_after / (2 * np.pi)
     periods_after = 2 * np.pi / omega_after   

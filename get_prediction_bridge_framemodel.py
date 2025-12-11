@@ -29,7 +29,7 @@ DO_ELASTIC  = True
 DO_INELASTIC = True
 
 # output nodes for bridge deck
-BRIDGE_OUTPUT_NODES = [2, 3, 5]
+# BRIDGE_OUTPUT_NODES = [2, 3, 5]
 
 # ================== output directories ==================
 root_output_dir       = "predictions_bridge_model"
@@ -63,15 +63,28 @@ inputs, dt = get_inputs(0, events=events, input_channels=input_channels, scale=2
 nt = inputs.shape[1]
 print("Input shape example:", inputs.shape)
 
+
 model = create_painter_bridge_model(
-    elastic=True,
-    inputx=inputs[0],
-    inputy=inputs[1],
-    dt=dt
-)
-disp = analyze(model, output_nodes=BRIDGE_OUTPUT_NODES, nt=nt, dt=dt)
+            elastic=ELASTIC,
+            inputx=inputs[0],
+            inputy=inputs[1],
+            dt=dt
+        )
+
+output_nodes = [2, 3, 5]
+
+disp = analyze(
+        model,
+        output_nodes=output_nodes,
+        nt=nt,
+        dt=dt,
+        output_elements=[2,3],
+        yFiber=8.0,
+        zFiber=0.0
+    )
+
 # get_outputs must support node_order parameter
-outputs = get_outputs(disp, node_order=BRIDGE_OUTPUT_NODES)
+outputs = get_outputs(disp)  #, node_order=BRIDGE_OUTPUT_NODES
 outputs = outputs[:, 1:]
 num_channels = outputs.shape[0]
 
@@ -82,9 +95,7 @@ error_matrix_inel = np.full((num_channels, num_algos, num_events), np.nan)
 dT_mode1_inel = []   # collect first mode ΔT/T
 ev_ids_inel   = []
 
-# ==========================================
 #              main event loop
-# ==========================================
 
 for event_id in range(1, num_events + 1):
 
@@ -103,7 +114,16 @@ for event_id in range(1, num_events + 1):
         T_before_el = get_natural_periods(model, nmodes=3) if DO_Q5 else None
 
         try:
-            disp = analyze(model, output_nodes=BRIDGE_OUTPUT_NODES, nt=nt, dt=dt)
+            
+            disp = analyze(
+            model,
+            output_nodes=output_nodes,
+            nt=nt,
+            dt=dt,
+            output_elements=[2,3],
+            yFiber=8.0,
+            zFiber=0.0
+        )
         except RuntimeError:
             continue
 
@@ -114,7 +134,7 @@ for event_id in range(1, num_events + 1):
             print(f"[Q5][Elastic-Bridge] Event {event_id:02d} ΔT/T (%):",
                   np.array2string(dT_pct_el, precision=3))
 
-        outputs = get_outputs(disp, node_order=BRIDGE_OUTPUT_NODES)
+        outputs = get_outputs(disp) #, node_order=BRIDGE_OUTPUT_NODES
         outputs = outputs[:, 1:]
         time = np.arange(outputs.shape[1]) * dt
 
@@ -300,7 +320,15 @@ for event_id in range(1, num_events + 1):
         T0_inel = get_natural_periods(model_inel, nmodes=3) if DO_Q5 else None
 
         try:
-            disp_inel = analyze(model_inel, output_nodes=BRIDGE_OUTPUT_NODES, nt=nt, dt=dt)
+            disp = analyze(
+            model,
+            output_nodes=output_nodes,
+            nt=nt,
+            dt=dt,
+            output_elements=[2,3],
+            yFiber=8.0,
+            zFiber=0.0
+        )
         except RuntimeError:
             pass
         else:
@@ -313,7 +341,7 @@ for event_id in range(1, num_events + 1):
                 dT_mode1_inel.append(float(dT_pct[0]))
                 ev_ids_inel.append(event_id)
 
-            outputs_inel = get_outputs(disp_inel, node_order=BRIDGE_OUTPUT_NODES)
+            outputs_inel = get_outputs(disp)  #, node_order=BRIDGE_OUTPUT_NODES
             outputs_inel = outputs_inel[:, 1:]
             time_inel = np.arange(outputs_inel.shape[1]) * dt
 
