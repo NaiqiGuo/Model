@@ -672,8 +672,8 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     # Materials: concrete and steel
 
     # Concrete strengths (ksi)
-    fc_unconf = 3.0   # unconfined concrete
-    fc_conf   = 3.5  # confined concrete
+    fc_unconf = 4.0   # unconfined concrete
+    fc_conf   = 5.0  # confined concrete
 
     # Concrete modulus (ksi), same formula as your frame model
     Ec = 57000.0 * math.sqrt(fc_unconf * 1000.0) / 1000.0
@@ -759,10 +759,10 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
                 0.0, 2 * math.pi)
    
 
-
+    beam_stiff_factor = 5.0
     A_beam = 864.0          # 24in × 36in = 864 in^2
-    I_beam = 9.33e4         # in^4  (strong axis)
-    J_beam = 3.73e5         # in^4  approximate torsion
+    I_beam = 9.33e4 * beam_stiff_factor        # in^4  (strong axis)
+    J_beam = 3.73e5 * beam_stiff_factor        # in^4  approximate torsion
 
     model.section("Elastic", beamSec_elastic, Ec, A_beam, I_beam, I_beam, Gc, J_beam)
 
@@ -821,7 +821,7 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     # 
     for nd in [2, 3, 5]:
         # mass(MX, MY, MZ, RX, RY, RZ)
-        model.mass(nd, (m_per_node, m_per_node, m_per_node, 0.0, 0.0, 0.0))
+        model.mass(nd, (m_per_node/90, m_per_node/90, m_per_node/10, 0.0, 0.0, 0.0))
 
     # Plain + Constant
     model.pattern("Plain", 1, "Constant")
@@ -1027,8 +1027,8 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
         writer = csv.writer(f)
         if not file_exists:
             header = ["event_id"]
-            header += [f"f{i+1}_before_s" for i in range(n_modes)] #Hz
-            header += [f"f{i+1}_after_s" for i in range(n_modes)]
+            header += [f"f{i+1}_before_Hz" for i in range(n_modes)] #Hz
+            header += [f"f{i+1}_after_Hz" for i in range(n_modes)]
             writer.writerow(header)
         row = [event_id] + list(freqs_before) + list(freqs_after)
         writer.writerow(row)

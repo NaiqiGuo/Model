@@ -65,7 +65,7 @@ print("Input shape example:", inputs.shape)
 
 
 model = create_painter_bridge_model(
-            elastic=ELASTIC,
+            elastic=DO_ELASTIC,
             inputx=inputs[0],
             inputy=inputs[1],
             dt=dt
@@ -73,7 +73,7 @@ model = create_painter_bridge_model(
 
 output_nodes = [2, 3, 5]
 
-disp = analyze(
+disp, stresses, strains = analyze(
         model,
         output_nodes=output_nodes,
         nt=nt,
@@ -115,7 +115,7 @@ for event_id in range(1, num_events + 1):
 
         try:
             
-            disp = analyze(
+            disp, stresses, strains = analyze(
             model,
             output_nodes=output_nodes,
             nt=nt,
@@ -320,7 +320,7 @@ for event_id in range(1, num_events + 1):
         T0_inel = get_natural_periods(model_inel, nmodes=3) if DO_Q5 else None
 
         try:
-            disp = analyze(
+            disp, stresses, strains = analyze(
             model,
             output_nodes=output_nodes,
             nt=nt,
