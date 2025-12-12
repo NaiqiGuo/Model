@@ -24,7 +24,7 @@ windowed_plot = True
 
 DO_Q5 = False
 DO_ELASTIC   = True
-DO_INELASTIC = True
+DO_INELASTIC = False
 
 root_output_dir     = "predictions_framemodel"
 elastic_output_dir  = os.path.join(root_output_dir, "elastic")

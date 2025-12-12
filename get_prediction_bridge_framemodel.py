@@ -28,6 +28,7 @@ DO_Q5       = False
 DO_ELASTIC  = True
 DO_INELASTIC = True
 
+
 # output nodes for bridge deck
 # BRIDGE_OUTPUT_NODES = [2, 3, 5]
 
@@ -83,8 +84,7 @@ disp, stresses, strains = analyze(
         zFiber=0.0
     )
 
-# get_outputs must support node_order parameter
-outputs = get_outputs(disp)  #, node_order=BRIDGE_OUTPUT_NODES
+outputs = get_outputs(disp)  
 outputs = outputs[:, 1:]
 num_channels = outputs.shape[0]
 
@@ -136,6 +136,7 @@ for event_id in range(1, num_events + 1):
 
         outputs = get_outputs(disp) #, node_order=BRIDGE_OUTPUT_NODES
         outputs = outputs[:, 1:]
+
         time = np.arange(outputs.shape[1]) * dt
 
         have_aligned   = False
@@ -172,6 +173,15 @@ for event_id in range(1, num_events + 1):
                 verbose=False, max_lag_allowed=None
             )
 
+            ytrue_shifted = ytrue_aln.copy()
+
+            for ch in range(num_channels):
+                mean_true = np.mean(ytrue_aln[ch])
+                mean_pred = np.mean(ypred_aln[ch])
+                offset = mean_pred - mean_true
+                ytrue_shifted[ch] = ytrue_aln[ch] + offset
+
+
             have_aligned  = True
             last_sys_name = sys_name
 
@@ -201,7 +211,7 @@ for event_id in range(1, num_events + 1):
 
             # error matrix and save aligned time series
             for ch in range(num_channels):
-                y_t = ytrue_aln[ch]
+                y_t = ytrue_shifted[ch]
                 y_p = ypred_aln[ch]
 
                 data = np.column_stack([time_aln, y_t, y_p])
@@ -237,7 +247,7 @@ for event_id in range(1, num_events + 1):
             # X
             ax = axs[0]
             for f in idxs:
-                ax.plot(time_aln, ytrue_aln[2 * f],   "--", label=f"True NodeGrp{f+1} X")
+                ax.plot(time_aln, ytrue_shifted[2 * f],   "--", label=f"True NodeGrp{f+1} X")
                 ax.plot(time_aln, ypred_aln[2 * f],         label=f"{sys_name.upper()} NodeGrp{f+1} X")
             ax.set(title=f"{sys_name.upper()} Bridge. X direction", xlabel="Time (s)", ylabel="Disp")
             ax.legend()
@@ -245,7 +255,7 @@ for event_id in range(1, num_events + 1):
             # Y
             ax = axs[1]
             for f in idxs:
-                ax.plot(time_aln, ytrue_aln[2 * f + 1], "--", label=f"True NodeGrp{f+1} Y")
+                ax.plot(time_aln, ytrue_shifted[2 * f + 1], "--", label=f"True NodeGrp{f+1} Y")
                 ax.plot(time_aln, ypred_aln[2 * f + 1],       label=f"{sys_name.upper()} NodeGrp{f+1} Y")
             ax.set(title=f"{sys_name.upper()} Bridge. Y direction", xlabel="Time (s)", ylabel="Disp")
             ax.legend()
@@ -265,7 +275,7 @@ for event_id in range(1, num_events + 1):
                 ch_true = 2 * f
                 ch_pred = 2 * f
                 figx.add_scatter(
-                    x=time_aln, y=ytrue_aln[ch_true],
+                    x=time_aln, y=ytrue_shifted[ch_true],
                     mode="lines", name=f"True NodeGrp{f+1} X", line=dict(dash="dash")
                 )
                 figx.add_scatter(
@@ -288,7 +298,7 @@ for event_id in range(1, num_events + 1):
                 ch_true = 2 * f + 1
                 ch_pred = 2 * f + 1
                 figy.add_scatter(
-                    x=time_aln, y=ytrue_aln[ch_true],
+                    x=time_aln, y=ytrue_shifted[ch_true],
                     mode="lines", name=f"True NodeGrp{f+1} Y", line=dict(dash="dash")
                 )
                 figy.add_scatter(
@@ -321,7 +331,7 @@ for event_id in range(1, num_events + 1):
 
         try:
             disp, stresses, strains = analyze(
-            model,
+            model_inel,
             output_nodes=output_nodes,
             nt=nt,
             dt=dt,
@@ -378,6 +388,14 @@ for event_id in range(1, num_events + 1):
                     verbose=False, max_lag_allowed=None
                 )
 
+                ytrue_shifted = ytrue_aln.copy()
+
+                for ch in range(num_channels):
+                    mean_true = np.mean(ytrue_aln[ch])
+                    mean_pred = np.mean(ypred_aln[ch])
+                    offset = mean_pred - mean_true
+                    ytrue_shifted[ch] = ytrue_aln[ch] + offset
+
                 have_aligned_inel  = True
                 last_sys_name_inel = sys_name
 
@@ -405,7 +423,7 @@ for event_id in range(1, num_events + 1):
                               f"({lag_sec:+.4f} s), {direction}")
 
                 for ch in range(num_channels):
-                    y_t = ytrue_aln[ch]
+                    y_t = ytrue_shifted[ch]
                     y_p = ypred_aln[ch]
 
                     data = np.column_stack([time_aln, y_t, y_p])
@@ -439,7 +457,7 @@ for event_id in range(1, num_events + 1):
                 # X
                 ax = axs[0]
                 for f in idxs:
-                    ax.plot(time_aln, ytrue_aln[2 * f],   "--", label=f"True NodeGrp{f+1} X")
+                    ax.plot(time_aln, ytrue_shifted[2 * f],   "--", label=f"True NodeGrp{f+1} X")
                     ax.plot(time_aln, ypred_aln[2 * f],         label=f"{sys_name.upper()} NodeGrp{f+1} X")
                 ax.set(title=f"{sys_name.upper()} Bridge. X direction",
                        xlabel="Time (s)", ylabel="Disp")
@@ -448,7 +466,7 @@ for event_id in range(1, num_events + 1):
                 # Y
                 ax = axs[1]
                 for f in idxs:
-                    ax.plot(time_aln, ytrue_aln[2 * f + 1], "--", label=f"True NodeGrp{f+1} Y")
+                    ax.plot(time_aln, ytrue_shifted[2 * f + 1], "--", label=f"True NodeGrp{f+1} Y")
                     ax.plot(time_aln, ypred_aln[2 * f + 1],       label=f"{sys_name.upper()} NodeGrp{f+1} Y")
                 ax.set(title=f"{sys_name.upper()} Bridge. Y direction",
                        xlabel="Time (s)", ylabel="Disp")
@@ -483,7 +501,7 @@ for event_id in range(1, num_events + 1):
                     ch_true = 2 * f
                     ch_pred = 2 * f
                     figx.add_scatter(
-                        x=time_aln, y=ytrue_aln[ch_true],
+                        x=time_aln, y= ytrue_shifted[ch_true],
                         mode="lines", name=f"True NodeGrp{f+1} X", line=dict(dash="dash")
                     )
                     figx.add_scatter(
@@ -507,7 +525,7 @@ for event_id in range(1, num_events + 1):
                     ch_true = 2 * f + 1
                     ch_pred = 2 * f + 1
                     figy.add_scatter(
-                        x=time_aln, y=ytrue_aln[ch_true],
+                        x=time_aln, y= ytrue_shifted[ch_true],
                         mode="lines", name=f"True NodeGrp{f+1} Y", line=dict(dash="dash")
                     )
                     figy.add_scatter(

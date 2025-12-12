@@ -16,7 +16,7 @@ from model_utils import (
 
 if __name__ == "__main__":
     # Global switch for bridge model
-    ELASTIC = False   # True = elastic bridge, False = inelastic bridge
+    ELASTIC = False  # True = elastic bridge, False = inelastic bridge
 
     # --------------------------------------------------------
     # Load events
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     print(f"Total events loaded: {len(events)}")
 
-    START_EVENT_ID = 20
+    START_EVENT_ID = 1
     END_EVENT_ID   = 22
 
     # Input channels [x, y]
@@ -145,16 +145,16 @@ if __name__ == "__main__":
         #     j           = 4400
         # )
 
-        n = 4  
+        n = 2  
         options = Config(
-            m           = 300,       
-            horizon     = 100,       
-            nc          = 100,
-            order       = 2*n,       
-            period_band = (0.1, 1.0),
+            m           = 120,       
+            horizon     = 25,       
+            nc          = 25,
+            order       = 3,       
+            period_band = (0.15, 0.8),
             damping     = 0.05,
             pseudo      = True,
-            outlook     = 100,
+            outlook     = 25,
             threads     = 4,       
             chunk       = 200,
             i           = 250,

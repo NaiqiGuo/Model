@@ -821,7 +821,7 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     # 
     for nd in [2, 3, 5]:
         # mass(MX, MY, MZ, RX, RY, RZ)
-        model.mass(nd, (m_per_node/90, m_per_node/90, m_per_node/10, 0.0, 0.0, 0.0))
+        model.mass(nd, (m_per_node/90, m_per_node/90, m_per_node/10, 0.0, 0.0, 0.0)) #909010
 
     # Plain + Constant
     model.pattern("Plain", 1, "Constant")
