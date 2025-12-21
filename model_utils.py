@@ -7,6 +7,7 @@ import csv
 import os
 import cvxpy as cp 
 import tqdm
+import plotly.graph_objects as go
 
 def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBars, barArea, nfCoreY, nfCoreZ, nfCoverY, nfCoverZ, GJ):
     r"""
@@ -683,7 +684,7 @@ def write_freq_csv(event_id,
         writer.writerow(row)
 
 
-def get_outputs(displacements,
+def get_node_displacements(displacements,
                 nodes=[5,10,15], # building (3 story frame)
                 # nodes=[2,3,5], # bridge
                 ):
@@ -853,14 +854,11 @@ def save_event_modes_to_csv(event_id, Phi_true, method_modes, method_macs, algos
         writer.writerow([])  
 
 
-def plot_q4_max_strain(sr, model, title, html_base, PLOTLY_OK=True):
+def plot_q4_max_strain(sr, model, title, html_base):
     """
     sr = model.meta["strain_record"]
     Generate the time history curve of the maximum edge concrete strain/reinforcement strain (nonlinear) or edge strain (elastic).
     """
-    if not PLOTLY_OK:
-        return
-    import numpy as np, plotly.graph_objects as go, os
 
     t = np.asarray(sr["time"], float)
     cols = model.meta["column_elems"]

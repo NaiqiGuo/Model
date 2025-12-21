@@ -5,7 +5,7 @@ import numpy as np
 import quakeio
 from mdof import sysid
 from mdof.utilities.config import Config
-from model_utils import( get_inputs, get_outputs,
+from model_utils import( get_inputs, get_node_displacements,
                          create_frame_model, create_bridge_model,
                          apply_load_frame_model, apply_load_bridge_model,
                          analyze,
@@ -49,11 +49,15 @@ if __name__ == "__main__":
         event_id = str(i+1)
 
         # Result output directory
-        event_out_dir = OUT_DIR/event_id
-        os.makedirs(event_out_dir, exist_ok=True)
+        event_dir = OUT_DIR/event_id
+        os.makedirs(event_dir, exist_ok=True)
 
-        # System identification and model inputs
-        inputs, dt = get_inputs(i, events=events, input_channels=input_channels, scale=2.54)
+        # Model and system identification inputs (acceleration, in/s²)
+        inputs, dt = get_inputs(i,
+                                events=events,
+                                input_channels=input_channels,
+                                scale=1/2.54 # cm to inches
+                                )
         nt = inputs.shape[1]
         print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
 
@@ -64,6 +68,7 @@ if __name__ == "__main__":
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
+            input_nodes = [1]
             output_nodes = [5,10,15]
             output_elements = [1,5,9]
         elif MODEL == 'bridge':
@@ -72,13 +77,14 @@ if __name__ == "__main__":
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
+            input_nodes = [4]
             output_nodes = [2,3,5]
             output_elements = [2,3]
         try:
             disp, stresses, strains, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
                                                                     dt=dt,
-                                                                    output_nodes=output_nodes,
+                                                                    output_nodes=[*input_nodes,*output_nodes],
                                                                     output_elements=output_elements,
                                                                     yFiber=9.0,
                                                                     zFiber=0.0
@@ -89,26 +95,28 @@ if __name__ == "__main__":
             continue
 
         # Save frequencies, displacements, strains, and stresses
-        np.savetxt(event_out_dir/"pre_eq_natural_frequencies.csv", freqs_before)
-        np.savetxt(event_out_dir/"post_eq_natural_frequencies.csv", freqs_after)
-        save_displacements(disp, dt, filename=event_out_dir/"displacements.csv")
-        save_strain_stress(stresses, strains, dt, filename=event_out_dir/"strain_stress.csv")
+        np.savetxt(event_dir/"pre_eq_natural_frequencies.csv", freqs_before)
+        np.savetxt(event_dir/"post_eq_natural_frequencies.csv", freqs_after)
+        save_displacements(disp, dt, filename=event_dir/"displacements.csv")
+        save_strain_stress(stresses, strains, dt, filename=event_dir/"strain_stress.csv")
 
 
-        # System identification outputs
-        outputs = get_outputs(disp)
-        outputs = outputs[:,1:] 
-        assert inputs.shape[1] == outputs.shape[1], "inputs and outputs have different length of time samples."
+        # System identification outputs (displacement, inches)
+        outputs = get_node_displacements(disp, nodes=output_nodes)[:,1:]
+        print(f"{outputs.shape=}")
+        assert inputs.shape[1] == outputs.shape[1], (
+            "system identification inputs and outputs have different length of time samples.")
         time = np.arange(nt) * dt
 
-        # Save system identification inputs and outputs
-        with open(event_out_dir/"dt.txt", "w") as f:
+        # Save dt, time, and system identification inputs and outputs
+        with open(event_dir/"dt.txt", "w") as f:
             f.write(str(dt))
-        np.savetxt(event_out_dir/"inputs.csv", inputs)
-        np.savetxt(event_out_dir/"outputs.csv", outputs)
+        np.savetxt(event_dir/"time.csv", time)
+        np.savetxt(event_dir/"inputs.csv", inputs)
+        np.savetxt(event_dir/"outputs.csv", outputs)
 
         # Perform system identification and save systems
-        n = 6
+        n = 3
         options = Config(
             m           = 500,
             horizon     = 190,
@@ -126,5 +134,5 @@ if __name__ == "__main__":
         system_full = sysid(inputs, outputs, method=SID_METHOD, **options)
         A,B,C,D, *rest = system_full
         system = (A,B,C,D)
-        with open(event_out_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
+        with open(event_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
             pickle.dump(system, f)
