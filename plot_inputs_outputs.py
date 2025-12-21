@@ -1,4 +1,4 @@
-from Experimental_System_ID import get_inputs, get_outputs, analyze, create_model
+from model_utils import get_inputs, get_outputs, analyze, create_frame_model, apply_load_frame_model
 import matplotlib.pyplot as plt
 import quakeio
 from pathlib import Path
@@ -35,11 +35,8 @@ if __name__ == "__main__":
         print(f"Event {i+1}")
         inputs, dt = get_inputs(i, events, input_channels, scale=2.54)
         nt = inputs.shape[1]
-        model = create_model(column="forceBeamColumn",
-                             girder="forceBeamColumn",
-                             inputx=inputs[0],
-                             inputy=inputs[1],
-                             dt=dt)
+        model = create_frame_model(elastic=True)
+        model = apply_load_frame_model(model, inputx=inputs[0], inputy=inputs[1], dt=dt)
         disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
         outputs = get_outputs(disp)   
         outputs = outputs[:, 1:]

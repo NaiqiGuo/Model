@@ -513,12 +513,9 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn",
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
 
     # Ground motion: fault normal (x) and fault parallel (y) components
-    inputx_t = cosine_taper(inputx, dt, T_ramp=0.4)
-    inputy_t = cosine_taper(inputy, dt, T_ramp=0.4)
-
     # Time series for the two components
-    model.timeSeries("Path", 2, values=inputx_t.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy_t.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
 
     # Uniform excitation patterns in global X and Y directions
     # pattern("UniformExcitation", tag, dof, accel=seriesTag)
@@ -588,7 +585,7 @@ def get_material_response(model, element, sec_tag, y, z):
 
 
 def analyze(model, nt, dt, 
-            output_nodes=[5, 10, 15],
+            output_nodes=[5,10,15],
             output_elements=[1,5,9],
             n_modes=3,
             yFiber=9.0,
@@ -670,6 +667,7 @@ def write_freq_csv(event_id,
                    freqs_before,
                    freqs_after,
                    freq_csv_path="natural_frequencies.csv"):
+    
     n_modes = len(freqs_before)
     
     file_exists = os.path.exists(freq_csv_path)
@@ -831,22 +829,6 @@ def periods_from_A(A, dt):
     return np.sort(periods)
 
 
-def save_all_methods_to_csv(i, methods_dict):
-    """
-    methods_dict: {'srim': (A,B,C,D), 'n4sid': (A,B,C,D), ...}
-    """
-    out_dir = "event_outputs_ABCD"
-    os.makedirs(out_dir, exist_ok=True)
-    filename = os.path.join(out_dir, f"event_modes_{i+1:02d}.csv")
-    with open(filename, "w") as f:
-        for method, (A, B, C, D) in methods_dict.items():
-            for matrix_name, M in zip(['A','B','C','D'], [A, B, C, D]):
-                f.write(f"# {method.upper()}-{matrix_name}\n")
-                np.savetxt(f, M, delimiter=",", fmt="%.8e")
-                f.write("\n")  # Add an empty line for readability
-    print(f"Saved all system matrices for event {i+1} to {filename}")
-
-
 def save_event_modes_to_csv(event_id, Phi_true, method_modes, method_macs, algos, filename):
     # method_modes: {'srim': Phi_srim, ...}  Phi, shape=(dof, n_modes)
     # method_macs:  {'srim': MAC_srim, ...}  MAC,  shape=(n_modes, n_modes)
@@ -917,66 +899,17 @@ def plot_q4_max_strain(sr, model, title, html_base, PLOTLY_OK=True):
     f2.write_html(html_base + "_inelastic_steel.html", include_plotlyjs="cdn")
 
 
-def get_natural_periods(model, nmodes=3):
-    """
-    Return a periodic array T (in s) of length nmodes.
-    Suppose the eigen/modal interface returns the eigenvalue λ = ω^2 (OpenSees style).
-    If your interface directly returns ω (rad/s), simply change the sqrt line below to not take sqrt.
-    """
-    import numpy as np
+def save_displacements(displacements, dt, filename):
 
-    evals = None
-    for api in ("modal_eigenvalues", "eigenvalues", "eigen"):
-        if hasattr(model, api):
-            try:
-                evals = getattr(model, api)(nmodes)
-                break
-            except Exception:
-                pass
-    if evals is None:
-        raise RuntimeError("No modal eigenvalue API found on model (tried modal_eigenvalues/eigenvalues/eigen).")
-
-    evals = np.asarray(evals, float)            # λ = ω^2
-    omegas = np.sqrt(np.clip(evals, 0.0, None)) # ω
-    T = 2*np.pi / np.where(omegas > 1e-12, omegas, np.nan)
-    return T
-
-
-def plot_deltaT_across_events(event_ids, dT_pct_list, plotly_dir, title="ΔT/T after EQ (Inelastic)"):
-    """
-    Draw the "percentage change of each event period" of the nonlinear model (by default, the first mode is taken, or any sequence you pass in).
-    """
-    import os
-    if not event_ids or not dT_pct_list:
-        return
-    try:
-        import plotly.graph_objects as go
-    except Exception:
-        return
-    fig = go.Figure()
-    fig.add_bar(x=[f"E{e:02d}" for e in event_ids], y=dT_pct_list, name="ΔT/T (%)")
-    fig.update_layout(title=title, xaxis_title="Event", yaxis_title="Change (%)")
-    os.makedirs(plotly_dir, exist_ok=True)
-    outp = os.path.join(plotly_dir, "q5_dT_mode1_across_events.html")
-    fig.write_html(outp, include_plotlyjs="cdn")
-    print("[Q5] Saved →", outp)
-
-
-def save_event_disp(event_id, displacements, dt, out_dir="event_disp"):
-    os.makedirs(out_dir, exist_ok=True)
-
-    first_node = next(iter(displacements.keys()))
-    nt = len(displacements[first_node])  
+    nt = len(displacements.values()[0])
     time = np.arange(nt) * dt
 
     nodes = sorted(displacements.keys())
 
-    filename = os.path.join(out_dir, f"event_{event_id:02d}_disp.csv")
-
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
 
-        # sheet tital: time + each node 6 dof
+        # header: time + each node 6 dof
         dof_labels = ["UX", "UY", "UZ", "RX", "RY", "RZ"]
         header = ["time"]
         for n in nodes:
@@ -992,25 +925,18 @@ def save_event_disp(event_id, displacements, dt, out_dir="event_disp"):
                 row.extend(u)
             writer.writerow(row)
 
-    print(f"[save_event_disp] Saved displacements for event {event_id:02d} to {filename}")
 
+def save_strain_stress(stresses, strains, dt, filename):
 
-def save_event_strain_stress(event_id, stresses, strains, dt,
-                             out_dir="event_strain_stress"):
-    os.makedirs(out_dir, exist_ok=True)
-
-    first_ele = next(iter(stresses.keys()))
-    nt = len(stresses[first_ele])  
+    nt = len(stresses.values()[0])
     time = np.arange(nt) * dt
 
     elems = sorted(stresses.keys())
 
-    filename = os.path.join(out_dir, f"event_{event_id:02d}_strain_stress.csv")
-
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
 
-        # sheet tital: time + stress + strain
+        # header: time + stress + strain
         header = ["time"]
         header += [f"ele{e}_stress" for e in elems]
         header += [f"ele{e}_strain" for e in elems]
@@ -1024,5 +950,3 @@ def save_event_strain_stress(event_id, stresses, strains, dt,
             for e in elems:
                 row.append(strains[e][k])
             writer.writerow(row)
-
-    print(f"[save_event_strain_stress] Saved strain/stress for event {event_id:02d} to {filename}")
