@@ -901,7 +901,7 @@ def plot_q4_max_strain(sr, model, title, html_base, PLOTLY_OK=True):
 
 def save_displacements(displacements, dt, filename):
 
-    nt = len(displacements.values()[0])
+    nt = len(list(displacements.values())[0])
     time = np.arange(nt) * dt
 
     nodes = sorted(displacements.keys())
@@ -928,7 +928,7 @@ def save_displacements(displacements, dt, filename):
 
 def save_strain_stress(stresses, strains, dt, filename):
 
-    nt = len(stresses.values()[0])
+    nt = len(list(stresses.values())[0])
     time = np.arange(nt) * dt
 
     elems = sorted(stresses.keys())
