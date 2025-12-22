@@ -2,11 +2,11 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from pathlib import Path
 
 from model_utils import (
     get_inputs, create_frame_model, analyze, get_outputs,
-    stabilize_with_lmi, stabilize_by_radius_clipping,
-    simulate, stabilize_discrete, intensity_bounds, truncate_by_bounds, record_strain_step,
+    simulate, stabilize_discrete, intensity_bounds, truncate_by_bounds,
     plot_q4_max_strain, get_natural_periods, plot_deltaT_across_events
 )
 from mdof.utilities.testing import align_signals
@@ -16,7 +16,6 @@ from scipy.signal import correlate, correlation_lags
 from mdof.prediction import _get_error 
 import plotly.graph_objects as go
 
-
 num_events = 21
 sys_names = ["srim"]
 num_algos = len(sys_names)
@@ -25,8 +24,16 @@ windowed_plot = True
 DO_Q5 = False
 DO_ELASTIC   = True
 DO_INELASTIC = False
+MODEL = "frame"
 
-root_output_dir     = "predictions_framemodel"
+
+OUT_DIR = Path(f"{MODEL}")/SID_METHOD/{"elastic" if ELASTIC else "inelastic"}/"systems"
+
+if MODEL == "frame":
+    root_output_dir     = "predictions_framemodel"
+elif MODEL == "bridge":
+    root_output_dir     = "predictions_bridge_model"
+
 elastic_output_dir  = os.path.join(root_output_dir, "elastic")
 inelastic_output_dir = os.path.join(root_output_dir, "inelastic")
 os.makedirs(elastic_output_dir, exist_ok=True)

@@ -1,34 +1,13 @@
-#import opensees.openseespy as ops
 import xara
-
-#import openseespy.opensees as ops
 import xara.units.iks as units
 import math
-
-#——————new import——————
-from pathlib import Path
-import quakeio
 import numpy as np
 from mdof.utilities.config import extract_channels
 import csv
 import os
-import matplotlib.pyplot as plt
-from mdof.simulate import simulate
-from mdof import sysid
-from mdof.validation import stabilize_discrete
-from mdof.utilities.config import Config
-
-from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
-
 import cvxpy as cp 
-import dccp
-
-import pickle
 import tqdm
-
-import warnings
-
-LOAD_EVENTS = False
+import plotly.graph_objects as go
 
 def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBars, barArea, nfCoreY, nfCoreZ, nfCoverY, nfCoverZ, GJ):
     r"""
@@ -117,239 +96,10 @@ def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBar
     model.layer("straight", steelID, numBars, barArea, coreY-spacingY, -coreZ, (-coreY+spacingY), -coreZ)
 
 
-
-def create_model(column=None, girder="elasticBeamColumn", inputx=None, inputy=None, dt=None):
-    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
-        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
-
-    if column is None:
-        column = "forceBeamColumn"
+def create_frame_model(elastic: bool):
 
     # create Model in three-dimensions with 6 DOF/node
     model = xara.Model(ndm=3, ndf=6)
-
-    # Geometry
-    # ---------------
-
-    # Set parameters for model geometry
-    h  = 144.0;      # Story height
-    by = 240.0;      # Bay width in Y-direction
-    bx = 240.0;      # Bay width in X-direction
-
-    # Create nodes
-    #            tag    X        Y       Z 
-    model.node( 1, (-bx/2.0,  by/2.0,   0.0))
-    model.node( 2, ( bx/2.0,  by/2.0,   0.0))
-    model.node( 3, ( bx/2.0, -by/2.0,   0.0))
-    model.node( 4, (-bx/2.0, -by/2.0,   0.0))
-
-    model.node( 5, (-bx/2.0,  by/2.0,     h))
-    model.node( 6, ( bx/2.0,  by/2.0,     h))
-    model.node( 7, ( bx/2.0, -by/2.0,     h))
-    model.node( 8, (-bx/2.0, -by/2.0,     h))
-
-    model.node(10, (-bx/2.0,  by/2.0, 2.0*h))
-    model.node(11, ( bx/2.0,  by/2.0, 2.0*h))
-    model.node(12, ( bx/2.0, -by/2.0, 2.0*h))
-    model.node(13, (-bx/2.0, -by/2.0, 2.0*h))
-
-    model.node(15, (-bx/2.0,  by/2.0, 3.0*h))
-    model.node(16, ( bx/2.0,  by/2.0, 3.0*h))
-    model.node(17, ( bx/2.0, -by/2.0, 3.0*h))
-    model.node(18, (-bx/2.0, -by/2.0, 3.0*h))
-
-    # Retained nodes for rigid diaphragm
-    #        tag    ( X    Y    Z   )
-    model.node( 9,  (0.0, 0.0,     h))
-    model.node(14,  (0.0, 0.0, 2.0*h))
-    model.node(19,  (0.0, 0.0, 3.0*h))
-
-    # Set base constraints
-    #      tag DX DY DZ RX RY RZ
-    model.fix(1, (1, 1, 1, 1, 1, 1))
-    model.fix(2, (1, 1, 1, 1, 1, 1))
-    model.fix(3, (1, 1, 1, 1, 1, 1))
-    model.fix(4, (1, 1, 1, 1, 1, 1))
-
-    # Define rigid diaphragm multi-point constraints
-    #              normalDir retained constrained
-    model.rigidDiaphragm(3,  9,  5,  6,  7,  8)
-    model.rigidDiaphragm(3, 14, 10, 11, 12, 13)
-    model.rigidDiaphragm(3, 19, 15, 16, 17, 18)
-
-    # Constraints for rigid diaphragm retained nodes
-    #        tag  (DX DY DZ RX RY RZ)
-    model.fix( 9, ( 0, 0, 1, 1, 1, 0))
-    model.fix(14, ( 0, 0, 1, 1, 1, 0))
-    model.fix(19, ( 0, 0, 1, 1, 1, 0))
-
-    # Define materials for nonlinear columns
-    # --------------------------------------
-    # CONCRETE
-    fc = 6.0
-    Ec = 57000.0*math.sqrt(fc*1000.0)/1000.0
-
-    # Core concrete (confined)
-    #                                 tag  f'c   epsc0  f'cu  epscu
-    model.uniaxialMaterial("Concrete01", 1, -5.0, -0.005, -3.5, -0.02)
-
-    # Cover concrete (unconfined)
-    #                                 tag  f'c   epsc0  f'cu  epscu
-    model.uniaxialMaterial("Concrete01", 2, -fc, -0.002, 0.0, -0.006)
-
-    # STEEL
-    fy = 60.0;       # Yield stress
-    Es = 30000.0;    # Young's modulus
-    # Reinforcing steel 
-    #                                tag fy  E0  b
-    model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
-
-    # Column parameters
-    h_col  = 18.0
-    GJ = 1.0E10
-    colSec = 1
-    beamSec = 2
-
-    # Call the RCsection procedure to generate the column section
-    #                              id    h     b  cover coreid coverid steelid nBars barArea nfCoreY nfCoreZ nfCoverY nfCoverZ GJ
-    ReinforcedRectangle(model, colSec, h_col, h_col, 2.5, 1,    2,    3,    3,   0.79,     8,      8,      10,      10,   GJ)
-
-    # Define material properties for elastic beams
-    # Using beam depth of 24 and width of 18
-    Abeam = 18.0*24.0
-    # "Cracked" second moments of area
-    Ibeamzz = 0.5*1.0/12.0*18.0*pow(24.0,3)
-    Ibeamyy = 0.5*1.0/12.0*24.0*pow(18.0,3)
-
-    # Define elastic section for beams
-    #                       tag     E    A      Iz       Iy     G    J
-    model.section("Elastic", beamSec, Ec, Abeam, Ibeamzz, Ibeamyy, GJ, 1.0)
-
-    # Define column elements
-    # ----------------------
-    # Geometric transformation for columns
-    colTransf = 1
-    model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
-
-    # Number of column integration points (sections)
-    itg_col = 1
-    npts_col = 4
-    model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
-
-
-    #                   tag ndI ndJ transfTag integrationTag
-    model.element(column,  1, ( 1,  5), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  2, ( 2,  6), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  3, ( 3,  7), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  4, ( 4,  8), transform=colTransf, section=colSec, shear=0)
-
-    model.element(column,  5, ( 5, 10), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  6, ( 6, 11), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  7, ( 7, 12), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  8, ( 8, 13), transform=colTransf, section=colSec, shear=0)
-
-    model.element(column,  9, (10, 15), transform=colTransf, section=colSec, shear=0)
-    model.element(column, 10, (11, 16), transform=colTransf, section=colSec, shear=0)
-    model.element(column, 11, (12, 17), transform=colTransf, section=colSec, shear=0)
-    model.element(column, 12, (13, 18), transform=colTransf, section=colSec, shear=0)
-
-    # Define beam elements
-    # --------------------
-    # Geometric transformation for beams
-    beamTransf = 2
-    model.geomTransf("Linear", beamTransf, 1.0, 1.0, 0.0)
-
-
-    # Create the beam elements
-    #                   tag (ndI ndJ) transfTag integrationTag
-    model.element(girder, 13, ( 5,  6), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 14, ( 6,  7), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 15, ( 7,  8), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 16, ( 8,  5), transform=beamTransf, section=beamSec, shear=0)
-
-    model.element(girder, 17, (10, 11), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 18, (11, 12), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 19, (12, 13), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 20, (13, 10), transform=beamTransf, section=beamSec, shear=0)
-
-    model.element(girder, 21, (15, 16), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 22, (16, 17), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 23, (17, 18), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 24, (18, 15), transform=beamTransf, section=beamSec, shear=0)
-
-    # Define gravity loads
-    # --------------------
-    # Gravity load applied at each corner node
-    # 10% of column capacity
-    p = 0.1*fc*h*h
-
-    # Mass lumped at retained nodes
-    m = (4.0*p)/units.gravity
-
-    # Rotary inertia of floor about retained node
-    i = m*(bx*bx + by*by)/12.0
-
-    # Set mass at the retained nodes
-    #         tag   MX MY MZ   RX   RY   RZ
-    model.mass( 9, (m, m, 0.0, 0.0, 0.0, i))
-    model.mass(14, (m, m, 0.0, 0.0, 0.0, i))
-    model.mass(19, (m, m, 0.0, 0.0, 0.0, i))
-
-    # Define gravity loads
-    # create a Plain load pattern with Constant scaling
-    model.pattern("Plain", 1, "Constant")
-
-    for i in [5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18]:
-        model.load(i, (0.0, 0.0, -p, 0.0, 0.0, 0.0), pattern=1)
-
-    # set rayleigh damping factors
-    model.rayleigh(0.0, 0.0, 0.0, 0.0018)
-
-    # Define earthquake excitation
-    # ----------------------------
-    # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
-    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
-
-    # Define the excitation using the given ground motion records
-    #                         tag dir         accel series args
-    model.pattern("UniformExcitation", 2, 1, accel=2)
-    model.pattern("UniformExcitation", 3, 2, accel=3)
-
-    return model
-
-def J_rect(b, h):
-    b, h = float(b), float(h)
-    if b > h:
-        b, h = h, b
-    return b * h**3 * (1/3 - 0.21*b/h * (1 - b**4/(12*h**4)))
-
-def cosine_taper(arr, dt, T_ramp=0.4):
-    arr = np.asarray(arr, dtype=float).copy()
-    n = max(1, int(T_ramp / dt))
-    w = 0.5 * (1 - np.cos(np.linspace(0, np.pi, n)))
-    arr[:n] *= w
-    return arr
-
-
-def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, inputy=None, dt=None):
-    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
-        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
-    
-    if girder != "elasticBeamColumn":
-        raise ValueError("Only elasticBeamColumn allowed for girders")
-
-    column = "forceBeamColumn"
-
-    # create Model in three-dimensions with 6 DOF/node
-    model = xara.Model(ndm=3, ndf=6)
-
-
-    # If model.meta is already a dictionary, use it directly
-    if not hasattr(model, "meta") or not isinstance(model.meta, dict):
-        model.meta = {}
-
-    model.meta["column_elems"] = []
 
     # Geometry and Material Properties
         # Nodes(location)
@@ -430,7 +180,6 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
 
     # Define column elements
     # ----------------------
-
     # Column parameters
     h_col  = 20.0
     b_col = 20.0
@@ -438,50 +187,44 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
     colSec = 1
     beamSec = 2
 
-    if True:
-        # # Call the RCsection procedure to generate the column section
-        ReinforcedRectangle(model, colSec,
-                            h=h_col, 
-                            b=b_col,
-                            cover=2.5, 
-                            coreID=1,
-                            coverID=2,
-                            steelID=3,
-                            numBars=3,
-                            barArea=0.79,
-                            nfCoreY=8,      
-                            nfCoreZ=8,      
-                            nfCoverY=10,      
-                            nfCoverZ=10,
-                            GJ=GJ)
-        # Number of column integration points (sections)
-        itg_col = 1
-        npts_col = 4
-        model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
+    ReinforcedRectangle(model, colSec,
+                        h=h_col, 
+                        b=b_col,
+                        cover=2.5, 
+                        coreID=1,
+                        coverID=2,
+                        steelID=3,
+                        numBars=3,
+                        barArea=0.79,
+                        nfCoreY=8,      
+                        nfCoreZ=8,      
+                        nfCoverY=10,      
+                        nfCoverZ=10,
+                        GJ=GJ)
+    # Number of column integration points (sections)
+    itg_col = 1
+    npts_col = 4
+    model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
         
     # Geometric transformation for columns
     colTransf = 1
     model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
 
-    #                   tag ndI ndJ transfTag integrationTag
-    model.element(column,  1, ( 1,  5), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  2, ( 2,  6), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  3, ( 3,  7), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  4, ( 4,  8), transform=colTransf, section=colSec, shear=0)
+    #                                tag ndI ndJ transfTag integrationTag
+    model.element("forceBeamColumn",  1, ( 1,  5), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  2, ( 2,  6), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  3, ( 3,  7), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  4, ( 4,  8), transform=colTransf, section=colSec, shear=0)
 
-    model.element(column,  5, ( 5, 10), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  6, ( 6, 11), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  7, ( 7, 12), transform=colTransf, section=colSec, shear=0)
-    model.element(column,  8, ( 8, 13), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  5, ( 5, 10), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  6, ( 6, 11), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  7, ( 7, 12), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  8, ( 8, 13), transform=colTransf, section=colSec, shear=0)
 
-    model.element(column,  9, (10, 15), transform=colTransf, section=colSec, shear=0)
-    model.element(column, 10, (11, 16), transform=colTransf, section=colSec, shear=0)
-    model.element(column, 11, (12, 17), transform=colTransf, section=colSec, shear=0)
-    model.element(column, 12, (13, 18), transform=colTransf, section=colSec, shear=0)
-
-    
-    for ele_tag in range(1, 13):
-        model.meta["column_elems"].append(ele_tag)
+    model.element("forceBeamColumn",  9, (10, 15), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn", 10, (11, 16), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn", 11, (12, 17), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn", 12, (13, 18), transform=colTransf, section=colSec, shear=0)
 
     # Define beam elements
     # --------------------
@@ -492,11 +235,11 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
     # Second moments of area
     Ibeamzz = 1.0/12.0*18.0*pow(24.0,3)
     Ibeamyy = 1.0/12.0*24.0*pow(18.0,3)
+    Jbeam = Ibeamzz + Ibeamyy
 
     nu = 0.2
     Gb = Ec/(2 * (1 + nu))
 
-    Jbeam = J_rect(18.0, 24.0)
     # Define elastic section for beams
     #                       tag     E    A      Iz       Iy     G    J
     model.section("Elastic", beamSec, Ec, Abeam, Ibeamzz, Ibeamyy, Gb, Jbeam)
@@ -507,108 +250,41 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
 
     # Create the beam elements
     #                   tag (ndI ndJ) transfTag integrationTag
-    model.element(girder, 13, ( 5,  6), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 14, ( 6,  7), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 15, ( 7,  8), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 16, ( 8,  5), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 13, ( 5,  6), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 14, ( 6,  7), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 15, ( 7,  8), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 16, ( 8,  5), transform=beamTransf, section=beamSec, shear=0)
 
-    model.element(girder, 17, (10, 11), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 18, (11, 12), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 19, (12, 13), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 20, (13, 10), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 17, (10, 11), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 18, (11, 12), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 19, (12, 13), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 20, (13, 10), transform=beamTransf, section=beamSec, shear=0)
 
-    model.element(girder, 21, (15, 16), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 22, (16, 17), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 23, (17, 18), transform=beamTransf, section=beamSec, shear=0)
-    model.element(girder, 24, (18, 15), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 21, (15, 16), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 22, (16, 17), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 23, (17, 18), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 24, (18, 15), transform=beamTransf, section=beamSec, shear=0)
 
-
-    # ================== helpers (ADD THIS BLOCK) ==================
-    
-
-    # column_conn = {
-    #     1:(1,5),  2:(2,6),  3:(3,7),  4:(4,8),
-    #     5:(5,10), 6:(6,11), 7:(7,12), 8:(8,13),
-    #     9:(10,15),10:(11,16),11:(12,17),12:(13,18)
-    # }
-    # model.meta["column_conn"] = column_conn
-    # model.meta["column_len"]  = {ele: h for ele in model.meta["column_elems"]}  
-    # model.meta["section_depth"] = float(h_col)  # Section height (for edge strain eps_edge = eps0 ± kappa*h/2）
-
-    # # ---- elastic query: Approximate eps0, kappa ---- using end node displacement/rotation Angle
-    # # Agreement: The axial direction of the column is Z (UZ), and the curvature is calculated as the difference in rotation angles at the end nodes divided by the length.
-    # # Note: For vertical components, bending in the X-direction corresponds to "rotation around the Y-axis (RY)", and bending in the Y-direction corresponds to "rotation around the X-axis (RX)" (if replacement is needed, simply change the idx mapping).
-    # def _query_section_eps0(ele):
-    #     ni, nj = model.meta["column_conn"][ele]
-    #     uzi = model.nodeDisp(ni)[2]   # UZ at i
-    #     uzj = model.nodeDisp(nj)[2]   # UZ at j
-    #     L   = model.meta["column_len"][ele]
-    #     return (uzj - uzi) / L
-
-    # def _query_section_kappa(ele, axis='x'):
-    #     # To match the common conventions of vertical columns: 
-    #     # X-direction displacement dominant → bending around the Y-axis; Y-direction displacement dominance → bending around the X-axis
-    #     # Therefore, here we map axis='x' to RY and axis='y' to RX (if your local coordinates are different, you can switch them as needed).
-    #     idx_map = {'x':4, 'y':3, 'z':5}  # RX=3, RY=4, RZ=5（0-based）
-    #     idx = idx_map[axis]
-    #     ni, nj = model.meta["column_conn"][ele]
-    #     thi = model.nodeDisp(ni)[idx]
-    #     thj = model.nodeDisp(nj)[idx]
-    #     L   = model.meta["column_len"][ele]
-    #     return (thj - thi) / L
-
-
-    # # start strain_record record_strain_step
-    # sr = {
-    #     "enabled": True,
-    #     "inelastic": bool(column == "forceBeamColumn"),
-    #     "section_depth": model.meta["section_depth"],
-    #     "time": [],
-    #     "eps0":  {ele: [] for ele in model.meta["column_elems"]},
-    #     "kappa": {ele: [] for ele in model.meta["column_elems"]},
-    #     "conc_edge_max": {ele: [] for ele in model.meta["column_elems"]},
-    #     "steel_max":     {ele: [] for ele in model.meta["column_elems"]},
-    #     "edge_fibers": {},
-    #     "steel_mats":  {},
-    # }
-    # if sr["inelastic"]:
-    #     hsec = model.meta["section_depth"]
-    #     for ele in model.meta["column_elems"]:
-    #         sr["edge_fibers"][ele] = [(0, +hsec/2.0, 0.0),
-    #                                   (0, -hsec/2.0, 0.0)]
-    #         sr["steel_mats"][ele] = []
-    # model.meta["strain_record"] = sr
-    # ================== END helpers (ADD THIS BLOCK) ==================
-
-    # Define gravity loads
-    # --------------------
-    # Gravity load applied at each corner node
-    # 10% of column capacity
-    p = 0.1*fc*b_col*h_col /4.0
-
-    # Mass lumped at retained nodes
-    m = (4.0*p)/units.gravity
-
-    # Rotary inertia of floor about retained node
-    i = m*(bx*bx + by*by)/12.0
-
-
-    # Set mass at the nodes
+    # Lumped mass at nodes on top of columns
+    # 10% of axial column capacity assuming unconfined concrete
+    p = 0.1*fc*b_col*h_col
+    m = p/units.gravity
     #         tag   MX MY MZ   RX   RY   RZ
-    model.mass( 5, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 6, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 7, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 8, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 5, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 6, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 7, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 8, (m, m, m, 0.0, 0.0, 0.0))
 
-    model.mass( 10, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 11, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 12, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 13, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 10, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 11, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 12, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 13, (m, m, m, 0.0, 0.0, 0.0))
 
-    model.mass( 15, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 16, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 17, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
-    model.mass( 18, (m/4, m/4, m/4, 0.0, 0.0, 0.0))
+    model.mass( 15, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 16, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 17, (m, m, m, 0.0, 0.0, 0.0))
+    model.mass( 18, (m, m, m, 0.0, 0.0, 0.0))
+
     # Define gravity loads
     # create a Plain load pattern with Constant scaling
     model.pattern("Plain", 1, "Constant")
@@ -619,16 +295,21 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
     # set rayleigh damping factors
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
 
+    return model
+
+
+def apply_load_frame_model(model, inputx=None, inputy=None, dt=None):
+    """
+    Add dynamic loads to frame model
+    """
+    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
+        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
+    
     # Define earthquake excitation
     # ----------------------------
     # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
-    inputx_t = cosine_taper(inputx, dt, T_ramp=0.4)
-    inputy_t = cosine_taper(inputy, dt, T_ramp=0.4)
-    model.timeSeries("Path", 2, values=inputx_t.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy_t.tolist(), dt=dt, factor=1.0)
-    
-    # model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
-    # model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
 
     # Define the excitation using the given ground motion records
     #                         tag dir         accel series args
@@ -638,7 +319,7 @@ def create_frame_model(elastic: bool, girder="elasticBeamColumn", inputx=None, i
     return model
 
 
-def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn", inputx=None, inputy=None, dt=None):
+def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn", inputx=None, inputy=None, dt=None):
     
     #input check
     if np.all(inputx is None) or np.all(inputy is None) or dt is None:
@@ -833,17 +514,35 @@ def create_painter_bridge_model(elastic: bool = True, girder: str = "elasticBeam
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
 
     # Ground motion: fault normal (x) and fault parallel (y) components
-    inputx_t = cosine_taper(inputx, dt, T_ramp=0.4)
-    inputy_t = cosine_taper(inputy, dt, T_ramp=0.4)
-
     # Time series for the two components
-    model.timeSeries("Path", 2, values=inputx_t.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy_t.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
 
     # Uniform excitation patterns in global X and Y directions
     # pattern("UniformExcitation", tag, dof, accel=seriesTag)
     model.pattern("UniformExcitation", 2, 1, accel=2)   # dof 1 = global X
     model.pattern("UniformExcitation", 3, 2, accel=3)   # dof 2 = global Y
+
+    return model
+
+
+def apply_load_bridge_model(model, inputx=None, inputy=None, dt=None):
+    """
+    Add dynamic loads to bridge model
+    """
+    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
+        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
+    
+    # Define earthquake excitation
+    # ----------------------------
+    # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
+    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
+
+    # Define the excitation using the given ground motion records
+    #                         tag dir         accel series args
+    model.pattern("UniformExcitation", 2, 1, accel=2)
+    model.pattern("UniformExcitation", 3, 2, accel=3)
 
     return model
 
@@ -860,7 +559,6 @@ def save_event_io(i, inputs, outputs, dt, out_dir="event_data"):
     nt = inputs.shape[1]
     time = np.arange(nt) * dt
     
-    # —— Save as CSV (readable) —— 
     csv_in = os.path.join(out_dir, f"event_{i+1}_inputs.csv")
     with open(csv_in, 'w', newline='') as f:
         writer = csv.writer(f)
@@ -877,52 +575,6 @@ def save_event_io(i, inputs, outputs, dt, out_dir="event_data"):
             writer.writerow(row)
 
 
-def record_strain_step(model, t):
-    """
-    Use it once per time rhythm
-    - elasticBeamColumn: Record eps0 and kappa (then use eps_edge=eps0+kappa*h/2)
-    - Nonlinearity (forceBeamColumn+fiber) : Record the "maximum strain of edge concrete fibers" and the "maximum strain of reinforcing bar fibers"
-    """
-    sr = getattr(model, "meta", {}).get("strain_record", None)
-    if not sr or not sr.get("enabled", False):
-        return
-
-    # record time
-    sr["time"].append(float(t))
-
-    # elastic/inelastic
-    if not sr.get("inelastic", False):
-        # ---- elastic：eps0, kappa ----
-        for ele in model.meta["column_elems"]:
-            eps0  = getattr(model, "query_section_eps0",  lambda e: np.nan)(ele)
-            kappa = getattr(model, "query_section_kappa", lambda e, axis='x': np.nan)(ele, axis='x')
-            sr["eps0"][ele].append(float(eps0)  if eps0  is not None else np.nan)
-            sr["kappa"][ele].append(float(kappa) if kappa is not None else np.nan)
-        return
-
-    # ---- Nonlinearity: take the maximum strain ---- for the edge concrete and reinforcing bars
-    for ele in model.meta["column_elems"]:
-        # Concrete edge fibers (±h/2,z=0)
-        max_conc = None
-        for (sec_idx, y, z) in sr.get("edge_fibers", {}).get(ele, []):
-            val = getattr(model, "query_fiber_strain", lambda *a, **k: None)(
-                ele, sec_idx=sec_idx, y=y, z=z
-            )
-            if val is not None:
-                max_conc = val if max_conc is None else max(max_conc, val)
-        sr["conc_edge_max"][ele].append(float(max_conc) if max_conc is not None else np.nan)
-
-        # Reinforcing bar material fiber
-        max_steel = None
-        for (sec_idx, mat_tag) in sr.get("steel_mats", {}).get(ele, []):
-            val = getattr(model, "query_material_strain", lambda *a, **k: None)(
-                ele, sec_idx=sec_idx, mat_tag=mat_tag
-            )
-            if val is not None:
-                max_steel = val if max_steel is None else max(max_steel, val)
-        sr["steel_max"][ele].append(float(max_steel) if max_steel is not None else np.nan)
-
-    
 def get_material_response(model, element, sec_tag, y, z):
     try:
         strain =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "strain")
@@ -933,16 +585,13 @@ def get_material_response(model, element, sec_tag, y, z):
         return None
 
 
-def analyze(model, output_nodes, nt, dt, n_modes=3,
+def analyze(model, nt, dt, 
+            output_nodes=[5,10,15],
             output_elements=[1,5,9],
-            yFiber=8.0,
-            zFiber=0.0):
-
-    if not hasattr(analyze, "call_count"):
-        analyze.call_count = 0
-
-    analyze.call_count += 1
-    event_id = analyze.call_count
+            n_modes=3,
+            yFiber=9.0,
+            zFiber=0.0,
+            ):
 
     # ----------------------------
     # 1. Configure the analysis
@@ -991,9 +640,7 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
     # get modes
     lambdas = model.eigen(n_modes, "fullGenLapack")  
     omega = np.sqrt(np.abs(lambdas))
-    freqs_before = omega / (2 * np.pi) 
-    periods_before = 2 * np.pi / omega
-    #print(omega) # TODO: instead of printing, save this in a file so we know which earthquake it belongs to
+    freqs_before = omega/(2*np.pi) 
 
     # Perform nt analysis steps with a time step of dt
     print(f"Analysis Progress ({nt} timesteps)")
@@ -1001,11 +648,6 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
         status = model.analyze(1, dt) 
         if status != 0:
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
-
-        # TODO: use this line to debug        
-        # print(get_material_response(model, 1, 1, 0.0, 0.0))
-        # import sys
-        # sys.exit()
 
         # Save displacements at the current time
         for node in output_nodes:
@@ -1017,13 +659,21 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
 
     lambdas_after = model.eigen(n_modes, "fullGenLapack") 
     omega_after = np.sqrt(np.abs(lambdas_after))   
-    freqs_after = omega_after / (2 * np.pi)
-    periods_after = 2 * np.pi / omega_after   
+    freqs_after = omega_after/(2*np.pi)
+           
+    return displacements, stresses, strains, freqs_before, freqs_after
 
-    csv_path = "natural_frequencies.csv" 
-    file_exists = os.path.exists(csv_path)
 
-    with open(csv_path, "a", newline="") as f:
+def write_freq_csv(event_id,
+                   freqs_before,
+                   freqs_after,
+                   freq_csv_path="natural_frequencies.csv"):
+    
+    n_modes = len(freqs_before)
+    
+    file_exists = os.path.exists(freq_csv_path)
+
+    with open(freq_csv_path, "a", newline="") as f:
         writer = csv.writer(f)
         if not file_exists:
             header = ["event_id"]
@@ -1032,19 +682,19 @@ def analyze(model, output_nodes, nt, dt, n_modes=3,
             writer.writerow(header)
         row = [event_id] + list(freqs_before) + list(freqs_after)
         writer.writerow(row)
-           
-    return displacements, stresses, strains
 
 
-def get_outputs(displacements):
+def get_node_displacements(displacements,
+                nodes=[5,10,15], # building (3 story frame)
+                # nodes=[2,3,5], # bridge
+                ):
     """
     displacements: { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
     Returns outputs: ndarray, shape=(6, nt), row order:
-      [1F X, 1F Y, 2F X, 2F Y, 3F X, 3F Y]
+      [Node1 X, Node1 Y, Node2 X, Node2 Y, Node3 X, Node3 Y, ...]
     """
-    floors = [2, 3, 5] #[9, 14, 19]  [5, 10, 15]  [2, 3, 5]
     rows = []
-    for node in floors:
+    for node in nodes:
         arr = np.array(displacements[node])  # shape (nt+1, 6)
         rows.append(arr[:, 0])  # X displacement 
         rows.append(arr[:, 1])  # Y displacement
@@ -1180,22 +830,6 @@ def periods_from_A(A, dt):
     return np.sort(periods)
 
 
-def save_all_methods_to_csv(i, methods_dict):
-    """
-    methods_dict: {'srim': (A,B,C,D), 'n4sid': (A,B,C,D), ...}
-    """
-    out_dir = "event_outputs_ABCD"
-    os.makedirs(out_dir, exist_ok=True)
-    filename = os.path.join(out_dir, f"event_modes_{i+1:02d}.csv")
-    with open(filename, "w") as f:
-        for method, (A, B, C, D) in methods_dict.items():
-            for matrix_name, M in zip(['A','B','C','D'], [A, B, C, D]):
-                f.write(f"# {method.upper()}-{matrix_name}\n")
-                np.savetxt(f, M, delimiter=",", fmt="%.8e")
-                f.write("\n")  # Add an empty line for readability
-    print(f"Saved all system matrices for event {i+1} to {filename}")
-
-
 def save_event_modes_to_csv(event_id, Phi_true, method_modes, method_macs, algos, filename):
     # method_modes: {'srim': Phi_srim, ...}  Phi, shape=(dof, n_modes)
     # method_macs:  {'srim': MAC_srim, ...}  MAC,  shape=(n_modes, n_modes)
@@ -1220,14 +854,11 @@ def save_event_modes_to_csv(event_id, Phi_true, method_modes, method_macs, algos
         writer.writerow([])  
 
 
-def plot_q4_max_strain(sr, model, title, html_base, PLOTLY_OK=True):
+def plot_q4_max_strain(sr, model, title, html_base):
     """
     sr = model.meta["strain_record"]
     Generate the time history curve of the maximum edge concrete strain/reinforcement strain (nonlinear) or edge strain (elastic).
     """
-    if not PLOTLY_OK:
-        return
-    import numpy as np, plotly.graph_objects as go, os
 
     t = np.asarray(sr["time"], float)
     cols = model.meta["column_elems"]
@@ -1266,66 +897,17 @@ def plot_q4_max_strain(sr, model, title, html_base, PLOTLY_OK=True):
     f2.write_html(html_base + "_inelastic_steel.html", include_plotlyjs="cdn")
 
 
-def get_natural_periods(model, nmodes=3):
-    """
-    Return a periodic array T (in s) of length nmodes.
-    Suppose the eigen/modal interface returns the eigenvalue λ = ω^2 (OpenSees style).
-    If your interface directly returns ω (rad/s), simply change the sqrt line below to not take sqrt.
-    """
-    import numpy as np
+def save_displacements(displacements, dt, filename):
 
-    evals = None
-    for api in ("modal_eigenvalues", "eigenvalues", "eigen"):
-        if hasattr(model, api):
-            try:
-                evals = getattr(model, api)(nmodes)
-                break
-            except Exception:
-                pass
-    if evals is None:
-        raise RuntimeError("No modal eigenvalue API found on model (tried modal_eigenvalues/eigenvalues/eigen).")
-
-    evals = np.asarray(evals, float)            # λ = ω^2
-    omegas = np.sqrt(np.clip(evals, 0.0, None)) # ω
-    T = 2*np.pi / np.where(omegas > 1e-12, omegas, np.nan)
-    return T
-
-
-def plot_deltaT_across_events(event_ids, dT_pct_list, plotly_dir, title="ΔT/T after EQ (Inelastic)"):
-    """
-    Draw the "percentage change of each event period" of the nonlinear model (by default, the first mode is taken, or any sequence you pass in).
-    """
-    import os
-    if not event_ids or not dT_pct_list:
-        return
-    try:
-        import plotly.graph_objects as go
-    except Exception:
-        return
-    fig = go.Figure()
-    fig.add_bar(x=[f"E{e:02d}" for e in event_ids], y=dT_pct_list, name="ΔT/T (%)")
-    fig.update_layout(title=title, xaxis_title="Event", yaxis_title="Change (%)")
-    os.makedirs(plotly_dir, exist_ok=True)
-    outp = os.path.join(plotly_dir, "q5_dT_mode1_across_events.html")
-    fig.write_html(outp, include_plotlyjs="cdn")
-    print("[Q5] Saved →", outp)
-
-
-def save_event_disp(event_id, displacements, dt, out_dir="event_disp"):
-    os.makedirs(out_dir, exist_ok=True)
-
-    first_node = next(iter(displacements.keys()))
-    nt = len(displacements[first_node])  
+    nt = len(list(displacements.values())[0])
     time = np.arange(nt) * dt
 
     nodes = sorted(displacements.keys())
 
-    filename = os.path.join(out_dir, f"event_{event_id:02d}_disp.csv")
-
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
 
-        # sheet tital: time + each node 6 dof
+        # header: time + each node 6 dof
         dof_labels = ["UX", "UY", "UZ", "RX", "RY", "RZ"]
         header = ["time"]
         for n in nodes:
@@ -1341,25 +923,18 @@ def save_event_disp(event_id, displacements, dt, out_dir="event_disp"):
                 row.extend(u)
             writer.writerow(row)
 
-    print(f"[save_event_disp] Saved displacements for event {event_id:02d} to {filename}")
 
+def save_strain_stress(stresses, strains, dt, filename):
 
-def save_event_strain_stress(event_id, stresses, strains, dt,
-                             out_dir="event_strain_stress"):
-    os.makedirs(out_dir, exist_ok=True)
-
-    first_ele = next(iter(stresses.keys()))
-    nt = len(stresses[first_ele])  
+    nt = len(list(stresses.values())[0])
     time = np.arange(nt) * dt
 
     elems = sorted(stresses.keys())
 
-    filename = os.path.join(out_dir, f"event_{event_id:02d}_strain_stress.csv")
-
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
 
-        # sheet tital: time + stress + strain
+        # header: time + stress + strain
         header = ["time"]
         header += [f"ele{e}_stress" for e in elems]
         header += [f"ele{e}_strain" for e in elems]
@@ -1373,5 +948,3 @@ def save_event_strain_stress(event_id, stresses, strains, dt,
             for e in elems:
                 row.append(strains[e][k])
             writer.writerow(row)
-
-    print(f"[save_event_strain_stress] Saved strain/stress for event {event_id:02d} to {filename}")
