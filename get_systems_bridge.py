@@ -96,7 +96,7 @@ if __name__ == "__main__":
                 output_nodes=output_nodes,
                 nt=nt,
                 dt=dt,
-                output_elements=[2,3],
+                output_elements=[2,3,5],
                 yFiber=8.0,
                 zFiber=0.0
             )

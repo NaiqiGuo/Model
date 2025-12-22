@@ -634,6 +634,38 @@ if DO_ELASTIC:
 
         plt.close(fig)
 
+    # version 3
+    y_rows = [1, 3, 5]
+    y_labels = ["Node2 Y", "Node3 Y", "Node5 Y"]
+
+    vmax_global = np.nanmax(error_matrix)
+    for i, algo in enumerate(algo_names):
+        fig, ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
+        data = np.nan_to_num(error_matrix[y_rows, i, :], nan=0.0)
+
+        im = ax.imshow(
+            data,
+            vmin=0, vmax=1.2,
+            aspect="equal",
+            origin="lower",
+            cmap="viridis"
+        )
+
+        cbar = fig.colorbar(im, ax=ax, extend="max", fraction=0.02, pad=0.04)
+        cbar.set_label("$\\epsilon$: L2 Error (mean) normalized",
+                       fontsize=20)
+        cbar.ax.tick_params(labelsize=15)
+
+        ax.set_xlabel("Event index", fontsize=22)
+        ax.set_ylabel("Channel", fontsize=22)
+        ax.set_xticks(np.arange(num_events))
+        ax.set_xticklabels(np.arange(1, num_events + 1), fontsize=15)
+        ax.set_yticks(np.arange(len(y_labels)))
+        ax.set_yticklabels(y_labels, fontsize=15)
+
+        fig.savefig(os.path.join(elastic_output_dir, f"{algo}_bridge_heatmap_Yonly.png"), dpi=300)
+        plt.close(fig)
+
     print(f"[ELASTIC Bridge] All plots saved in: {elastic_output_dir}")
 
 
@@ -743,6 +775,38 @@ if DO_INELASTIC:
                                      f"{algo}_bridge_heatmap_inelastic.png"),
                         dpi=300)
 
+        plt.close(fig)
+
+    # version 3
+    y_rows = [1, 3, 5]
+    y_labels = ["Node2 Y", "Node3 Y", "Node5 Y"]
+
+    vmax_global = np.nanmax(error_matrix_inel)
+    for i, algo in enumerate(algo_names):
+        fig, ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
+        data = np.nan_to_num(error_matrix[y_rows, i, :], nan=0.0)
+
+        im = ax.imshow(
+            data,
+            vmin=0, vmax=1.2,
+            aspect="equal",
+            origin="lower",
+            cmap="viridis"
+        )
+
+        cbar = fig.colorbar(im, ax=ax, extend="max", fraction=0.02, pad=0.04)
+        cbar.set_label("$\\epsilon$: L2 Error (mean) normalized",
+                       fontsize=20)
+        cbar.ax.tick_params(labelsize=15)
+
+        ax.set_xlabel("Event index", fontsize=22)
+        ax.set_ylabel("Channel", fontsize=22)
+        ax.set_xticks(np.arange(num_events))
+        ax.set_xticklabels(np.arange(1, num_events + 1), fontsize=15)
+        ax.set_yticks(np.arange(len(y_labels)))
+        ax.set_yticklabels(y_labels, fontsize=15)
+
+        fig.savefig(os.path.join(inelastic_output_dir, f"{algo}_bridge_heatmap_Yonly.png"), dpi=300)
         plt.close(fig)
 
     print(f"[INELASTIC Bridge] All error heatmaps saved in: {inelastic_output_dir}")
