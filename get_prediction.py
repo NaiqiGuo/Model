@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
             # Plot true vs predicted outputs
             fig_plt, axs = plt.subplots(int(len(out_labels)/2), 2,
-                                        figsize=(14,1.5*int(len(out_labels))),
+                                        figsize=(14,len(out_labels)),
                                         sharex=True,
                                         constrained_layout=True) # matplotlib
             fig_go = [go.Figure(), go.Figure()] # plotly
@@ -149,7 +149,7 @@ if __name__ == "__main__":
                         color = next(colors_go)
                         axs[r,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
                         axs[r,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
-                        axs[r,j].set_ylabel(f"{out_label}\nDisplacement (in)")
+                        axs[r,j].set_ylabel(out_label)
                         axs[r,j].legend()
                         fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array[i],
                                               mode="lines", line=dict(color=color),
@@ -167,7 +167,8 @@ if __name__ == "__main__":
                 )
                 fig_go[j].update_xaxes(rangeslider=dict(visible=True))
                 fig_go[j].write_html(pred_dir/f"prediction_{dirs[j]}.html", include_plotlyjs="cdn")
-            fig_plt.suptitle(f"Event {event_id}")
+            fig_plt.align_ylabels()
+            fig_plt.suptitle(f"Event {event_id} Displacement Response (in)")
             fig_plt.savefig(pred_dir/"prediction.png", dpi=350)
             plt.close(fig_plt)
 
