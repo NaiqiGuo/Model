@@ -30,7 +30,6 @@ for elas in elas_cases:
 
 if __name__ == "__main__":
 
-    input_labels = ['Channel 1', 'Channel 3']
     if MODEL == "frame":
         out_nodes = [5,10,15]
         # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
@@ -45,7 +44,7 @@ if __name__ == "__main__":
         if VERBOSE:
             print(f"\nComputing {elas} case.")
 
-        n_events = len(glob.glob(str(OUT_DIR/elas/"*")))
+        n_events = len(glob.glob(str(OUT_DIR/elas/"[0-9]*")))
         errors = np.full((n_events,len(out_labels)), np.nan)
         for event_id in tqdm(range(1, n_events+1)):
             # Load inputs and true outputs
@@ -136,29 +135,35 @@ if __name__ == "__main__":
             np.savetxt(pred_dir/"errors.csv", np.array(errors))
 
             # Plot true vs predicted outputs
-            colors = iter(["blue","lightblue","green","lightgreen","darkorange","orange"])
-            fig_plt, axs = plt.subplots(1, 2, figsize=(12,4), constrained_layout=True) # matplotlib
+            fig_plt, axs = plt.subplots(int(len(out_labels)/2), 2,
+                                        figsize=(14,1.5*int(len(out_labels))),
+                                        sharex=True,
+                                        constrained_layout=True) # matplotlib
             fig_go = [go.Figure(), go.Figure()] # plotly
             dirs = ['X','Y']
             for j in range(2):
+                colors_go = iter(["blue","darkorange","green"])
                 for i,out_label in enumerate(out_labels):
                     if dirs[j] in out_label:
-                        color = next(colors)
-                        axs[j].plot(time_aln, out_true_aln_array[i], color=color, linestyle='-',  label=f"True {out_label}") 
-                        axs[j].plot(time_aln, out_pred_aln_array[i], color=color, linestyle='--', label=f"Pred {out_label}") 
+                        r = i//2
+                        color = next(colors_go)
+                        axs[r,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
+                        axs[r,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
+                        axs[r,j].set_ylabel(f"{out_label}\nDisplacement (in)")
+                        axs[r,j].legend()
                         fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array[i],
                                               mode="lines", line=dict(color=color),
                                               name=f"True {out_label}")
                         fig_go[j].add_scatter(x=time_aln, y=out_pred_aln_array[i],
                                               mode="lines", line=dict(color=color, dash="dash"),
                                               name=f"Pred {out_label}")
-                axs[j].set(title=f"{dirs[j]} direction", xlabel="Time (s)", ylabel="Displacement (in)")
-                axs[j].legend()
+                axs[r,j].set_xlabel(f"Time (s)")
                 fig_go[j].update_layout(
-                    title=f"Event {event_id} Prediction — X direction",
+                    title=f"Event {event_id} Prediction, {dirs[j]} direction",
                     xaxis_title="Time (s)",
-                    yaxis_title="Disp",
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                    yaxis_title="Displacement (in)",
+                    legend=dict(orientation="h", yanchor="bottom", y=0.0, xanchor="left", x=0,
+                                font=dict(size=18)),
                 )
                 fig_go[j].update_xaxes(rangeslider=dict(visible=True))
                 fig_go[j].write_html(pred_dir/f"prediction_{dirs[j]}.html", include_plotlyjs="cdn")
@@ -167,11 +172,13 @@ if __name__ == "__main__":
             plt.close(fig_plt)
 
         # Heatmap non-square with numbers
+        heatmap_dir = OUT_DIR/elas/SID_METHOD
+        os.makedirs(heatmap_dir, exist_ok=True)
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
-        data_display = np.nan_to_num(errors, nan=0.0)
-        vmax = np.nanmax(errors)
+        heatmap_data = np.nan_to_num(errors.T, nan=0.0)
+        vmax = np.max(heatmap_data)
         im = ax.imshow(
-            errors,
+            heatmap_data,
             vmin=0, vmax=vmax,
             aspect='auto',
             origin='lower',
@@ -180,24 +187,23 @@ if __name__ == "__main__":
         cbar = fig.colorbar(im, ax=ax, extend='max')
         cbar.set_label("$\\epsilon$: Normalized $L_2$ Error", fontsize=14)
         ax.set_xlabel("Event", fontsize=14)
-        ax.set_ylabel("Channel", fontsize=14)
         ax.set_xticks(np.arange(n_events))
         ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=12)
         ax.set_yticks(np.arange(len(out_labels)))
         ax.set_yticklabels(out_labels, fontsize=12)
-        half_vmax = np.nanmax(data_display)/2.0
+        half_vmax = np.nanmax(heatmap_data)/2.0
         for ev in range(n_events):
             for i in range(len(out_labels)):
-                val = data_display[ev,i]
+                val = heatmap_data[i,ev]
                 color = 'black' if val > half_vmax else 'white'
                 ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=6)
-        fig.savefig(pred_dir/f"heatmap.png", dpi=400)
+        fig.savefig(heatmap_dir/f"heatmap.png", dpi=400)
         plt.close(fig)
 
         # Heatmap square with no numbers
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
         im = ax.imshow(
-            errors,
+            heatmap_data,
             vmin=0, vmax=vmax,
             aspect='equal',
             origin='lower',
@@ -207,7 +213,6 @@ if __name__ == "__main__":
         cbar.set_label("$\\epsilon$: Normalized $L_2$ Error", fontsize=20)
         cbar.ax.tick_params(labelsize=15)
         ax.set_xlabel("Event", fontsize=22)
-        ax.set_ylabel("Channel", fontsize=22)
         ax.set_xticks(np.arange(n_events))
         ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=15)
         ax.set_yticks(np.arange(len(out_labels)))
@@ -216,6 +221,6 @@ if __name__ == "__main__":
         #                top=False, right=False,
         #                length=3, width=0.8, pad=6)
         # ax.tick_params(which='minor', direction='out', length=0)
-        fig.savefig(pred_dir/f"heatmap_square.png", dpi=400)
+        fig.savefig(heatmap_dir/f"heatmap_square.png", dpi=400)
         plt.close(fig)
 
