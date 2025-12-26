@@ -19,7 +19,6 @@ SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]
 WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
-LINETYPES = iter(["-", "--", ":", "-."])
 
 # Output directories
 OUT_DIR = Path(f"{MODEL}")
@@ -218,10 +217,6 @@ if __name__ == "__main__":
         ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=15)
         ax.set_yticks(np.arange(len(out_labels)))
         ax.set_yticklabels(out_labels, fontsize=15)
-        # ax.tick_params(axis='both', which='major', direction='out',
-        #                top=False, right=False,
-        #                length=3, width=0.8, pad=6)
-        # ax.tick_params(which='minor', direction='out', length=0)
         fig.savefig(heatmap_dir/f"heatmap_square.png", dpi=400)
         plt.close(fig)
 
