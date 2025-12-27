@@ -3,9 +3,10 @@ import glob
 import csv
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 
-DATA_DIR = "event_strain_stress_inelastic"   # Folder containing event_XX_strain_stress.csv
+DATA_DIR = Path("frame/inelastic")   # Folder containing event_XX_strain_stress.csv
 ELEMENT_ID = 1                     # Which element to plot
 
 
@@ -53,11 +54,15 @@ def plot_stress_strain_each_event(element_id=ELEMENT_ID, data_dir=DATA_DIR):
     Plot one stress–strain curve per event.
     Each event produces one figure.
     """
-    pattern = os.path.join(data_dir, "event_*_strain_stress.csv")
-    paths = sorted(glob.glob(pattern))
+    event_dirs = sorted(
+        [d for d in data_dir.iterdir() if d.is_dir()],
+        key=lambda d: int(d.name)
+    )
+
+    paths = [d / "strain_stress.csv" for d in event_dirs]
 
     if not paths:
-        raise FileNotFoundError(f"No files found matching {pattern}")
+        raise FileNotFoundError(f"No files found matching {data_dir}")
 
     # Output folder
     out_dir = "fig_stress_strain_each_event"
@@ -65,12 +70,11 @@ def plot_stress_strain_each_event(element_id=ELEMENT_ID, data_dir=DATA_DIR):
 
     for filepath in paths:
         # Extract event label from filename
-        filename = os.path.basename(filepath)
-        event_label = filename.split("_")[1]   # event_01_strain_stress.csv → "01"
+        event_label = Path(filepath).parent.name
 
         strain, stress = load_stress_strain_for_event(filepath, element_id)
         if strain is None:
-            print(f"[Skip] No valid data in {filename}")
+            print(f"[Skip] No valid data in {filepath}")
             continue
 
         idx = np.argsort(strain)
