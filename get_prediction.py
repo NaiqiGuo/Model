@@ -9,7 +9,6 @@ from mdof.simulate import simulate
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds, align_signals
 from mdof.validation import stabilize_discrete
 from mdof.prediction import _get_error 
-from scipy.signal import correlate, correlation_lags
 import utilities_visualization
 import plotly.graph_objects as go
 
