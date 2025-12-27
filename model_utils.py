@@ -685,8 +685,8 @@ def write_freq_csv(event_id,
 
 
 def get_node_displacements(displacements,
-                nodes=[5,10,15], # building (3 story frame)
-                # nodes=[2,3,5], # bridge
+                #nodes=[5,10,15], # building (3 story frame)
+                nodes=[2,3,5], # bridge
                 ):
     """
     displacements: { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }

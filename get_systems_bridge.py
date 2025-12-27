@@ -8,10 +8,10 @@ from mdof import sysid
 from mdof.validation import stabilize_discrete
 from mdof.utilities.config import Config
 from model_utils import (
-    create_model, get_inputs, analyze, get_outputs, stabilize_with_lmi,
-    stabilize_by_radius_clipping, save_all_methods_to_csv,
-    save_event_disp, save_event_strain_stress,
-    create_painter_bridge_model,     # make sure this is defined in model_utils
+    get_inputs, analyze, get_node_displacements, stabilize_with_lmi,
+    stabilize_by_radius_clipping, write_freq_csv,
+    save_displacements, save_strain_stress,
+    create_bridge_model,save_event_modes_to_csv     # make sure this is defined in model_utils
 )
 
 if __name__ == "__main__":
@@ -67,14 +67,14 @@ if __name__ == "__main__":
             i,
             events=events,
             input_channels=input_channels,
-            scale=2.54
+            scale=0.1  # 2.54
         )
         print(f"\nBridge model, event {i+1} inputs shape: {inputs.shape}, dt = {dt}")
 
         # ------------------------------------------------
         # Build Painter Street bridge model
         # ------------------------------------------------
-        model = create_painter_bridge_model(
+        model = create_bridge_model(
             elastic=ELASTIC,
             inputx=inputs[0],
             inputy=inputs[1],
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         
         # Time history analysis
         try:
-            disp, stresses, strains = analyze(
+            disp, stresses, strains, freqs_before, freqs_after = analyze(
                 model,
                 output_nodes=output_nodes,
                 nt=nt,
@@ -100,12 +100,24 @@ if __name__ == "__main__":
                 yFiber=8.0,
                 zFiber=0.0
             )
+            
         except RuntimeError as e:
             print(f"Error for event {i+1}:")
             print(e)
             continue
 
-        outputs = get_outputs(disp)
+        write_freq_csv(
+            event_id=event_id,
+            freqs_before=freqs_before,
+            freqs_after=freqs_after,
+            freq_csv_path=(
+                "natural_frequencies_bridge_elastic.csv"
+                if ELASTIC else
+                "natural_frequencies_bridge_inelastic.csv"
+            )
+        )
+
+        outputs = get_node_displacements(disp)
         outputs = outputs[:, 1:]   # drop time row
         assert inputs.shape[1] == outputs.shape[1], \
             "inputs and outputs have different length of time samples."
@@ -124,8 +136,10 @@ if __name__ == "__main__":
         os.makedirs(disp_dir, exist_ok=True)
         os.makedirs(ss_dir, exist_ok=True)
 
-        save_event_disp(event_id, disp, dt, out_dir=disp_dir)
-        save_event_strain_stress(event_id, stresses, strains, dt, out_dir=ss_dir)
+        disp_path = os.path.join(disp_dir, f"event_{event_id:02d}_disp.csv")
+        save_displacements(disp, dt, disp_path)
+        ss_path = os.path.join(ss_dir, f"event_{event_id:02d}_strain_stress.csv")
+        save_strain_stress(stresses, strains, dt, ss_path)
 
 
         # System identification options
@@ -175,4 +189,37 @@ if __name__ == "__main__":
             # you can enable other methods here if needed
         }
         # save methods to CSV, with event index i and method dict
-        save_all_methods_to_csv(event_id - 1, methods_dict)
+        # # ----- True modes from FE eigenvectors -----
+        # n_modes = 3
+        # freq_true, Phi_true = get_true_modes_xara(
+        #     model,
+        #     floor_nodes=(2, 3, 5),
+        #     dofs=(1, 2),
+        #     n=n_modes
+        # )
+
+        # # ----- Estimated modes from SRIM -----
+        # Phi_srim, eigvals_sel = phi_output(A_s, C_s)
+
+        # Phi_srim = Phi_srim[:, :n_modes]
+
+        # # ----- MAC -----
+        # MAC_srim = mac_matrix(Phi_true, Phi_srim)
+
+        # method_modes = {"srim": Phi_srim}
+        # method_macs  = {"srim": MAC_srim}
+        # algos = ["srim"]
+
+        # modes_dir = "event_modes_bridge_inelastic" if not ELASTIC else "event_modes_bridge_elastic"
+        # os.makedirs(modes_dir, exist_ok=True)
+
+        # modes_path = os.path.join(modes_dir, f"event_{event_id:02d}_modes.csv")
+
+        # save_event_modes_to_csv(
+        #     event_id=event_id,
+        #     Phi_true=Phi_true,
+        #     method_modes=method_modes,
+        #     method_macs=method_macs,
+        #     algos=algos,
+        #     filename=modes_path
+        # )

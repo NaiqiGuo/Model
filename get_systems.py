@@ -15,7 +15,7 @@ from model_utils import( get_inputs, get_node_displacements,
 # Analysis configuration
 SID_METHOD = 'srim'
 MODEL = "frame" # "frame", "bridge"
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Main output directory
@@ -86,7 +86,7 @@ if __name__ == "__main__":
                                                                     dt=dt,
                                                                     output_nodes=[*input_nodes,*output_nodes],
                                                                     output_elements=output_elements,
-                                                                    yFiber=9.0,
+                                                                    yFiber=5.0,
                                                                     zFiber=0.0
                                                                 )
         except RuntimeError as e:
