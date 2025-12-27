@@ -133,7 +133,7 @@ if __name__ == "__main__":
                 ))
             np.savetxt(pred_dir/"errors.csv", np.array(errors))
 
-            # Plot true vs predicted outputs
+            # Plot true vs predicted output timeseries
             fig_plt, axs = plt.subplots(int(len(out_labels)/2), 2,
                                         figsize=(14,len(out_labels)),
                                         sharex=True,

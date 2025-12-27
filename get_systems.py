@@ -68,23 +68,27 @@ if __name__ == "__main__":
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
-            input_nodes = [1]
             output_nodes = [5,10,15]
             output_elements = [1,5,9]
+            # # TODO: model-specific y and z fibers for stress-strain measurements
+            # yFiber = ...
+            # zFiber = ...
         elif MODEL == 'bridge':
             model = create_bridge_model(elastic=ELASTIC)
             model = apply_load_bridge_model(model,
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
-            input_nodes = [4]
             output_nodes = [2,3,5]
             output_elements = [2,3]
+            # # TODO: model-specific y and z fibers for stress-strain measurements
+            # yFiber = ...
+            # zFiber = ...
         try:
             disp, stresses, strains, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
                                                                     dt=dt,
-                                                                    output_nodes=[*input_nodes,*output_nodes],
+                                                                    output_nodes=output_nodes,
                                                                     output_elements=output_elements,
                                                                     yFiber=5.0,
                                                                     zFiber=0.0
