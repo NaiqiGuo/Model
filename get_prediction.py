@@ -176,7 +176,10 @@ if __name__ == "__main__":
         os.makedirs(heatmap_dir, exist_ok=True)
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
         heatmap_data = np.nan_to_num(errors.T, nan=0.0)
-        vmax = np.max(heatmap_data)
+        if MODEL == "frame":
+            vmax = 1.0
+        elif MODEL == "bridge":
+            vmax = np.max(heatmap_data)
         im = ax.imshow(
             heatmap_data,
             vmin=0, vmax=vmax,
