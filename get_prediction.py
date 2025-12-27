@@ -1,281 +1,222 @@
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-import os
-from model_utils import (
-get_inputs, create_model, analyze, get_outputs, stabilize_with_lmi,stabilize_by_radius_clipping,
-simulate, stabilize_discrete, intensity_bounds, truncate_by_bounds
-)
-from mdof.prediction import get_error_new
-from mdof.utilities.testing import align_signals
-import scienceplots
-plt.style.use(["science"])
-from scipy.signal import correlate, correlation_lags
+import os, glob
+from pathlib import Path
+from tqdm import tqdm
+
+from mdof.simulate import simulate
+from mdof.utilities.testing import intensity_bounds, truncate_by_bounds, align_signals
+from mdof.validation import stabilize_discrete
 from mdof.prediction import _get_error 
+from scipy.signal import correlate, correlation_lags
+import utilities_visualization
+import plotly.graph_objects as go
+
+# Analysis configuration
+MODEL = "frame" # "frame", "bridge"
+SID_METHOD = "srim"
+elas_cases = ["elastic", "inelastic"]
+WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting
+VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
+
+# Output directories
+OUT_DIR = Path(f"{MODEL}")
+os.makedirs(OUT_DIR, exist_ok=True)
+for elas in elas_cases:
+    elas_dir  = OUT_DIR/elas
+    os.makedirs(elas_dir, exist_ok=True)
+
+if __name__ == "__main__":
+
+    if MODEL == "frame":
+        out_nodes = [5,10,15]
+        # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
+        out_labels = ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y', ]
+    elif MODEL == "bridge":
+        out_nodes = [2,3,5]
+        out_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
+    # out_labels = [f'Node{i}{dof}' for i in out_nodes for dof in ['X','Y']]
 
 
-num_events = 21
-sys_names = ["srim"] #, "det", "n4sid", "det"
-num_algos = len(sys_names)
-windowed_plot = True  # Set True for windowed L2 error, False for all samples
+    for elas in elas_cases:
+        if VERBOSE:
+            print(f"\nComputing {elas} case.")
 
-with open("events.pkl", "rb") as f:
-    events = pickle.load(f)
-print(f"Total events loaded: {len(events)}")
+        n_events = len(glob.glob(str(OUT_DIR/elas/"[0-9]*")))
+        errors = np.full((n_events,len(out_labels)), np.nan)
+        for event_id in tqdm(range(1, n_events+1)):
+            # Load inputs and true outputs
+            event_dir = OUT_DIR/elas/str(event_id)
+            inputs = np.loadtxt(event_dir/"inputs.csv")
+            out_true = np.loadtxt(event_dir/"outputs.csv")
+            with open(event_dir/"dt.txt", "r") as f:
+                dt = float(f.read())
+            nt = inputs.shape[1]
+            time = np.arange(nt) * dt
 
-input_channels = [1, 3]
-output_dir = "predictions"
-os.makedirs(output_dir, exist_ok=True)
+            # Load identified system
+            with open(event_dir/f"system_{SID_METHOD}.pkl", "rb") as f:
+                A,B,C,D = pickle.load(f)
+            # Stabilize identified system
+            A_stable = stabilize_discrete(A)
 
-inputs, dt = get_inputs(0, events=events, input_channels=input_channels, scale=2.54)
-nt = inputs.shape[1]
-model = create_model(column="forceBeamColumn", girder="forceBeamColumn", inputx=inputs[0], inputy=inputs[1], dt=dt)
-disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
-outputs = get_outputs(disp)
-outputs = outputs[:, 1:]
-num_channels = outputs.shape[0]
+            # Predict outputs
+            out_pred = simulate((A_stable,B,C,D), inputs)
 
-# Initialize error matrix: shape [channels, algorithms, events]
-#error_matrix = np.zeros((num_channels, num_algos, num_events))
-error_matrix = np.full((num_channels, num_algos, num_events), np.nan)
-
-for event_id in range(1, num_events+1):
-    inputs, dt = get_inputs(event_id-1, events=events, input_channels=input_channels, scale=2.54)
-    nt = inputs.shape[1]
-    
-    model = create_model(
-        column="forceBeamColumn",
-        girder="forceBeamColumn",
-        inputx=inputs[0],
-        inputy=inputs[1],
-        dt=dt
-    )
-    try:
-        disp = analyze(model, output_nodes=[9, 14, 19], nt=nt, dt=dt)
-    except RuntimeError:
-        continue
-    outputs = get_outputs(disp)
-    outputs = outputs[:, 1:]
-    time = np.arange(outputs.shape[1]) * dt
-    
-    param_dir = "event_outputs_ABCD_model"
-    for sys_idx, sys_name in enumerate(sys_names):
-        # Load identified system parameters for this event and algorithm
-        pkl_path = os.path.join(param_dir, f"system_{sys_name}_{event_id:02d}.pkl")
-        if not os.path.exists(pkl_path):
-            print(f"{pkl_path} pass")
-            continue
-        with open(pkl_path, "rb") as f:
-            A, B, C, D = pickle.load(f)
-        # Stabilize A (modify here if you want to try LMI or radius clipping)
-        A_stable = stabilize_discrete(A)
-        # Optional: post-process A (choose only one)
-        #A_stable = stabilize_with_lmi(A)                
-        #A_stable = stabilize_by_radius_clipping(A)
-        # Simulate predicted outputs
-        pred = simulate((A_stable, B, C, D), inputs)
-        pred = pred[:, 1:]
-        
-        # Windowed plotting and error calculation
-        if windowed_plot:
-            bounds = intensity_bounds(outputs[0], lb=0.01, ub=0.99)
-            outputs_trunc = truncate_by_bounds(outputs, bounds)
-            pred_trunc    = truncate_by_bounds(pred, bounds)
-            time_trunc    = truncate_by_bounds(time, bounds)
-        else:
-            outputs_trunc = outputs
-            pred_trunc    = pred
-            time_trunc    = time
-
-        # Compute L2 errors for each channel
-        # for ch in range(num_channels):
-        #     num = np.linalg.norm(outputs_trunc[ch] - pred_trunc[ch])
-        #     den = np.linalg.norm(outputs_trunc[ch])
-        #     pred_norm = np.linalg.norm(pred_trunc[ch])
-        #     ratio = num/den if den > 1e-10 else np.nan
-        #     error_matrix[ch, sys_idx, event_id-1] = num
-        #     print(f"Event {event_id} {sys_name.upper()} Ch {ch}: ‖pred‖={pred_norm:.3e}, ‖diff‖={num:.3e}, ‖true‖={den:.3e}, ratio={ratio:.3f}")
-
-        max_lag_samp_global, ytrue_aln, ypred_aln, time_aln = align_signals(
-            outputs_trunc, pred_trunc, times=time_trunc, verbose=False, max_lag_allowed=None
-        )
-
-        lags_samp = np.empty(num_channels, dtype=int)
-        for ch in range(num_channels):
-            s1 = outputs_trunc[ch]
-            s2 = pred_trunc[ch]
-            corr = correlate(s1, s2, mode='full')
-            lags = correlation_lags(len(s1), len(s2), mode='full')
-            lags_samp[ch] = int(lags[np.argmax(corr)])
-
-        max_lag_allowed_sec = 1.0
-        for ch in range(num_channels):
-            max_lag_samp = int(lags_samp[ch])
-            lag_sec = max_lag_samp * dt
-            ch_name = f"Ch{ch}" 
-            if abs(lag_sec) > max_lag_allowed_sec:
-                print(f"[ALIGN] E{event_id:02d} {ch_name}: LARGE LAG {lag_sec:+.3f}s "
-                    f"({max_lag_samp:+d} samples) — exceeds ±{max_lag_allowed_sec:.1f}s limit. NO ALIGN APPLIED.")
-            elif max_lag_samp == 0:
-                print(f"[ALIGN] E{event_id:02d} {ch_name}: no shift (already aligned).")
+            # Window signals
+            if WINDOWED:
+                bounds = intensity_bounds(out_true[0], lb=0.01, ub=0.99)
+                inputs_trunc = truncate_by_bounds(inputs, bounds)
+                out_true_trunc = truncate_by_bounds(out_true, bounds)
+                out_pred_trunc = truncate_by_bounds(out_pred, bounds)
+                time_trunc     = truncate_by_bounds(time, bounds)
             else:
-                direction = "ypred originally lagged ytrue" if max_lag_samp > 0 else "ypred originally led ytrue"
-                print(f"[ALIGN] E{event_id:02d} {ch_name}: shifted {max_lag_samp:+d} samples "
-                    f"({lag_sec:+.4f} s) → {direction}")
-        
+                inputs_trunc = inputs
+                out_true_trunc = out_true
+                out_pred_trunc = out_pred
+                time_trunc     = time
+
+            # Align signals
+            max_lag_allowed_sec = 1.0
+
+            if VERBOSE==2:
+                print(f">>> Aligning signals for Event {event_id:02d}.")
+
+            out_true_aln_stacked = []
+            out_pred_aln_stacked = []
+            for i, output_label in enumerate(out_labels):
+                s1 = out_true_trunc[i]
+                s2 = out_pred_trunc[i]
+                lag, out_true_aln, out_pred_aln, _ = align_signals(s1, s2, time_trunc, 
+                                                            verbose=False, 
+                                                            max_lag_allowed=max_lag_allowed_sec)
+                out_true_aln_stacked.append(out_true_aln)
+                out_pred_aln_stacked.append(out_pred_aln)
+
+                if VERBOSE==2:
+                    if lag == 0:
+                            print(f">>>>>> {output_label}: no shift (already aligned).")
+                    else:
+                        lag_sec = lag*dt
+                        direction = "ypred originally lagged ytrue" if lag > 0 else "ypred originally led ytrue"
+                        print(f">>>>>> {output_label}: shifted {lag:+d} samples ({lag_sec:+.4f} s) → {direction}")
+                    
                 
-        for ch in range(num_channels):
-            y_t = ytrue_aln[ch]
-            y_p = ypred_aln[ch]
-            try:
-                val = _get_error(
-                ytrue=y_t,
-                ypred=y_p,
-                numerator_norm=2,
-                denominator_norm= 2,
-                numerator_averaged=True,
-                denominator_averaged=True
-            )
-            except ZeroDivisionError:
-                val = np.nan
-            error_matrix[ch, sys_idx, event_id - 1] = float(val)
+                nt = np.min([nt, len(out_true_aln)])
             
+            # Prediction directory
+            pred_dir  = event_dir/SID_METHOD
+            os.makedirs(pred_dir, exist_ok=True)
 
-        # Plot one or more channels for qualitative comparison
-        fig, axs = plt.subplots(1, 2, figsize=(12,4), constrained_layout=True)
-        floors = [0,1,2]  # 1F, 2F, 3F
+            # Save processed input, true output, predicted output, and time
+            input_array = np.array([input_series[:nt] for input_series in inputs_trunc])
+            np.savetxt(pred_dir/"inputs_processed.csv", input_array)
+            out_true_aln_array = np.array([out_true_aln[:nt] for out_true_aln in out_true_aln_stacked])
+            np.savetxt(pred_dir/"outputs_true_processed.csv", out_true_aln_array)
+            out_pred_aln_array = np.array([out_pred_aln[:nt] for out_pred_aln in out_pred_aln_stacked])
+            np.savetxt(pred_dir/"outputs_pred_processed.csv", out_pred_aln_array)
+            time_aln = time_trunc[:nt]
+            np.savetxt(pred_dir/"time_processed.csv", time_aln)
+            
+            # Compute errors
+            for i,output_label in enumerate(out_labels):
+                out_true = out_true_aln_array[i]
+                out_pred = out_pred_aln_array[i]
+                errors[event_id-1,i] = (_get_error(
+                    ytrue = out_true,
+                    ypred = out_pred,
+                    numerator_norm = 2,
+                    denominator_norm = 2,
+                    numerator_averaged = True,
+                    denominator_averaged = True
+                ))
+            np.savetxt(pred_dir/"errors.csv", np.array(errors))
 
-        # X
-        ax = axs[0]
-        for f in floors:
-            ax.plot(time_aln, ytrue_aln[2*f],   '--', label=f"True Fl{f+1} X")
-            ax.plot(time_aln, ypred_aln[2*f],         label=f"{sys_name.upper()} Fl{f+1} X")
-        ax.set(title=f"{sys_name.upper()} — X direction", xlabel="Time (s)", ylabel="Disp")
-        ax.legend()
+            # Plot true vs predicted outputs
+            fig_plt, axs = plt.subplots(int(len(out_labels)/2), 2,
+                                        figsize=(14,len(out_labels)),
+                                        sharex=True,
+                                        constrained_layout=True) # matplotlib
+            fig_go = [go.Figure(), go.Figure()] # plotly
+            dirs = ['X','Y']
+            for j in range(2):
+                colors_go = iter(["blue","darkorange","green"])
+                for i,out_label in enumerate(out_labels):
+                    if dirs[j] in out_label:
+                        r = i//2
+                        color = next(colors_go)
+                        axs[r,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
+                        axs[r,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
+                        axs[r,j].set_ylabel(out_label)
+                        axs[r,j].legend()
+                        fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array[i],
+                                              mode="lines", line=dict(color=color),
+                                              name=f"True {out_label}")
+                        fig_go[j].add_scatter(x=time_aln, y=out_pred_aln_array[i],
+                                              mode="lines", line=dict(color=color, dash="dash"),
+                                              name=f"Pred {out_label}")
+                axs[r,j].set_xlabel(f"Time (s)")
+                fig_go[j].update_layout(
+                    title=f"Event {event_id} Prediction, {dirs[j]} direction",
+                    xaxis_title="Time (s)",
+                    yaxis_title="Displacement (in)",
+                    legend=dict(orientation="h", yanchor="bottom", y=0.0, xanchor="left", x=0,
+                                font=dict(size=18)),
+                )
+                fig_go[j].update_xaxes(rangeslider=dict(visible=True))
+                fig_go[j].write_html(pred_dir/f"prediction_{dirs[j]}.html", include_plotlyjs="cdn")
+            fig_plt.align_ylabels()
+            fig_plt.suptitle(f"Event {event_id} Displacement Response (in)")
+            fig_plt.savefig(pred_dir/"prediction.png", dpi=350)
+            plt.close(fig_plt)
 
-        # Y
-        ax = axs[1]
-        for f in floors:
-            ax.plot(time_aln, ytrue_aln[2*f+1], '--', label=f"True Fl{f+1} Y")
-            ax.plot(time_aln, ypred_aln[2*f+1],       label=f"{sys_name.upper()} Fl{f+1} Y")
-        ax.set(title=f"{sys_name.upper()} — Y direction", xlabel="Time (s)", ylabel="Disp")
-        ax.legend()
-
-        plt.suptitle(f"Event {event_id} {sys_name.upper()} (aligned, windowed={windowed_plot})")
-        plt.savefig(os.path.join(output_dir, f"event_{event_id:02d}_{sys_name}.png"), dpi=300)
+        # Heatmap non-square with numbers
+        heatmap_dir = OUT_DIR/elas/SID_METHOD
+        os.makedirs(heatmap_dir, exist_ok=True)
+        fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
+        heatmap_data = np.nan_to_num(errors.T, nan=0.0)
+        vmax = np.max(heatmap_data)
+        im = ax.imshow(
+            heatmap_data,
+            vmin=0, vmax=vmax,
+            aspect='auto',
+            origin='lower',
+            cmap='viridis'
+        )
+        cbar = fig.colorbar(im, ax=ax, extend='max')
+        cbar.set_label("$\\epsilon$: Normalized $L_2$ Error", fontsize=14)
+        ax.set_xlabel("Event", fontsize=14)
+        ax.set_xticks(np.arange(n_events))
+        ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=12)
+        ax.set_yticks(np.arange(len(out_labels)))
+        ax.set_yticklabels(out_labels, fontsize=12)
+        half_vmax = np.nanmax(heatmap_data)/2.0
+        for ev in range(n_events):
+            for i in range(len(out_labels)):
+                val = heatmap_data[i,ev]
+                color = 'black' if val > half_vmax else 'white'
+                ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=6)
+        fig.savefig(heatmap_dir/f"heatmap.png", dpi=400)
         plt.close(fig)
 
-# Save the error matrix for later analysis
-np.savez(os.path.join(output_dir, "error_matrix.npz"), error_matrix=error_matrix, sys_names=sys_names)
-print("Error matrix saved to predictions/error_matrix.npz")
+        # Heatmap square with no numbers
+        fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
+        im = ax.imshow(
+            heatmap_data,
+            vmin=0, vmax=vmax,
+            aspect='equal',
+            origin='lower',
+            cmap='viridis'
+        )
+        cbar = fig.colorbar(im, ax=ax, extend='max', fraction=0.02, pad=0.04)
+        cbar.set_label("$\\epsilon$: Normalized $L_2$ Error", fontsize=20)
+        cbar.ax.tick_params(labelsize=15)
+        ax.set_xlabel("Event", fontsize=22)
+        ax.set_xticks(np.arange(n_events))
+        ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=15)
+        ax.set_yticks(np.arange(len(out_labels)))
+        ax.set_yticklabels(out_labels, fontsize=15)
+        fig.savefig(heatmap_dir/f"heatmap_square.png", dpi=400)
+        plt.close(fig)
 
-
-# Visualize error matrix as heatmap for each algorithm
-os.makedirs("predictions", exist_ok=True)
-channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
-print("error_matrix shape:", error_matrix.shape)
-
-algo_names = [name.upper() for name in sys_names]
-for i, algo in enumerate(algo_names):
-    fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
-    data = error_matrix[:, i, :]
-    data_display = np.nan_to_num(data, nan=0.0)
-    vmax_i = np.nanmax(error_matrix[:, i, :])
-    im = ax.imshow(error_matrix[:, i, :],
-                   vmin=0, vmax=vmax_i,
-                   aspect='auto', origin='lower', cmap='viridis')
-    cbar = fig.colorbar(im, ax=ax, extend='max')
-    cbar.set_label("$\epsilon$:$L_2$ Error (mean) \n(normalized)", fontsize=14)
-    ax.set_xlabel("Event index", fontsize=14)
-    ax.set_ylabel("Channel", fontsize=14)
-    ax.set_xticks(np.arange(num_events))
-    ax.set_xticklabels(np.arange(1, num_events+1), rotation=45, fontsize=12)
-    ax.set_yticks(np.arange(len(channel_labels)))
-    ax.set_yticklabels(channel_labels, fontsize=12)
-    #ax.set_title(f"{algo} Error heatmap (windowed part)", fontsize=16)
-    half = np.nanmax(data_display) / 2.0
-    for ch in range(len(channel_labels)):
-        for ev in range(num_events):
-            val = data_display[ch, ev]
-            color = 'black' if val > half else 'white'
-            ax.text(ev, ch, f"{val:.2f}", ha='center', va='center',
-                    color=color, fontsize=6)
-    plt.savefig(os.path.join("predictions", f"error_heatmap_{algo}.png"), dpi=300)
-    plt.close(fig)
-
-
-# === Visualization for error_matrix ===
-os.makedirs("predictions", exist_ok=True)
-channel_labels = ['1F X','1F Y','2F X','2F Y','3F X','3F Y']
-print("error_matrix shape:", error_matrix.shape)
-
-algo_names = [name.upper() for name in sys_names]
-DROP10 = False  
-
-# Unified colorbar range (ignore NaN)
-vmax_global = np.nanmax(error_matrix)
-print(f"Global color scale vmax = {vmax_global:.4f}")
-
-for i, algo in enumerate(algo_names):
-    fig, ax = plt.subplots(figsize=(12, 6), constrained_layout=True)
-
-    # Replace NaN with 0 (for visualization only)
-    data = np.nan_to_num(error_matrix[:, i, :], nan=0.0)
-
-    # Plot heatmap
-    im = ax.imshow(
-        data,
-        #vmin=0, vmax=vmax_global, 
-        vmin=0, vmax=1.2,  
-        aspect='equal',             
-        origin='lower',
-        cmap='viridis'
-    )
-
-    # Colorbar settings
-    cbar = fig.colorbar(im, 
-                        ax=ax, 
-                        extend='max', 
-                        fraction=0.02, 
-                        pad=0.04
-                        )
-    cbar.set_label(
-        "$\\epsilon$:$L_2$ Error (mean) \n(normalized)",
-        fontsize=20, fontname='serif'
-    )
-    cbar.ax.tick_params(labelsize=15)
-
-    # Axis labels and font
-    ax.set_xlabel("Event index", fontsize=22)
-    ax.set_ylabel("Channel", fontsize=22)
-    ax.set_xticks(np.arange(num_events))
-    ax.set_yticks(np.arange(len(channel_labels)))
-    ax.set_yticklabels(channel_labels, fontsize=15)
-
-    # X-axis labels
-    if DROP10:
-        ax.set_xticklabels(np.delete(np.arange(1, num_events + 2), 9),
-                           rotation=45, fontsize=15)
-    else:
-        ax.set_xticklabels(np.arange(1, num_events + 1),
-                           rotation=45, fontsize=15)
-
-    # Tick style
-    ax.tick_params(axis='both', which='major',
-                   direction='out', length=3, width=0.8,
-                   top=False, right=False, pad=6)
-    ax.tick_params(which='minor', direction='out', length=0)
-
-    # Title (optional)
-    # ax.set_title(f"{algo} Error heatmap (windowed part)",
-    #              fontsize=18, fontname='serif')
-
-    # Save figure
-    if DROP10:
-        fig.savefig(os.path.join("predictions", f"{algo}_heatmap_drop10.png"), dpi=300)
-    else:
-        fig.savefig(os.path.join("predictions", f"{algo}_heatmap.png"), dpi=300)
-
-    plt.close(fig)
-
-print("All error heatmaps for each algorithm have been saved in the predictions folder.")

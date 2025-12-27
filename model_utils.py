@@ -335,13 +335,13 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn",
     model.meta["column_elems"] = []
 
     # Nodes: (tag, (x, y, z))
-    model.node(0, (0.0,                                  0.0,                  320.0))
-    model.node(1, (3180.0,                               0.0,                  320.0))
-    model.node(2, (1752.0,                               0.0,                  320.0))
-    model.node(3, (1641.4628263430573,    199.41297159396336,                  320.0))
-    model.node(4, (1641.4628263430573,    199.41297159396336,                    0.0))
-    model.node(5, (1862.5371736569432,   -199.41297159396336,                  320.0))
-    model.node(6, (1862.5371736569432,   -199.41297159396336,                    0.0))
+    model.node(0, (0.0,                                  0.0,                  320.0)) # abutment 1
+    model.node(1, (3180.0,                               0.0,                  320.0)) # abutment 2
+    model.node(2, (1752.0,                               0.0,                  320.0)) # mid-deck
+    model.node(3, (1641.4628263430573,    199.41297159396336,                  320.0)) # top of column 1
+    model.node(4, (1641.4628263430573,    199.41297159396336,                    0.0)) # bottom of column 1
+    model.node(5, (1862.5371736569432,   -199.41297159396336,                  320.0)) # top of column 2
+    model.node(6, (1862.5371736569432,   -199.41297159396336,                    0.0)) # bottom of column 2
 
     # Boundary conditions, fully fixed at 0, 1, 4, 6
     # fix(tag, (DX, DY, DZ, RX, RY, RZ))
@@ -690,8 +690,8 @@ def get_node_displacements(displacements,
                 ):
     """
     displacements: { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
-    Returns outputs: ndarray, shape=(6, nt), row order:
-      [Node1 X, Node1 Y, Node2 X, Node2 Y, Node3 X, Node3 Y, ...]
+    Returns outputs: ndarray, shape=(n_nodes*2, nt), row order:
+      [Node1 X, Node1 Y, Node2 X, Node2 Y, ...]
     """
     rows = []
     for node in nodes:
@@ -699,7 +699,7 @@ def get_node_displacements(displacements,
         rows.append(arr[:, 0])  # X displacement 
         rows.append(arr[:, 1])  # Y displacement
     outputs = np.vstack(rows)
-    return outputs     # shape (6, nt+1)
+    return outputs     # shape (2*n_nodes, nt)
 
 
 def stabilize_with_lmi(A_hat, epsilon=1e-10, solver='CVXOPT'):
