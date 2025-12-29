@@ -13,7 +13,7 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]
 WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting
@@ -53,6 +53,7 @@ if __name__ == "__main__":
                 dt = float(f.read())
             nt = inputs.shape[1]
             time = np.arange(nt) * dt
+            
 
             # Load identified system
             with open(event_dir/f"system_{SID_METHOD}.pkl", "rb") as f:
@@ -117,10 +118,16 @@ if __name__ == "__main__":
             np.savetxt(pred_dir/"outputs_pred_processed.csv", out_pred_aln_array)
             time_aln = time_trunc[:nt]
             np.savetxt(pred_dir/"time_processed.csv", time_aln)
+
+            # true to 0.0
+            out_true_aln_array1 = out_true_aln_array.copy()
+            for ch in range(out_true_aln_array.shape[0]):
+                offset = np.mean(out_pred_aln_array[ch]) - np.mean(out_true_aln_array[ch])
+                out_true_aln_array1[ch] = out_true_aln_array[ch] + offset
             
             # Compute errors
             for i,output_label in enumerate(out_labels):
-                out_true = out_true_aln_array[i]
+                out_true = out_true_aln_array1[i]
                 out_pred = out_pred_aln_array[i]
                 errors[event_id-1,i] = (_get_error(
                     ytrue = out_true,
@@ -145,11 +152,11 @@ if __name__ == "__main__":
                     if dirs[j] in out_label:
                         r = i//2
                         color = next(colors_go)
-                        axs[r,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
+                        axs[r,j].plot(time_aln, out_true_aln_array1[i], color="black", linestyle='-',  label=f"True") 
                         axs[r,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
                         axs[r,j].set_ylabel(out_label)
                         axs[r,j].legend()
-                        fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array[i],
+                        fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array1[i],
                                               mode="lines", line=dict(color=color),
                                               name=f"True {out_label}")
                         fig_go[j].add_scatter(x=time_aln, y=out_pred_aln_array[i],

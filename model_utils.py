@@ -319,14 +319,14 @@ def apply_load_frame_model(model, inputx=None, inputy=None, dt=None):
     return model
 
 
-def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn", inputx=None, inputy=None, dt=None):
+def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn"):
     
-    #input check
-    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
-        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
+    # #input check
+    # if np.all(inputx is None) or np.all(inputy is None) or dt is None:
+    #     raise ValueError("Missing inputx, inputy, or dt. Exiting.")
 
-    if girder != "elasticBeamColumn":
-        raise ValueError("Only elasticBeamColumn allowed for girders.")
+    # if girder != "elasticBeamColumn":
+    #     raise ValueError("Only elasticBeamColumn allowed for girders.")
     
     model = xara.Model(ndm=3, ndf=6)
 
@@ -513,15 +513,15 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn",
     # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
 
-    # Ground motion: fault normal (x) and fault parallel (y) components
-    # Time series for the two components
-    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
+    # # Ground motion: fault normal (x) and fault parallel (y) components
+    # # Time series for the two components
+    # model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
+    # model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
 
-    # Uniform excitation patterns in global X and Y directions
-    # pattern("UniformExcitation", tag, dof, accel=seriesTag)
-    model.pattern("UniformExcitation", 2, 1, accel=2)   # dof 1 = global X
-    model.pattern("UniformExcitation", 3, 2, accel=3)   # dof 2 = global Y
+    # # Uniform excitation patterns in global X and Y directions
+    # # pattern("UniformExcitation", tag, dof, accel=seriesTag)
+    # model.pattern("UniformExcitation", 2, 1, accel=2)   # dof 1 = global X
+    # model.pattern("UniformExcitation", 3, 2, accel=3)   # dof 2 = global Y
 
     return model
 

@@ -14,7 +14,7 @@ from model_utils import( get_inputs, get_node_displacements,
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 ELASTIC = False
 LOAD_EVENTS = False
 
@@ -71,8 +71,8 @@ if __name__ == "__main__":
             output_nodes = [5,10,15]
             output_elements = [1,5,9]
             # # TODO: model-specific y and z fibers for stress-strain measurements
-            # yFiber = ...
-            # zFiber = ...
+            yFiber = 5.0
+            zFiber = 0.0
         elif MODEL == 'bridge':
             model = create_bridge_model(elastic=ELASTIC)
             model = apply_load_bridge_model(model,
@@ -82,16 +82,16 @@ if __name__ == "__main__":
             output_nodes = [2,3,5]
             output_elements = [2,3]
             # # TODO: model-specific y and z fibers for stress-strain measurements
-            # yFiber = ...
-            # zFiber = ...
+            yFiber = 5.0
+            zFiber = 0.0
         try:
             disp, stresses, strains, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
                                                                     dt=dt,
                                                                     output_nodes=output_nodes,
                                                                     output_elements=output_elements,
-                                                                    yFiber=5.0,
-                                                                    zFiber=0.0
+                                                                    yFiber=yFiber,
+                                                                    zFiber=zFiber
                                                                 )
         except RuntimeError as e:
             print(f"Error encounted when analyzing event {i}:")
