@@ -1131,12 +1131,7 @@ def compute_Df_event(f_event: np.ndarray, fbase_per_mode: np.ndarray, eps_stab: 
     }
 
 def compute_Dr_residual_tail(y_true: np.ndarray, y_pred: np.ndarray, dt: float, tail_sec: float) -> dict:
-    """
-    Residual-focused Dr using LAST tail_sec:
-      residual per channel = |mean(y_true_tail) - mean(y_pred_tail)|
-      Dr_residual_mean = mean(residual per channel)
-      Dr_residual_max  = max(residual per channel)
-    """
+    
     nt = y_true.shape[1]
     k_tail = int(round(tail_sec / dt))
     k_tail = max(1, min(k_tail, nt))
@@ -1144,9 +1139,11 @@ def compute_Dr_residual_tail(y_true: np.ndarray, y_pred: np.ndarray, dt: float, 
     y_true_tail = y_true[:, -k_tail:]
     y_pred_tail = y_pred[:, -k_tail:]
 
-    mu_true = np.mean(y_true_tail, axis=1)
-    mu_pred = np.mean(y_pred_tail, axis=1)
-    res = np.abs(mu_true - mu_pred)
+    # mu_true = np.mean(y_true_tail, axis=1)
+    # mu_pred = np.mean(y_pred_tail, axis=1)
+    # res = np.abs(mu_true - mu_pred)
+
+    res = np.mean(np.abs(y_true_tail - y_pred_tail), axis=1)
 
     out = {
         "Dr_tail_sec": float(tail_sec),

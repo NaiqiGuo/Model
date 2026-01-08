@@ -44,7 +44,7 @@ BASELINE_METRIC = "pga"        # "pga" (peak abs accel), or "rms"
 FREQ_FILE = "post_eq_natural_frequencies.csv"   # has 3 modes per event
 
 # Dr tail window (seconds)
-DR_TAIL_SEC = 30.0
+DR_TAIL_SEC = 10.0
 
 
 if __name__ == "__main__":
