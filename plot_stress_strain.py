@@ -55,7 +55,7 @@ def plot_stress_strain_each_event(element_id=ELEMENT_ID, data_dir=DATA_DIR):
     Each event produces one figure.
     """
     event_dirs = sorted(
-        [d for d in data_dir.iterdir() if d.is_dir()],
+        [d for d in data_dir.iterdir() if d.is_dir() and d.name.isdigit()],
         key=lambda d: int(d.name)
     )
 

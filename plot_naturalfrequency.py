@@ -1,5 +1,8 @@
+import re
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 def plot_natural_frequencies(csv_path, title, output_png):
     """
@@ -65,6 +68,72 @@ def plot_natural_frequencies(csv_path, title, output_png):
     plt.close()
 
     print(f"Saved: {output_png}")
+
+def _read_modes123(csv_path: Path) -> np.ndarray:
+    
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Missing file: {csv_path}")
+
+    try:
+        df = pd.read_csv(csv_path)
+        cols = [c.lower().strip() for c in df.columns]
+        if "mode1" in cols and "mode2" in cols and "mode3" in cols:
+            m1 = float(df.iloc[0, cols.index("mode1")])
+            m2 = float(df.iloc[0, cols.index("mode2")])
+            m3 = float(df.iloc[0, cols.index("mode3")])
+            return np.array([m1, m2, m3], dtype=float)
+    except Exception:
+        pass
+
+    raw = np.genfromtxt(csv_path, delimiter=",", dtype=float)
+    raw = np.atleast_1d(raw).flatten()
+    raw = raw[~np.isnan(raw)]
+    if raw.size < 3:
+        raise ValueError(f"Cannot parse 3 modes from: {csv_path}. Got {raw.size} values.")
+    return raw[:3].astype(float)
+
+def export_pre_post_summary(data_dir: Path, out_csv: str,
+                            pre_name: str = "pre_eq_natural_frequencies.csv",
+                            post_name: str = "post_eq_natural_frequencies.csv"):
+    
+    data_dir = Path(data_dir)
+    if not data_dir.exists():
+        raise FileNotFoundError(f"DATA_DIR not found: {data_dir}")
+
+    ev_dirs = [d for d in data_dir.iterdir() if d.is_dir() and d.name.isdigit()]
+    ev_dirs.sort(key=lambda d: int(d.name))
+    if not ev_dirs:
+        raise RuntimeError(f"No numeric event folders found under: {data_dir}")
+
+    rows = []
+    for d in ev_dirs:
+        ev = int(d.name)
+        pre_path = d / pre_name
+        post_path = d / post_name
+
+        pre = _read_modes123(pre_path)
+        post = _read_modes123(post_path)
+
+        rows.append({
+            "event_id": ev,
+            "mode1_before": pre[0],
+            "mode2_before": pre[1],
+            "mode3_before": pre[2],
+            "mode1_after": post[0],
+            "mode2_after": post[1],
+            "mode3_after": post[2],
+        })
+
+    df = pd.DataFrame(rows).sort_values("event_id")
+    df.to_csv(out_csv, index=False)
+    print(f"Saved summary CSV: {out_csv}")
+
+
+DATA_DIR_INELASTIC = Path("bridge/inelastic")   
+DATA_DIR_ELASTIC = Path("bridge/elastic")  
+export_pre_post_summary(DATA_DIR_INELASTIC, "natural_frequencies_inelastic.csv")
+export_pre_post_summary(DATA_DIR_ELASTIC, "natural_frequencies_elastic.csv")    
+
 
 
 # Call the function for elastic and inelastic

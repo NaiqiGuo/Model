@@ -7,8 +7,8 @@ def load_dT_over_T(csv_path):
     data = np.genfromtxt(csv_path, delimiter=",", names=True)
     cols = data.dtype.names
 
-    before_cols = [c for c in cols if "before_s" in c]
-    after_cols  = [c for c in cols if "after_s"  in c]
+    before_cols = [c for c in cols if c.endswith("_before")]
+    after_cols  = [c for c in cols if c.endswith("_after")]
     before_cols.sort()
     after_cols.sort()
 
