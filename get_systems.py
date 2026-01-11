@@ -15,7 +15,7 @@ from model_utils import( get_inputs, get_node_displacements,
 # Analysis configuration
 SID_METHOD = 'srim'
 MODEL = "bridge" # "frame", "bridge"
-ELASTIC = False
+ELASTIC = True
 LOAD_EVENTS = False
 
 # Main output directory
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
 
         # System identification outputs (displacement, inches)
-        outputs = get_node_displacements(disp, nodes=output_nodes)[:,1:]
+        outputs = get_node_displacements(disp, nodes=output_nodes, dt=dt)[:,1:]
         print(f"{outputs.shape=}")
         assert inputs.shape[1] == outputs.shape[1], (
             "system identification inputs and outputs have different length of time samples.")

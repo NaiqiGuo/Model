@@ -689,17 +689,50 @@ def write_freq_csv(event_id,
 def get_node_displacements(displacements,
                 #nodes=[5,10,15], # building (3 story frame)
                 nodes=[2,3,5], # bridge
+                dt=None,
+                win_sec=1.0,       # baseline window length
+                search_end_sec=10.0,  # search baseline window within first search_end_sec
+                use_median=True,
                 ):
     """
     displacements: { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
     Returns outputs: ndarray, shape=(n_nodes*2, nt), row order:
       [Node1 X, Node1 Y, Node2 X, Node2 Y, ...]
     """
+    
     rows = []
     for node in nodes:
         arr = np.array(displacements[node])  # shape (nt+1, 6)
-        rows.append(arr[:, 0])  # X displacement 
-        rows.append(arr[:, 1])  # Y displacement
+
+        ntp1 = arr.shape[0]
+        # window length in samples
+        nwin = int(round(win_sec / dt))
+        nwin = max(5, min(nwin, ntp1))  # at least 5 samples
+        # search range end index
+        k_end = int(round(search_end_sec / dt))
+        k_end = max(nwin, min(k_end, ntp1))
+        def _find_baseline_and_remove(y):
+            # find flattest window: minimal std
+            best_k = 0
+            best_std = np.inf
+            for k in range(0, k_end - nwin + 1):
+                seg = y[k:k+nwin]
+                s = float(np.std(seg))
+                if s < best_std:
+                    best_std = s
+                    best_k = k
+
+            seg_best = y[best_k:best_k+nwin]
+            b = float(np.median(seg_best)) if use_median else float(np.mean(seg_best))
+            return y - b
+
+        x = arr[:, 0]
+        y = arr[:, 1]
+        rows.append(_find_baseline_and_remove(x))  # X
+        rows.append(_find_baseline_and_remove(y))  # Y
+
+        # rows.append(arr[:, 0] - x0)  # X displacement 
+        # rows.append(arr[:, 1] - y0)  # Y displacement
     outputs = np.vstack(rows)
     return outputs     # shape (2*n_nodes, nt)
 
@@ -1139,11 +1172,8 @@ def compute_Dr_residual_tail(y_true: np.ndarray, y_pred: np.ndarray, dt: float, 
     y_true_tail = y_true[:, -k_tail:]
     y_pred_tail = y_pred[:, -k_tail:]
 
-    # mu_true = np.mean(y_true_tail, axis=1)
-    # mu_pred = np.mean(y_pred_tail, axis=1)
-    # res = np.abs(mu_true - mu_pred)
-
-    res = np.mean(np.abs(y_true_tail - y_pred_tail), axis=1)
+    
+    res = np.mean(np.abs(y_true_tail), axis=1)
 
     out = {
         "Dr_tail_sec": float(tail_sec),

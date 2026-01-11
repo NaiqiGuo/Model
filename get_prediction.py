@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]
-WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting
+WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
 # Output directories
