@@ -13,6 +13,9 @@ from model_utils import (
     save_displacements, save_strain_stress,
     create_bridge_model,save_event_modes_to_csv     # make sure this is defined in model_utils
 )
+import xara 
+from xara import units
+import math
 
 if __name__ == "__main__":
     # Global switch for bridge model

@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 from model_utils import (
-    create_model, get_inputs, get_true_modes_xara, analyze, get_outputs,
+    create_model, get_inputs, get_true_modes_xara, analyze, get_node_displacements,
     stabilize_with_lmi, stabilize_by_radius_clipping, normalize_Psi,
      phi_output, mac_matrix, stabilize_discrete
 )
