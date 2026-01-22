@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]
-WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
+WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
 # Output directories
@@ -33,8 +33,10 @@ if __name__ == "__main__":
         # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
         out_labels = ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y', ]
     elif MODEL == "bridge":
-        out_nodes = [2,3,5]
-        out_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
+        # out_nodes = [2,3,5]
+        # out_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
+        out_nodes = [3,5]
+        out_labels = ['Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y']
     # out_labels = [f'Node{i}{dof}' for i in out_nodes for dof in ['X','Y']]
 
 

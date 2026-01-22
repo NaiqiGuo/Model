@@ -129,8 +129,8 @@ def export_pre_post_summary(data_dir: Path, out_csv: str,
     print(f"Saved summary CSV: {out_csv}")
 
 
-DATA_DIR_INELASTIC = Path("bridge/inelastic")   
-DATA_DIR_ELASTIC = Path("bridge/elastic")  
+DATA_DIR_INELASTIC = Path("frame/inelastic")   
+DATA_DIR_ELASTIC = Path("frame/elastic")  
 export_pre_post_summary(DATA_DIR_INELASTIC, "natural_frequencies_inelastic.csv")
 export_pre_post_summary(DATA_DIR_ELASTIC, "natural_frequencies_elastic.csv")    
 

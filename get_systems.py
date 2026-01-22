@@ -9,13 +9,13 @@ from model_utils import( get_inputs, get_node_displacements,
                          create_frame_model, create_bridge_model,
                          apply_load_frame_model, apply_load_bridge_model,
                          analyze,
-                         save_displacements, save_strain_stress
+                         save_displacements, save_strain_stress, apply_gravity_static, apply_load_bridge_model_multi_support
                          )
 
 # Analysis configuration
 SID_METHOD = 'srim'
 MODEL = "bridge" # "frame", "bridge"
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Main output directory
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     # Perform model analysis and system identification and record responses
     if MODEL == "frame" or MODEL == "bridge":
-        input_channels = [1,3] # x,y
+        input_channels = [1,3,15,17,18,20] # x,y [1,3,15,17,18,20] [1,3] 
 
     for i, event in enumerate(events):
 
@@ -56,32 +56,61 @@ if __name__ == "__main__":
         inputs, dt = get_inputs(i,
                                 events=events,
                                 input_channels=input_channels,
-                                scale=1/2.54 # cm to inches
+                                scale=1/2.54 # cm to inches  1/2.54
                                 )
+        print("requested input_channels:", input_channels)
+        print("loaded inputs.shape:", inputs.shape)
         nt = inputs.shape[1]
         print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
 
         # Finite element model
         if MODEL == 'frame':
+            output_nodes = [5,10,15]
             model = create_frame_model(elastic=ELASTIC)
             model = apply_load_frame_model(model,
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
-            output_nodes = [5,10,15]
+            apply_gravity_static(
+                model,
+                output_nodes=[5,10,15],
+                fixed_nodes=[1,2,3,4],
+            )
             output_elements = [1,5,9]
             # # TODO: model-specific y and z fibers for stress-strain measurements
             yFiber = 7.5
             zFiber = 0.0
         elif MODEL == 'bridge':
+            output_nodes = [3,5]
             model = create_bridge_model(elastic=ELASTIC)
-            model = apply_load_bridge_model(model,
-                                    inputx=inputs[0],
-                                    inputy=inputs[1],
-                                    dt=dt)
-            output_nodes = [2,3,5]
-            output_elements = [2,3]
-            # # TODO: model-specific y and z fibers for stress-strain measurements
+            apply_gravity_static(
+                model,
+                output_nodes=[3,5],
+                fixed_nodes=[0,1,4,6], #[0,1,4,6,11,12,13,14] [0,1,4,6]
+            )
+            
+            #for  mutiple excitation
+            node_channel_map = {
+                0: (15, 17),
+                6: (1,  3),
+                4: (1,  3),
+                1: (18, 20),
+            }
+            model = apply_load_bridge_model_multi_support(
+                model,
+                inputs=inputs,
+                dt=dt,
+                node_channel_map=node_channel_map,
+                input_channels=input_channels,
+            )
+
+            # model = apply_load_bridge_model(model,
+            #                         inputx=inputs[0],
+            #                         inputy=inputs[1],
+            #                         dt=dt)
+            
+            output_elements = [3]
+            # model-specific y and z fibers for stress-strain measurements
             yFiber = 22.5
             zFiber = 0.0
         try:
@@ -93,6 +122,7 @@ if __name__ == "__main__":
                                                                     yFiber=yFiber,
                                                                     zFiber=zFiber
                                                                 )
+
         except RuntimeError as e:
             print(f"Error encounted when analyzing event {i}:")
             print(e)
@@ -120,20 +150,36 @@ if __name__ == "__main__":
         np.savetxt(event_dir/"outputs.csv", outputs)
 
         # Perform system identification and save systems
-        n = 3
+        # n = 3
+        # options = Config(
+        #     m           = 500,
+        #     horizon     = 190,
+        #     nc          = 190,
+        #     order       = 2*n,
+        #     period_band = (0.1,0.6),
+        #     damping     = 0.06,
+        #     pseudo      = True,
+        #     outlook     = 190,
+        #     threads     = 8,
+        #     chunk       = 200,
+        #     i           = 250,
+        #     j           = 4400
+        # )
+
+        n = 2  
         options = Config(
-            m           = 500,
-            horizon     = 190,
-            nc          = 190,
-            order       = 2*n,
-            period_band = (0.1,0.6),
-            damping     = 0.06,
+            m           = 120,       
+            horizon     = 25,       
+            nc          = 25,
+            order       = 3,       
+            period_band = (0.15, 0.8),
+            damping     = 0.05,
             pseudo      = True,
-            outlook     = 190,
-            threads     = 8,
+            outlook     = 25,
+            threads     = 4,       
             chunk       = 200,
             i           = 250,
-            j           = 4400
+            j           = 3500    
         )
         system_full = sysid(inputs, outputs, method=SID_METHOD, **options)
         A,B,C,D, *rest = system_full

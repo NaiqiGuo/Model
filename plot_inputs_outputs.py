@@ -9,7 +9,7 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 ELASTIC = True
 
 # Main output directory

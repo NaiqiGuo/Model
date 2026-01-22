@@ -70,13 +70,13 @@ def plot_natural_frequencies(csv_path, title, output_png):
 # BRIDGE
 
 plot_natural_frequencies(
-    csv_path="natural_frequencies_bridge_elastic.csv",
+    csv_path="natural_frequencies_elastic.csv",
     title="Bridge Model - Natural Frequencies Before/After (Elastic)",
     output_png="bridge_natural_frequencies_elastic.png"
 )
 
 plot_natural_frequencies(
-    csv_path="natural_frequencies_bridge_inelastic.csv",
+    csv_path="natural_frequencies_inelastic.csv",
     title="Bridge Model - Natural Frequencies Before/After (Inelastic)",
     output_png="bridge_natural_frequencies_inelastic.png"
 )
