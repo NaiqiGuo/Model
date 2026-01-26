@@ -13,9 +13,9 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 SID_METHOD = "srim"
-elas_cases = ["elastic", "inelastic"]
+elas_cases = ["elastic", "inelastic"]  #"elastic",
 WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
@@ -44,9 +44,16 @@ if __name__ == "__main__":
         if VERBOSE:
             print(f"\nComputing {elas} case.")
 
-        n_events = len(glob.glob(str(OUT_DIR/elas/"[0-9]*")))
-        errors = np.full((n_events,len(out_labels)), np.nan)
-        for event_id in tqdm(range(1, n_events+1)):
+        if MODEL == "frame":
+            event_ids = list(range(226, 248))  # 226..247
+        else:
+            n_events = len(glob.glob(str(OUT_DIR/elas/"[0-9]*")))
+            event_ids = list(range(1, n_events+1))
+
+        n_events = len(event_ids)
+        errors = np.full((n_events, len(out_labels)), np.nan)
+
+        for k, event_id in enumerate(tqdm(event_ids)):
             # Load inputs and true outputs
             event_dir = OUT_DIR/elas/str(event_id)
             inputs = np.loadtxt(event_dir/"inputs.csv")
@@ -131,7 +138,7 @@ if __name__ == "__main__":
             for i,output_label in enumerate(out_labels):
                 out_true = out_true_aln_array[i]
                 out_pred = out_pred_aln_array[i]
-                errors[event_id-1,i] = (_get_error(
+                errors[k,i] = (_get_error(
                     ytrue = out_true,
                     ypred = out_pred,
                     numerator_norm = 2,
@@ -199,7 +206,7 @@ if __name__ == "__main__":
         cbar.set_label("$\\epsilon$: Normalized $L_2$ Error", fontsize=14)
         ax.set_xlabel("Event", fontsize=14)
         ax.set_xticks(np.arange(n_events))
-        ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=12)
+        ax.set_xticklabels(event_ids, rotation=45, fontsize=12)
         ax.set_yticks(np.arange(len(out_labels)))
         ax.set_yticklabels(out_labels, fontsize=12)
         half_vmax = np.nanmax(heatmap_data)/2.0
@@ -225,7 +232,8 @@ if __name__ == "__main__":
         cbar.ax.tick_params(labelsize=15)
         ax.set_xlabel("Event", fontsize=22)
         ax.set_xticks(np.arange(n_events))
-        ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=15)
+        #ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=15)
+        ax.set_xticklabels(event_ids, rotation=45, fontsize=15)
         ax.set_yticks(np.arange(len(out_labels)))
         ax.set_yticklabels(out_labels, fontsize=15)
         fig.savefig(heatmap_dir/f"heatmap_square.png", dpi=400)

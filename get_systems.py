@@ -1,5 +1,6 @@
 from pathlib import Path
-import os
+import os, glob
+from get_249_data import get_249_data
 import pickle
 import numpy as np
 import quakeio
@@ -14,8 +15,8 @@ from model_utils import( get_inputs, get_node_displacements,
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame", "bridge"
-ELASTIC = False
+MODEL = "frame" # "frame", "bridge"
+ELASTIC = True
 LOAD_EVENTS = False
 
 # Main output directory
@@ -27,37 +28,62 @@ os.makedirs(OUT_DIR, exist_ok=True)
 if __name__ == "__main__":
 
     # Load events
-    if LOAD_EVENTS:
-        events = sorted([
-            print(file) or quakeio.read(file, exclusions=["*filter*"])
-            for file in list(Path(f"../uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
-        ], key=lambda event: abs(event["peak_accel"]))
-        with open("events.pkl","wb") as f:
-            pickle.dump(events,f)
+    if MODEL == "frame":
+        files_249 = sorted(glob.glob("uploads/CE249_2024_Lab4data/ce249Run*.txt"))
+        print(f"Total CE249 txt files loaded: {len(files_249)}")
     else:
-        with open("events.pkl","rb") as f:
-            events = pickle.load(f)
-    print(f"Total events loaded: {len(events)}")
+        if LOAD_EVENTS:
+            events = sorted([
+                print(file) or quakeio.read(file, exclusions=["*filter*"])
+                for file in list(Path(f"../uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+            ], key=lambda event: abs(event["peak_accel"]))
+            with open("events.pkl","wb") as f:
+                pickle.dump(events,f)
+        else:
+            with open("events.pkl","rb") as f:
+                events = pickle.load(f)
+        print(f"Total events loaded: {len(events)}")
 
 
     # Perform model analysis and system identification and record responses
     if MODEL == "frame" or MODEL == "bridge":
-        input_channels = [1,3,15,17,18,20] # x,y [1,3,15,17,18,20] [1,3] 
+        input_channels = [1,3] # x,y [1,3,15,17,18,20] [1,3] 
 
-    for i, event in enumerate(events):
+    if MODEL == "frame":
+        iterator = enumerate(files_249)
+    else:
+        iterator = enumerate(events)
 
-        event_id = str(i+1)
+    for i, item in iterator:
+
+        if MODEL == "frame":
+            # item is file path like .../ce249Run244.txt
+            event_id = Path(item).stem.replace("ce249Run", "")  # "244"
+        else:
+            event_id = str(i+1)
 
         # Result output directory
         event_dir = OUT_DIR/event_id
         os.makedirs(event_dir, exist_ok=True)
 
         # Model and system identification inputs (acceleration, in/s²)
-        inputs, dt = get_inputs(i,
-                                events=events,
-                                input_channels=input_channels,
-                                scale=1/2.54 # cm to inches  1/2.54
-                                )
+        if MODEL == "frame":
+            array, sensor_names, sensor_units, time_raw, dt = get_249_data(item)
+
+            # 纯数据第1列 -> x, 第3列 -> y
+            inputs = np.vstack([array[0, :], array[2, :]])  # (2, nt)
+
+            print("CE249 file:", item)
+            print("x:", sensor_names[0], sensor_units[0])
+            print("y:", sensor_names[2], sensor_units[2])
+
+        else:
+            inputs, dt = get_inputs(i,
+                                    events=events,
+                                    input_channels=input_channels,
+                                    scale=1/2.54 # cm to inches  1/2.54
+                                    )
+            
         print("requested input_channels:", input_channels)
         print("loaded inputs.shape:", inputs.shape)
         nt = inputs.shape[1]
@@ -77,7 +103,7 @@ if __name__ == "__main__":
                 fixed_nodes=[1,2,3,4],
             )
             output_elements = [1,5,9]
-            # # TODO: model-specific y and z fibers for stress-strain measurements
+            # model-specific y and z fibers for stress-strain measurements
             yFiber = 7.5
             zFiber = 0.0
         elif MODEL == 'bridge':
@@ -89,25 +115,26 @@ if __name__ == "__main__":
                 fixed_nodes=[0,1,4,6], #[0,1,4,6,11,12,13,14] [0,1,4,6]
             )
             
-            #for  mutiple excitation
-            node_channel_map = {
-                0: (15, 17),
-                6: (1,  3),
-                4: (1,  3),
-                1: (18, 20),
-            }
-            model = apply_load_bridge_model_multi_support(
-                model,
-                inputs=inputs,
-                dt=dt,
-                node_channel_map=node_channel_map,
-                input_channels=input_channels,
-            )
+            # #for  mutiple excitation
+            # node_channel_map = {
+            #     0: (15, 17),
+            #     6: (1,  3),
+            #     4: (1,  3),
+            #     1: (18, 20),
+            # }
+            # model = apply_load_bridge_model_multi_support(
+            #     model,
+            #     inputs=inputs,
+            #     dt=dt,
+            #     node_channel_map=node_channel_map,
+            #     input_channels=input_channels,
+            # )
 
-            # model = apply_load_bridge_model(model,
-            #                         inputx=inputs[0],
-            #                         inputy=inputs[1],
-            #                         dt=dt)
+            #for uniform excitation
+            model = apply_load_bridge_model(model,
+                                    inputx=inputs[0],
+                                    inputy=inputs[1],
+                                    dt=dt)
             
             output_elements = [3]
             # model-specific y and z fibers for stress-strain measurements

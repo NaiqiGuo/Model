@@ -115,9 +115,9 @@ def create_frame_model(elastic: bool):
     # ---------------
 
     # Set parameters for model geometry
-    h  = 144.0;      # Story height
-    by = 240.0;      # Bay width in Y-direction
-    bx = 240.0;      # Bay width in X-direction
+    h  = 82.0;      # Story height
+    by = 96.0;      # Bay width in Y-direction
+    bx = 72.0;      # Bay width in X-direction 240
 
     # Create nodes
     #            tag    X        Y       Z 
@@ -628,15 +628,20 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
 
     # Boundary conditions, fully fixed at 0, 1, 4, 6
     # fix(tag, (DX, DY, DZ, RX, RY, RZ))
-    model.fix(0, (0, 0, 1, 1, 1, 1))
-    model.fix(1, (0, 0, 1, 1, 1, 1))
-    model.fix(4, (0, 0, 1, 1, 1, 1))
-    model.fix(6, (0, 0, 1, 1, 1, 1))
+    # model.fix(0, (0, 0, 1, 1, 1, 1))
+    # model.fix(1, (0, 0, 1, 1, 1, 1))
+    # model.fix(4, (0, 0, 1, 1, 1, 1))
+    # model.fix(6, (0, 0, 1, 1, 1, 1))
 
     # model.fix(0, (1, 1, 1, 1, 1, 1))
     # model.fix(1, (1, 1, 1, 1, 1, 1))
     # model.fix(4, (1, 0, 1, 1, 1, 1))
     # model.fix(6, (1, 0, 1, 1, 1, 1))
+
+    model.fix(0, (1, 1, 1, 1, 1, 1))
+    model.fix(1, (1, 1, 1, 1, 1, 1))
+    model.fix(4, (1, 1, 1, 1, 1, 1))
+    model.fix(6, (1, 1, 1, 1, 1, 1))
 
     # Materials: concrete and steel
 
@@ -812,7 +817,7 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
     #     model.load(nd, (0.0, 0.0, -P_per_col/2.0, 0.0, 0.0, 0.0), pattern=1)
 
     for nd in [2, 3, 5]:
-        model.load(nd, (0,0,-P_grav_total,0,0,0), pattern=1)
+        model.load(nd, (0,0,-P_grav_total/4,0,0,0), pattern=1)
 
 
     print("post-gravity")
