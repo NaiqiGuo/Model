@@ -13,7 +13,7 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]  #"elastic",
 WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting

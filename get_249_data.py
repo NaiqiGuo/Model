@@ -10,7 +10,7 @@ def _parse_time_to_seconds(t: str) -> float:
         pass
 
     # case 2: timestamp like "0015:12:27.680000" or "15:12:27.680000"
-    # interpret as HH:MM:SS.ssssss (HH can be > 23, that's fine)
+    # interpret as HH:MM:SS.ssssss
     parts = t.split(":")
     if len(parts) != 3:
         raise ValueError(f"Unrecognized Time format: {t}")

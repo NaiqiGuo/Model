@@ -115,9 +115,9 @@ def create_frame_model(elastic: bool):
     # ---------------
 
     # Set parameters for model geometry
-    h  = 82.0;      # Story height
-    by = 96.0;      # Bay width in Y-direction
-    bx = 72.0;      # Bay width in X-direction 240
+    h  = 82.0;      # Story height 82 144
+    by = 96.0;      # Bay width in Y-direction 96 240
+    bx = 72.0;      # Bay width in X-direction 72 240
 
     # Create nodes
     #            tag    X        Y       Z 
@@ -614,17 +614,26 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
         model.meta = {}
     model.meta["column_elems"] = []
 
-    # Nodes: (tag, (x, y, z))
+    # # Nodes: (tag, (x, y, z))
+    # model.node(0, (0.0,                                  0.0,                  320.0)) # abutment 1
+    # model.node(1, (3180.0,                               0.0,                  320.0)) # abutment 2
+    # model.node(2, (1752.0,                               0.0,                  320.0)) # mid-deck
+    # model.node(3, (1641.4628263430573,    199.41297159396336,                  320.0)) # top of column 1
+    # model.node(4, (1641.4628263430573,    199.41297159396336,                    0.0)) # bottom of column 1
+    # model.node(5, (1862.5371736569432,   -199.41297159396336,                  320.0)) # top of column 2
+    # model.node(6, (1862.5371736569432,   -199.41297159396336,                    0.0)) # bottom of column 2
+    # model.node(9, (54, 0.0, 320.0))  
+    # model.node(10, (3102, 0.0, 320.0))  
+
     model.node(0, (0.0,                                  0.0,                  320.0)) # abutment 1
     model.node(1, (3180.0,                               0.0,                  320.0)) # abutment 2
-    model.node(2, (1752.0,                               0.0,                  320.0)) # mid-deck
-    model.node(3, (1641.4628263430573,    199.41297159396336,                  320.0)) # top of column 1
-    model.node(4, (1641.4628263430573,    199.41297159396336,                    0.0)) # bottom of column 1
-    model.node(5, (1862.5371736569432,   -199.41297159396336,                  320.0)) # top of column 2
-    model.node(6, (1862.5371736569432,   -199.41297159396336,                    0.0)) # bottom of column 2
-
+    model.node(2, (1590.0,                               0.0,                  320.0)) # mid-deck
+    model.node(3, (1590,    199.41297159396336,                  320.0)) # top of column 1
+    model.node(4, (1590,    199.41297159396336,                    0.0)) # bottom of column 1
+    model.node(5, (1590,   -199.41297159396336,                  320.0)) # top of column 2
+    model.node(6, (1590,   -199.41297159396336,                    0.0)) # bottom of column 2
     model.node(9, (54, 0.0, 320.0))  
-    model.node(10, (3102, 0.0, 320.0))  
+    model.node(10, (3126, 0.0, 320.0))  
 
     # Boundary conditions, fully fixed at 0, 1, 4, 6
     # fix(tag, (DX, DY, DZ, RX, RY, RZ))
@@ -640,8 +649,8 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
 
     model.fix(0, (1, 1, 1, 1, 1, 1))
     model.fix(1, (1, 1, 1, 1, 1, 1))
-    model.fix(4, (1, 1, 1, 1, 1, 1))
-    model.fix(6, (1, 1, 1, 1, 1, 1))
+    model.fix(4, (1, 1, 1, 0, 0, 0))
+    model.fix(6, (1, 1, 1, 0, 0, 0))
 
     # Materials: concrete and steel
 
@@ -807,7 +816,7 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
     m_per_node = P_per_col / g             # kip / (in/s^2) 
 
     # 
-    for nd in [2, 3, 5]:
+    for nd in [2, 9, 10]:
         # mass(MX, MY, MZ, RX, RY, RZ)
         model.mass(nd, (m_per_node/90, m_per_node/90, m_per_node/10, 0.0, 0.0, 0.0)) #909010
 
@@ -816,8 +825,8 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
     # for nd in [2, 3, 5]:
     #     model.load(nd, (0.0, 0.0, -P_per_col/2.0, 0.0, 0.0, 0.0), pattern=1)
 
-    for nd in [2, 3, 5]:
-        model.load(nd, (0,0,-P_grav_total/4,0,0,0), pattern=1)
+    for nd in [2, 9, 10]:
+        model.load(nd, (0,0,-P_grav_total,0,0,0), pattern=1)
 
 
     print("post-gravity")
