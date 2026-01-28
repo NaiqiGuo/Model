@@ -16,6 +16,7 @@ from model_utils import( get_inputs, get_node_displacements,
 # Analysis configuration
 SID_METHOD = 'srim'
 MODEL = "bridge" # "frame", "bridge"
+MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
 
@@ -47,7 +48,12 @@ if __name__ == "__main__":
 
     # Perform model analysis and system identification and record responses
     if MODEL == "frame" or MODEL == "bridge":
-        input_channels = [1,3] # x,y [1,3,15,17,18,20] [1,3] 
+        input_channels = [1,3] # x,y
+    elif MODEL == "bridge":
+        if MULTISUPPORT:
+            input_channels = [1,3]
+        else:
+            input_channels = [1,3,15,17,18,20]
 
     if MODEL == "frame":
         iterator = enumerate(files_249)
