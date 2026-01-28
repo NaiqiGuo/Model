@@ -137,7 +137,7 @@ if __name__ == "__main__":
             model = create_bridge_model(elastic=ELASTIC)
             apply_gravity_static(
                 model,
-                output_nodes=[3,5],
+                output_nodes=[3,5,4],
                 fixed_nodes=[0,1,4,6], #[0,1,4,6,11,12,13,14] [0,1,4,6]
             )
             
@@ -240,37 +240,37 @@ if __name__ == "__main__":
         np.savetxt(event_dir/"outputs.csv", outputs)
 
         # Perform system identification and save systems
-        n = 3
-        options = Config(
-            m           = 500,
-            horizon     = 190,
-            nc          = 190,
-            order       = 2*n,
-            period_band = (0.1,0.6),
-            damping     = 0.06,
-            pseudo      = True,
-            outlook     = 190,
-            threads     = 8,
-            chunk       = 200,
-            i           = 250,
-            j           = 4400
-        )
-
-        # n = 2  
+        # n = 3
         # options = Config(
-        #     m           = 120,       
-        #     horizon     = 25,       
-        #     nc          = 25,
-        #     order       = 3,       
-        #     period_band = (0.15, 0.8),
-        #     damping     = 0.05,
+        #     m           = 500,
+        #     horizon     = 190,
+        #     nc          = 190,
+        #     order       = 2*n,
+        #     period_band = (0.1,0.6),
+        #     damping     = 0.06,
         #     pseudo      = True,
-        #     outlook     = 25,
-        #     threads     = 4,       
+        #     outlook     = 190,
+        #     threads     = 8,
         #     chunk       = 200,
         #     i           = 250,
-        #     j           = 3500    
+        #     j           = 4400
         # )
+
+        n = 3
+        options = Config(
+            m           = 120,       
+            horizon     = 25,       
+            nc          = 25,
+            order       = 3,       
+            period_band = (0.15, 0.8),
+            damping     = 0.05,
+            pseudo      = True,
+            outlook     = 25,
+            threads     = 4,       
+            chunk       = 200,
+            i           = 250,
+            j           = 3500    
+        )
         system_full = sysid(inputs, outputs, method=SID_METHOD, **options)
         A,B,C,D, *rest = system_full
         system = (A,B,C,D)

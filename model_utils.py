@@ -648,9 +648,9 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
     # model.fix(6, (1, 0, 1, 1, 1, 1))
 
     model.fix(0, (1, 1, 1, 1, 1, 1))
-    model.fix(1, (1, 1, 1, 1, 1, 1))
-    model.fix(4, (1, 1, 1, 0, 0, 0))
-    model.fix(6, (1, 1, 1, 0, 0, 0))
+    model.fix(1, (0, 1, 1, 1, 1, 1))
+    model.fix(4, (1, 1, 1, 1, 1, 1))
+    model.fix(6, (1, 1, 1, 1, 1, 1))
 
     # Materials: concrete and steel
 
@@ -685,7 +685,7 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
     
     # Section properties: 5 ft circular section
     # Geometry of circular section
-    D_total = 60 #60.0        # total diameter in inches (5 ft)
+    D_total = 30 #60.0        # total diameter in inches (5 ft)
     cover   = 2.0         # concrete cover in inches
     R_ext   = D_total / 2.0
     R_core  = R_ext - cover  # approximate core radius
@@ -732,7 +732,7 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
                 0.0, 2 * math.pi)
 
     # longitudinal steel
-    numBars = 36 # 36
+    numBars = 18 # 36
     barArea = 1.56 #1.56                    # #11 bar area
     model.layer("circ",
                 3,                    # steel matTag
@@ -1133,7 +1133,7 @@ def apply_gravity_static(
     """
 
     if fixed_nodes is None:
-        fixed_nodes = []  # you can pass [0,1,4,6] for bridge, [1,2,3,4] for frame
+        fixed_nodes = []  # [0,1,4,6] for bridge, [1,2,3,4] for frame
 
     print("pre-gravity disp")
     for n in output_nodes:
@@ -1170,6 +1170,19 @@ def apply_gravity_static(
     print("post-gravity disp")
     for n in output_nodes:
         print(n, model.nodeDisp(n))
+
+    #check
+    check_nodes = [0,1,2,3,4,5,6,9,10]
+    print("\n[gravity check] nodeDisp for key nodes")
+    for n in check_nodes:
+        print(n, model.nodeDisp(n))
+    print("\n[gravity check] du = top - base")
+    for top, base in [(3,4),(5,6)]:
+        uT = model.nodeDisp(top)
+        uB = model.nodeDisp(base)
+        du = [uT[i]-uB[i] for i in range(6)]
+        print(f"{top}-{base} du_XY=({du[0]:+.6e}, {du[1]:+.6e}), du_Z={du[2]:+.6e}, du_R=({du[3]:+.6e},{du[4]:+.6e},{du[5]:+.6e})")
+    
 
     # fix gravity loads as constant and reset time
     model.loadConst("-time", 0.0)

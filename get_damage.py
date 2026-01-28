@@ -30,7 +30,7 @@ from model_utils import (
 # -----------------------------
 # User config
 # -----------------------------
-CASE_DIR = Path("/Users/guonaiqi/Documents/UCB/299/Example5-python/Model/bridge/inelastic") #frame bridge
+CASE_DIR = Path("/Users/guonaiqi/Documents/UCB/299/Example5-python/Model/frame/inelastic") #frame bridge
 SID_METHOD = "srim"
 
 # Elements used for Dk 
