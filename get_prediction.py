@@ -35,7 +35,7 @@ if __name__ == "__main__":
     elif MODEL == "bridge":
         # out_nodes = [2,3,5]
         # out_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
-        out_nodes = [3,5]
+        out_nodes = [3,5] #[3,5]
         out_labels = ['Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y']
     # out_labels = [f'Node{i}{dof}' for i in out_nodes for dof in ['X','Y']]
 
