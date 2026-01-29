@@ -648,7 +648,7 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
     # model.fix(6, (1, 0, 1, 1, 1, 1))
 
     model.fix(0, (1, 1, 1, 1, 1, 1))
-    model.fix(1, (0, 1, 1, 1, 1, 1))
+    model.fix(1, (1, 1, 1, 1, 1, 1))
     model.fix(4, (1, 1, 1, 1, 1, 1))
     model.fix(6, (1, 1, 1, 1, 1, 1))
 
@@ -826,7 +826,7 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
     #     model.load(nd, (0.0, 0.0, -P_per_col/2.0, 0.0, 0.0, 0.0), pattern=1)
 
     for nd in [2, 9, 10]:
-        model.load(nd, (0,0,-P_grav_total,0,0,0), pattern=1)
+        model.load(nd, (0,0,-P_grav_total/5,0,0,0), pattern=1)
 
 
     print("post-gravity")

@@ -16,7 +16,7 @@ from model_utils import( get_inputs, get_node_displacements,
 # Analysis configuration
 SID_METHOD = 'srim'
 MODEL = "bridge" # "frame", "bridge"
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Main output directory
