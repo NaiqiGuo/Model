@@ -16,7 +16,7 @@ from model_utils import( get_inputs, get_node_displacements,
 # Analysis configuration
 SID_METHOD = 'srim'
 MODEL = "bridge" # "frame", "bridge"
-MULTISUPPORT = True
+MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
 
@@ -47,13 +47,13 @@ if __name__ == "__main__":
 
 
     # Perform model analysis and system identification and record responses
-    if MODEL == "frame" or MODEL == "bridge":
+    if MODEL == "frame":
         input_channels = [1,3] # x,y
     elif MODEL == "bridge":
         if MULTISUPPORT:
-            input_channels = [1,3]
-        else:
             input_channels = [1,3,15,17,18,20]
+        else:
+            input_channels = [1,3]
 
     if MODEL == "frame":
         iterator = enumerate(files_249)
@@ -138,23 +138,23 @@ if __name__ == "__main__":
             apply_gravity_static(
                 model,
                 output_nodes=[3,5,4],
-                fixed_nodes=[0,1,4,6], #[0,1,4,6,11,12,13,14] [0,1,4,6]
+                fixed_nodes=[0,1,4,6,11,12,13,14] if MULTISUPPORT else [0,1,4,6],
             )
             
-            # #for  mutiple excitation
-            # node_channel_map = {
-            #     0: (15, 17),
-            #     6: (1,  3),
-            #     4: (1,  3),
-            #     1: (18, 20),
-            # }
-            # model = apply_load_bridge_model_multi_support(
-            #     model,
-            #     inputs=inputs,
-            #     dt=dt,
-            #     node_channel_map=node_channel_map,
-            #     input_channels=input_channels,
-            # )
+            if MULTISUPPORT:
+                node_channel_map = {
+                    0: (15, 17),
+                    6: (1,  3),
+                    4: (1,  3),
+                    1: (18, 20),
+                }
+                model = apply_load_bridge_model_multi_support(
+                    model,
+                    inputs=inputs,
+                    dt=dt,
+                    node_channel_map=node_channel_map,
+                    input_channels=input_channels,
+                )
 
             #for uniform excitation
             model = apply_load_bridge_model(model,
