@@ -15,11 +15,12 @@ from utilities import (
     analyze,
     )
 from utilities_experimental import(
-                         apply_load_bridge_model,
-                         apply_load_bridge_model_multi_support,
-                         apply_gravity_static,
-                         save_displacements, save_strain_stress,
-                         )
+    apply_load_bridge_model, # TODO CC: first pass clean
+    apply_load_bridge_model_multi_support, # TODO CC+NG: after clean apply_load_bridge_model, merge
+    apply_gravity_static, # TODO CC+NG: clean this; clarify wipe analysis commands
+    save_displacements, # TODO CC: verify and move to utilities
+    save_strain_stress, # TODO CC: verify and move to utilities
+    )
 
 # Analysis configuration
 SID_METHOD = 'srim'
@@ -27,7 +28,9 @@ MODEL = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
-VERBOSE = True
+VERBOSE = 1 # False means print nothing;
+            # True or 1 means print some helper messages;
+            # 2 means print many messages
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
@@ -64,27 +67,29 @@ if __name__ == "__main__":
     # Perform model analysis and system identification and record responses
 
     if MODEL == "frame":
-        # Rows in data array parsed from txt file 
-        input_channels = [0,2] # x,y
+        if not MULTISUPPORT:
+            # Rows in data array parsed from txt file
+            input_channels = [0,2] # x, y
     elif MODEL == "bridge":
         if not MULTISUPPORT:
             # Labeled channel numbers from quakeio object
-            input_channels = [1,3] # x,y
+            input_channels = [1,3] # x, y
         else:
             # Labeled channel numbers from quakeio object
             input_channels = [1,3,15,17,18,20] # ordered arbitrarily
             # Nodes for excitation, order corresponds to input_channels
-            input_nodes = []
+            input_nodes = [] # TODO: fill in input nodes
             # DOFs for excitation, order corresponds to input_channels
-            input_dofs = []
+            input_dofs = []  # TODO: fill in input dofs
 
     for i,event in enumerate(events):
-
         if MODEL == "frame":
             # filepaths are like .../ce249Run244.txt
             event_id = Path(event).stem.replace("ce249Run", "")  # "244"
         elif MODEL == "bridge":
             event_id = str(i+1)
+        if VERBOSE:
+            print(f"Event: {event}; Event ID: {event_id}")
 
         # Result output directory
         event_dir = OUT_DIR/event_id
@@ -94,74 +99,58 @@ if __name__ == "__main__":
         if MODEL == "frame":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
-            inputs = np.vstack([array[0, :], array[2, :]])  # (2, nt)
+            inputs = array[input_channels]
 
-            print("CE249 file:", event)
-            print("x:", sensor_names[0], sensor_units[0])
-            print("y:", sensor_names[2], sensor_units[2])
-
-            print("dt:", dt, "nt:", inputs.shape[1], "duration(s):", inputs.shape[1]*dt)
-            for lab, sig, unit in [
-                ("X", inputs[0], sensor_units[0]),
-                ("Y", inputs[1], sensor_units[2]),
-            ]:
-                print(f"[{lab}] unit={unit}  min={sig.min():.4g}  max={sig.max():.4g}  mean={sig.mean():.4g}  std={sig.std():.4g}")
-            if inputs[0].std() < 1e-8 and inputs[1].std() < 1e-8:
-                print("WARNING: both X and Y inputs have near-zero std. This will produce almost no dynamic response.")
-
-        else:
+            if VERBOSE >= 2:
+                print(
+                    f"frame sensor x: \n"
+                        f"\tName = {sensor_names[input_channels[0]]}\n"
+                        f"\tUnits = {sensor_units[input_channels[0]]}"
+                    f"frame sensor y: \n"
+                        f"\tName = {sensor_names[input_channels[1]]}\n"
+                        f"\tUnits = {sensor_units[input_channels[1]]}"
+                    )
+                
+        elif MODEL == "bridge":
             inputs, dt = get_inputs(i,
                                     events=events,
                                     input_channels=input_channels,
                                     scale=1/2.54 # cm to inches  1/2.54
                                     )
-            
-        print("requested input_channels:", input_channels)
-        print("loaded inputs.shape:", inputs.shape)
-        nt = inputs.shape[1]
-        print(f"\nevent {i+1} inputs shape: {inputs.shape}, dt = {dt}")
+        
+        # For uniform excitation, inputs shape should be (2, nt)
+        # For multi-support excitation, inputs shape should be (len(input_channels), nt)
+        nin,nt = inputs
+        assert nin==len(input_channels) if MULTISUPPORT else nin==2
+        if VERBOSE >= 2:
+            print("Requested input channels:", input_channels)
+            print(f"Event {event_id} time series length: {nt}, Time step dt = {dt}")
 
-
-        #
-        def summarize_series(name, x, dt):
-            x = np.asarray(x).ravel()
-            imax = int(np.argmax(np.abs(x)))
-            print(f"{name}: max={x[imax]:+.4e} at t={imax*dt:.2f}s, mean={np.mean(x):+.3e}, std={np.std(x):.3e}")
-        summarize_series("input X", inputs[0], dt)
-        summarize_series("input Y", inputs[1], dt)
 
         # Finite element model
         if MODEL == 'frame':
             output_nodes = [5,10,15]
-            model = create_frame_model(elastic=ELASTIC)
-            
-            apply_gravity_static(
-                model,
-                output_nodes=[5,10,15],
-                fixed_nodes=[1,2,3,4],
-            )
+            output_elements = [1,5,9]
+            yFiber = 7.5
+            zFiber = 0.0
+
+            model = create_frame_model(elastic=ELASTIC,
+                                       multisupport=MULTISUPPORT,
+                                       verbose=VERBOSE)
+
             model = apply_load_frame_model(model,
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
-            output_elements = [1,5,9]
-            # model-specific y and z fibers for stress-strain measurements
-            yFiber = 7.5
-            zFiber = 0.0
-        elif MODEL == 'bridge' or MODEL == 'bridge_multisupport':
+
+        elif MODEL == 'bridge':
             output_nodes = [3,5]
             model = create_bridge_model(elastic=ELASTIC,
                                         multisupport=MULTISUPPORT,
                                         separate_deck_ends=True,
                                         verbose=VERBOSE
                                         )
-            apply_gravity_static(
-                model,
-                output_nodes=[3,5,4],
-                fixed_nodes=[0,1,4,6,11,12,13,14] if MULTISUPPORT else [0,1,4,6],
-            )
             
-            # for multi-support excitation
             if MULTISUPPORT:
                 node_channel_map = {
                     0: (15, 17),
@@ -176,9 +165,7 @@ if __name__ == "__main__":
                     node_channel_map=node_channel_map,
                     input_channels=input_channels,
                 )
-
             else:
-                # for uniform excitation
                 model = apply_load_bridge_model(model,
                                         inputx=inputs[0],
                                         inputy=inputs[1],

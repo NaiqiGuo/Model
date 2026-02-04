@@ -95,7 +95,9 @@ def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBar
     model.layer("straight", steelID, numBars, barArea, coreY-spacingY, -coreZ, (-coreY+spacingY), -coreZ)
 
 
-def create_frame_model(elastic: bool):
+def create_frame_model(elastic:bool,
+                       multisupport:bool,
+                       verbose = False):
 
     # create Model in three-dimensions with 6 DOF/node
     model = xara.Model(ndm=3, ndf=6)
