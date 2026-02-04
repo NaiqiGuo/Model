@@ -16,7 +16,7 @@ from model_utils import( get_inputs, get_node_displacements,
 # Analysis configuration
 SID_METHOD = 'srim'
 MODEL = "bridge" # "frame", "bridge"
-MULTISUPPORT = True
+MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
 
@@ -138,7 +138,7 @@ if __name__ == "__main__":
             apply_gravity_static(
                 model,
                 output_nodes=[3,5,4],
-                fixed_nodes=[0,1,4,6], #[0,1,4,6,11,12,13,14] [0,1,4,6]
+                fixed_nodes=[0,1,4,6,11,12,13,14], #[0,1,4,6,11,12,13,14] [0,1,4,6]
             )
             
             # #for  mutiple excitation
@@ -276,3 +276,5 @@ if __name__ == "__main__":
         system = (A,B,C,D)
         with open(event_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
             pickle.dump(system, f)
+
+        

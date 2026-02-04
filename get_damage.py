@@ -34,7 +34,7 @@ CASE_DIR = Path("/Users/guonaiqi/Documents/UCB/299/Example5-python/Model/frame/i
 SID_METHOD = "srim"
 
 # Elements used for Dk 
-ELEMENTS = [2, 3] #(1, 5, 9) (2, 3, 5)
+ELEMENTS = [1, 5, 9] #(1, 5, 9) (2, 3, 5)
 
 # Baseline selection
 N_BASELINE = 5                 # pick lowest-intensity N events as baseline

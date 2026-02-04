@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]  #"elastic",
-WINDOWED = True # if true, truncates all signals before aligning, computing error, and plotting
+WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
 # Output directories
@@ -45,7 +45,7 @@ if __name__ == "__main__":
             print(f"\nComputing {elas} case.")
 
         if MODEL == "frame":
-            event_ids = list(range(226, 248))  # 226..247
+            event_ids = list(range(1, 23))  # 226..247 (226, 248)
         else:
             n_events = len(glob.glob(str(OUT_DIR/elas/"[0-9]*")))
             event_ids = list(range(1, n_events+1))
@@ -75,7 +75,11 @@ if __name__ == "__main__":
 
             # Window signals
             if WINDOWED:
-                bounds = intensity_bounds(out_true[0], lb=0.01, ub=0.99)
+                pre_sec = 5.0
+                n0 = int(pre_sec / dt)
+                sig = out_true[0].copy()
+                sig = sig - np.mean(sig[:n0])
+                bounds = intensity_bounds(sig, lb=0.01, ub=0.99)
                 inputs_trunc = truncate_by_bounds(inputs, bounds)
                 out_true_trunc = truncate_by_bounds(out_true, bounds)
                 out_pred_trunc = truncate_by_bounds(out_pred, bounds)

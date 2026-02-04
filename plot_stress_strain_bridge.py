@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 
 DATA_DIR = "event_strain_stress_bridge_inelastic"   # Folder containing event_XX_strain_stress.csv
-ELEMENT_ID = 2  
+ELEMENT_ID = 3  
 
 
 def load_stress_strain_for_event(filepath, element_id):
