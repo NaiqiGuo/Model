@@ -7,7 +7,7 @@ import os
 from mdof import sysid
 from mdof.validation import stabilize_discrete
 from mdof.utilities.config import Config
-from model_utils import (
+from utilities_experimental import (
     get_inputs, analyze, get_node_displacements, stabilize_with_lmi,
     stabilize_by_radius_clipping, write_freq_csv,
     save_displacements, save_strain_stress,

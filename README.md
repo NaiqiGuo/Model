@@ -5,8 +5,14 @@ A suite of structures, their vibration responses to strong ground motion events,
 ## Getting Started
 
 1. `get_systems.py` : finite element model and its system identification.
-    - Choose an analysis configuration: "frame", "bridge", or "bridge_multisupport"
-    - 
+    - Choose an analysis configuration
+        - "frame" or "bridge"
+        - `MULTISUPPORT = True` or `False`
+        - `ELASTIC = True` or `False`
+    - Loads a suite of events
+    - For each event:
+        - performs FEM analysis
+        - 
 
 
 

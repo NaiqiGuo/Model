@@ -2,8 +2,8 @@ import pickle
 import numpy as np
 import csv
 import os
-from model_utils import create_model, get_true_modes_xara, get_inputs, get_outputs
-from model_utils import stabilize_discrete, periods_from_A, analyze, phi_output, create_frame_model
+from utilities_experimental import create_model, get_true_modes_xara, get_inputs, get_outputs
+from utilities_experimental import stabilize_discrete, periods_from_A, analyze, phi_output, create_frame_model
 
 # get true frequency
 with open("events.pkl", "rb") as f:

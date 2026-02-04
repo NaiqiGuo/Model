@@ -6,18 +6,25 @@ import numpy as np
 import quakeio
 from mdof import sysid
 from mdof.utilities.config import Config
-from model_utils import( get_inputs, get_node_displacements,
-                         create_frame_model, create_bridge_model,
-                         apply_load_frame_model, apply_load_bridge_model,
+from utilities import (
+    get_inputs,
+    get_node_displacements,
+    create_frame_model,
+    create_bridge_model,
+    apply_load_frame_model,
+    analyze,
+    )
+from utilities_experimental import(
+                         apply_load_bridge_model,
                          apply_load_bridge_model_multi_support,
                          apply_gravity_static,
-                         analyze,
                          save_displacements, save_strain_stress,
                          )
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame", "bridge", "bridge_multisupport"
+MODEL = "bridge" # "frame", "bridge"
+MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
 VERBOSE = True
@@ -38,7 +45,7 @@ if __name__ == "__main__":
     if MODEL == "frame":
         # events are a list of filepaths to txt
         events = sorted(glob.glob("uploads/CE249_2024_Lab4data/ce249Run*.txt"))
-    if MODEL == "bridge" or MODEL == "bridge_multisupport":
+    if MODEL == "bridge":
         # events are a list of quakeio objects
         if LOAD_EVENTS:
             events = sorted([
@@ -55,26 +62,28 @@ if __name__ == "__main__":
 
 
     # Perform model analysis and system identification and record responses
+
     if MODEL == "frame":
         # Rows in data array parsed from txt file 
         input_channels = [0,2] # x,y
     elif MODEL == "bridge":
-        # Labeled channel numbers from quakeio object
-        input_channels = [1,3] # x,y
-    elif MODEL == "bridge_multisupport":
-        # Labeled channel numbers from quakeio object
-        input_channels = [1,3,15,17,18,20] # ordered arbitrarily
-        # Nodes for excitation, order corresponds to input_channels
-        input_nodes = []
-        # DOFs for excitation, order corresponds to input_channels
-        input_dofs = []
+        if not MULTISUPPORT:
+            # Labeled channel numbers from quakeio object
+            input_channels = [1,3] # x,y
+        else:
+            # Labeled channel numbers from quakeio object
+            input_channels = [1,3,15,17,18,20] # ordered arbitrarily
+            # Nodes for excitation, order corresponds to input_channels
+            input_nodes = []
+            # DOFs for excitation, order corresponds to input_channels
+            input_dofs = []
 
     for i,event in enumerate(events):
 
         if MODEL == "frame":
             # filepaths are like .../ce249Run244.txt
             event_id = Path(event).stem.replace("ce249Run", "")  # "244"
-        else:
+        elif MODEL == "bridge":
             event_id = str(i+1)
 
         # Result output directory
@@ -142,43 +151,43 @@ if __name__ == "__main__":
         elif MODEL == 'bridge' or MODEL == 'bridge_multisupport':
             output_nodes = [3,5]
             model = create_bridge_model(elastic=ELASTIC,
-                                        multisupport= (MODEL=='bridge_multisupport'),
+                                        multisupport=MULTISUPPORT,
                                         separate_deck_ends=True,
                                         verbose=VERBOSE
                                         )
             apply_gravity_static(
                 model,
                 output_nodes=[3,5,4],
-                fixed_nodes=[0,1,4,6,11,12,13,14] if MODEL=='bridge_multisupport' else [0,1,4,6],
+                fixed_nodes=[0,1,4,6,11,12,13,14] if MULTISUPPORT else [0,1,4,6],
             )
             
-        # for multi-support excitation
-        if MODEL == 'bridge_multisupport':
-            node_channel_map = {
-                0: (15, 17),
-                6: (1,  3),
-                4: (1,  3),
-                1: (18, 20),
-            }
-            model = apply_load_bridge_model_multi_support(
-                model,
-                inputs=inputs,
-                dt=dt,
-                node_channel_map=node_channel_map,
-                input_channels=input_channels,
-            )
+            # for multi-support excitation
+            if MULTISUPPORT:
+                node_channel_map = {
+                    0: (15, 17),
+                    6: (1,  3),
+                    4: (1,  3),
+                    1: (18, 20),
+                }
+                model = apply_load_bridge_model_multi_support(
+                    model,
+                    inputs=inputs,
+                    dt=dt,
+                    node_channel_map=node_channel_map,
+                    input_channels=input_channels,
+                )
 
-        if MODEL == 'bridge':
-            # for uniform excitation
-            model = apply_load_bridge_model(model,
-                                    inputx=inputs[0],
-                                    inputy=inputs[1],
-                                    dt=dt)
-            
-            output_elements = [3]
-            # model-specific y and z fibers for stress-strain measurements
-            yFiber = 22.5
-            zFiber = 0.0
+            else:
+                # for uniform excitation
+                model = apply_load_bridge_model(model,
+                                        inputx=inputs[0],
+                                        inputy=inputs[1],
+                                        dt=dt)
+                
+                output_elements = [3]
+                # model-specific y and z fibers for stress-strain measurements
+                yFiber = 22.5
+                zFiber = 0.0
 
         try:
             disp, stresses, strains, freqs_before, freqs_after = analyze(model,
