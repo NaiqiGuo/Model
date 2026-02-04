@@ -29,9 +29,12 @@ MODEL = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
-VERBOSE = 2 # False means print nothing;
-            # True or 1 means print some helper messages;
-            # 2 means print many messages
+
+# Verbosity
+# False means print nothing;
+# True or 1 means print progress messages only;
+# 2 means print progress and validation messages
+VERBOSE = 1
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
@@ -101,7 +104,6 @@ if __name__ == "__main__":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
             input_units = sensor_units[input_channels[0]]
-            print([sensor_units[i] for i in input_channels])
             assert all([unit==input_units for unit in [sensor_units[i] for i in input_channels]])
 
             inputs = array[input_channels]*units.gravity # TODO NG: Change this to scale_249_units(units=input_units)
@@ -110,7 +112,7 @@ if __name__ == "__main__":
                 print(
                     f"frame sensor x: \n"
                         f"\tName = {sensor_names[input_channels[0]]}\n"
-                        f"\tUnits = {sensor_units[input_channels[0]]}"
+                        f"\tUnits = {sensor_units[input_channels[0]]}\n"
                     f"frame sensor y: \n"
                         f"\tName = {sensor_names[input_channels[1]]}\n"
                         f"\tUnits = {sensor_units[input_channels[1]]}"
@@ -194,7 +196,8 @@ if __name__ == "__main__":
                                                                     output_nodes=output_nodes,
                                                                     output_elements=output_elements,
                                                                     yFiber=yFiber,
-                                                                    zFiber=zFiber
+                                                                    zFiber=zFiber,
+                                                                    verbose=VERBOSE
                                                                 )
 
         except RuntimeError as e:
@@ -244,7 +247,6 @@ if __name__ == "__main__":
                 print(f"WARNING: outputs has odd channels ({outputs.shape[0]}), cannot split X/Y pairs cleanly.")
 
 
-        print(f"{outputs.shape=}")
         assert inputs.shape[1] == outputs.shape[1], (
             "system identification inputs and outputs have different length of time samples.")
         time = np.arange(nt) * dt

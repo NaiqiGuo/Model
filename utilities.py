@@ -581,6 +581,7 @@ def analyze(model, nt, dt,
             n_modes=3,
             yFiber=9.0,
             zFiber=0.0,
+            verbose=False,
             ):
 
     # ----------------------------
@@ -633,8 +634,12 @@ def analyze(model, nt, dt,
     freqs_before = omega/(2*np.pi) 
 
     # Perform nt analysis steps with a time step of dt
-    print(f"Analysis Progress ({nt} timesteps)")
-    for i in tqdm.tqdm(range(nt)):
+    if verbose:
+        print(f"Analysis Progress ({nt} timesteps)")
+        timesteps = tqdm.tqdm(range(nt))
+    else:
+        timesteps = range(nt)
+    for i in timesteps:
         status = model.analyze(1, dt) 
         if status != 0:
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
