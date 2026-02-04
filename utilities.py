@@ -1,5 +1,5 @@
 import xara
-from xara import units
+import xara.units.iks as units
 import numpy as np
 import math
 import tqdm
@@ -616,9 +616,6 @@ def analyze(model, nt, dt,
     # 3. Perform the analysis
     # -----------------------
 
-    print("[analyze] pre-dynamic disp ")
-    for n in output_nodes:
-        print(n, model.nodeDisp(n))
     # record once at time 0
     displacements = {
         node: [model.nodeDisp(node)] for node in output_nodes
@@ -642,13 +639,6 @@ def analyze(model, nt, dt,
         if status != 0:
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
         
-        # --- add: print right after the first step (t=dt) ---
-        if i == 0:
-            print(f"[analyze] after 1 step, time={model.getTime():.6f}")
-            print("[analyze] disp after first step (check jump)")
-            for n in output_nodes:
-                print(n, model.nodeDisp(n))
-
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))

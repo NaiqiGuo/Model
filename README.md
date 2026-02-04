@@ -11,8 +11,17 @@ A suite of structures, their vibration responses to strong ground motion events,
         - `ELASTIC = True` or `False`
     - Loads a suite of events
     - For each event:
-        - performs FEM analysis
-        - 
+        - performs FEM analysis and saves:
+            - pre- and post- earthquake natural frequencies from FEM eigenvalue analysis
+            - displacement response histories at select output nodes
+            - strain/stress response histories at select output elements
+        - performs system identification and saves:
+            - timestep (dt)
+            - time array
+            - inputs array
+            - outputs array
+            - system matrices (A,B,C,D)
+
 
 
 
