@@ -621,7 +621,7 @@ def create_bridge_model1111(elastic: bool = True, girder: str = "elasticBeamColu
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
     return model
 
-def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn"):
+def create_bridge_model111(elastic: bool = True, girder: str = "elasticBeamColumn"):
     
     # #input check
     # if np.all(inputx is None) or np.all(inputy is None) or dt is None:
@@ -910,6 +910,9 @@ def create_bridge_model(elastic:bool,
     
     model = xara.Model(ndm=3, ndf=6)
 
+    if (not hasattr(model, "_user_meta")) or (not isinstance(model._user_meta, dict)):
+        model._user_meta = {}
+
     # Geometry
     deck_height = 24*units.ft + (5*units.ft + 8*units.inch)/2
 
@@ -1060,7 +1063,7 @@ def create_bridge_model(elastic:bool,
     model.element(col_type, 3, (6, 5), transform=colTransf, section=sec_col, shear=0)
     
 
-    model.meta["column_elems"] = [2, 3]
+    model._user_meta["column_elems"] = [2, 3]
 
     # beams always elastic
     beam_type = "elasticBeamColumn"

@@ -196,7 +196,7 @@ if __name__ == "__main__":
             continue
 
 
-        if False:
+        if True:
             # Save frequencies, displacements, strains, and stresses
             np.savetxt(event_dir/"pre_eq_natural_frequencies.csv", freqs_before)
             np.savetxt(event_dir/"post_eq_natural_frequencies.csv", freqs_after)

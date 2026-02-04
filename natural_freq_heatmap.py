@@ -89,7 +89,7 @@ def plot_mode_heatmap(event_ids, df_over_f, mode_index, out_png, title,
     print(f"Saved: {out_png}")
 
 # inelastic
-base_dir_in = "/Users/guonaiqi/Documents/UCB/299/Example5-python/Model/frame/inelastic"
+base_dir_in = "/Users/guonaiqi/Documents/UCB/299/Example5-python/Model/bridge/inelastic"
 event_in, df_in, fpre_in, fpost_in = load_df_over_f_from_event_folders(base_dir_in, n_events=22)
 
 plot_mode_heatmap(
