@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.signal import find_peaks, detrend
 
-from model_utils import (
+from utilities_experimental import (
     get_inputs, create_frame_model, get_natural_periods
 )
 
