@@ -903,54 +903,42 @@ def create_bridge_model(elastic: bool = True, girder: str = "elasticBeamColumn")
 
     return model
 
-def create_bridge_model11(elastic: bool = True, girder: str = "elasticBeamColumn"):
-    
-    # #input check
-    # if np.all(inputx is None) or np.all(inputy is None) or dt is None:
-    #     raise ValueError("Missing inputx, inputy, or dt. Exiting.")
-
-    # if girder != "elasticBeamColumn":
-    #     raise ValueError("Only elasticBeamColumn allowed for girders.")
+def create_bridge_model(elastic:bool,
+                        multisupport:bool,
+                        separate_deck_ends:bool = True,
+                        verbose = False):
     
     model = xara.Model(ndm=3, ndf=6)
 
-    if not hasattr(model, "meta") or not isinstance(model.meta, dict):
-        model.meta = {}
-    model.meta["column_elems"] = []
+    # Geometry
+    deck_height = 24*units.ft + (5*units.ft + 8*units.inch)/2
 
-    # # Nodes: (tag, (x, y, z))
-    model.node(0, (0.0,                                  0.0,                  320.0)) # abutment 1
-    model.node(1, (3180.0,                               0.0,                  320.0)) # abutment 2
-    model.node(2, (1752.0,                               0.0,                  320.0)) # mid-deck
-    model.node(3, (1641.4628263430573,    199.41297159396336,                  320.0)) # top of column 1
-    model.node(4, (1641.4628263430573,    199.41297159396336,                    0.0)) # bottom of column 1
-    model.node(5, (1862.5371736569432,   -199.41297159396336,                  320.0)) # top of column 2
-    model.node(6, (1862.5371736569432,   -199.41297159396336,                    0.0)) # bottom of column 2
-    model.node(9, (54, 0.0, 320.0))  
-    model.node(10, (3102, 0.0, 320.0))  
+    skew_angle = np.deg2rad(38.9)
+    deck_width = 52*units.ft
+    skew_x = deck_width*np.tan(skew_angle)/2
 
-    # model.node(0, (0.0,                                  0.0,                  320.0)) # abutment 1
-    # model.node(1, (3180.0,                               0.0,                  320.0)) # abutment 2
-    # model.node(2, (1590.0,                               0.0,                  320.0)) # mid-deck
-    # model.node(3, (1590,    199.41297159396336,                  320.0)) # top of column 1
-    # model.node(4, (1590,    199.41297159396336,                    0.0)) # bottom of column 1
-    # model.node(5, (1590,   -199.41297159396336,                  320.0)) # top of column 2
-    # model.node(6, (1590,   -199.41297159396336,                    0.0)) # bottom of column 2
-    # model.node(9, (54, 0.0, 320.0))  
-    # model.node(10, (3126, 0.0, 320.0))  
+    span1_length = 146*units.ft
+    span2_length = 119*units.ft
+
+    deck_length = 2*skew_x + span1_length + span2_length
+
+    # Nodes: (tag, (x, y, z))
+    model.node(0, (0.0,                                   0.0,            deck_height)) # abutment 1 (west)
+    model.node(1, (deck_length,                           0.0,            deck_height)) # abutment 2 (east)
+    model.node(2, (skew_x+span1_length,                   0.0,            deck_height)) # mid-bent
+    model.node(3, (span1_length,                 deck_width/3,            deck_height)) # top of column 1 (north)
+    model.node(4, (span1_length,                 deck_width/3,                    0.0)) # bottom of column 1 (north)
+    model.node(5, (2*skew_x+span1_length,       -deck_width/3,            deck_height)) # top of column 2 (south)
+    model.node(6, (2*skew_x+span1_length,       -deck_width/3,                    0.0)) # bottom of column 2 (south)
+    if separate_deck_ends:
+        model.node(9,  (skew_x,                           0.0,            deck_height)) # deck-abut interface (west)
+        model.node(10, (deck_length-skew_x,               0.0,            deck_height)) # deck-abut interface (east) 
+
+    if verbose:
+        print([f"{nodeTag}: {model.nodeCoord(nodeTag)}" for nodeTag in model.getNodeTags()])
 
     # Boundary conditions, fully fixed at 0, 1, 4, 6
     # fix(tag, (DX, DY, DZ, RX, RY, RZ))
-    # model.fix(0, (0, 0, 1, 1, 1, 1))
-    # model.fix(1, (0, 0, 1, 1, 1, 1))
-    # model.fix(4, (0, 0, 1, 1, 1, 1))
-    # model.fix(6, (0, 0, 1, 1, 1, 1))
-
-    # model.fix(0, (1, 1, 1, 1, 1, 1))
-    # model.fix(1, (1, 1, 1, 1, 1, 1))
-    # model.fix(4, (1, 0, 1, 1, 1, 1))
-    # model.fix(6, (1, 0, 1, 1, 1, 1))
-
     model.fix(0, (1, 1, 1, 1, 1, 1))
     model.fix(1, (1, 1, 1, 1, 1, 1))
     model.fix(4, (1, 1, 1, 1, 1, 1))
@@ -962,7 +950,7 @@ def create_bridge_model11(elastic: bool = True, girder: str = "elasticBeamColumn
     fc_unconf = 4.0   # unconfined concrete
     fc_conf   = 5.0  # confined concrete
 
-    # Concrete modulus (ksi), same formula as your frame model
+    # Concrete modulus (ksi)
     Ec = 57000.0 * math.sqrt(fc_unconf * 1000.0) / 1000.0
 
     # Steel properties
@@ -989,19 +977,17 @@ def create_bridge_model11(elastic: bool = True, girder: str = "elasticBeamColumn
     
     # Section properties: 5 ft circular section
     # Geometry of circular section
-    D_total = 60 #60.0        # total diameter in inches (5 ft)
-    cover   = 2.0         # concrete cover in inches
+    D_total = 5.0*units.ft  # total diameter in inches (5 ft)
+    cover   = 2.0           # concrete cover in inches
     R_ext   = D_total / 2.0
     R_core  = R_ext - cover  # approximate core radius
 
     # mesh subdivisions for nonlinear fiber section
     numSubdivCirc = 32
     numSubdivRad  = 5
-    divs = (numSubdivCirc, numSubdivRad)
 
     # tags
-    
-    colSec_fiber   = 1
+    colSec_fiber    = 1
     beamSec_elastic = 2   # beams stay elastic
 
     # ELASTIC SECTION (for elasticBeamColumn model)
@@ -1016,8 +1002,6 @@ def create_bridge_model11(elastic: bool = True, girder: str = "elasticBeamColumn
     itg_col = 1
     npts_col = 4
     model.beamIntegration("Lobatto", itg_col, colSec_fiber, npts_col)
-
-    numSubdivCirc, numSubdivRad = divs
 
     # core concrete
     model.patch("circ",
