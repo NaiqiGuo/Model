@@ -95,7 +95,7 @@ def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBar
     model.layer("straight", steelID, numBars, barArea, coreY-spacingY, -coreZ, (-coreY+spacingY), -coreZ)
 
 
-def create_frame_model(elastic:bool,
+def create_frame(elastic:bool,
                        multisupport:bool,
                        verbose = False):
 
@@ -299,7 +299,7 @@ def create_frame_model(elastic:bool,
     return model
 
 
-def apply_load_frame_model(model, inputx=None, inputy=None, dt=None):
+def apply_load_frame(model, inputx=None, inputy=None, dt=None):
     """
     Add dynamic loads to frame model
     """
@@ -320,7 +320,7 @@ def apply_load_frame_model(model, inputx=None, inputy=None, dt=None):
     return model
 
 
-def create_bridge_model(elastic:bool,
+def create_bridge(elastic:bool,
                         multisupport:bool,
                         separate_deck_ends:bool = True,
                         verbose = False):

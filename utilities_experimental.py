@@ -806,7 +806,7 @@ def create_bridge_model1(elastic: bool = True, girder: str = "elasticBeamColumn"
 
     return model
 
-def apply_load_bridge_model(model, inputx=None, inputy=None, dt=None):
+def apply_load_bridge(model, inputx=None, inputy=None, dt=None):
     """
     Add dynamic loads to bridge model
     """
@@ -1374,7 +1374,7 @@ def compute_Dr_residual_tail(y_true: np.ndarray, y_pred: np.ndarray, dt: float, 
     return out
 
 
-def apply_load_bridge_model_multi_support(
+def apply_load_bridge_multi_support(
     model,
     inputs: np.ndarray,
     dt: float,

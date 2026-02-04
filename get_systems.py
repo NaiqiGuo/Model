@@ -9,14 +9,14 @@ from mdof.utilities.config import Config
 from utilities import (
     get_inputs,
     get_node_displacements,
-    create_frame_model,
-    create_bridge_model,
-    apply_load_frame_model,
+    create_frame,
+    create_bridge,
+    apply_load_frame,
     analyze,
     )
 from utilities_experimental import(
-    apply_load_bridge_model, # TODO CC: first pass clean
-    apply_load_bridge_model_multi_support, # TODO CC+NG: after clean apply_load_bridge_model, merge
+    apply_load_bridge, # TODO CC: first pass clean
+    apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge_model, merge
     apply_gravity_static, # TODO CC+NG: clean this; clarify wipe analysis commands
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
@@ -134,31 +134,31 @@ if __name__ == "__main__":
             yFiber = 7.5
             zFiber = 0.0
 
-            model = create_frame_model(elastic=ELASTIC,
+            model = create_frame(elastic=ELASTIC,
                                        multisupport=MULTISUPPORT,
                                        verbose=VERBOSE)
 
-            model = apply_load_frame_model(model,
+            model = apply_load_frame(model,
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
 
         elif MODEL == 'bridge':
             output_nodes = [3,5]
-            model = create_bridge_model(elastic=ELASTIC,
+            model = create_bridge(elastic=ELASTIC,
                                         multisupport=MULTISUPPORT,
                                         separate_deck_ends=True,
                                         verbose=VERBOSE
                                         )
             
             if MULTISUPPORT:
-                node_channel_map = {
+                node_channel_map = { # TODO CC+NG: After clean apply_load_bridge_model, supersede with input_nodes and input_dofs
                     0: (15, 17),
                     6: (1,  3),
                     4: (1,  3),
                     1: (18, 20),
                 }
-                model = apply_load_bridge_model_multi_support(
+                model = apply_load_bridge_multi_support(
                     model,
                     inputs=inputs,
                     dt=dt,
@@ -166,7 +166,7 @@ if __name__ == "__main__":
                     input_channels=input_channels,
                 )
             else:
-                model = apply_load_bridge_model(model,
+                model = apply_load_bridge(model,
                                         inputx=inputs[0],
                                         inputy=inputs[1],
                                         dt=dt)
