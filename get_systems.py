@@ -34,7 +34,7 @@ LOAD_EVENTS = False
 # False means print nothing;
 # True or 1 means print progress messages only;
 # 2 means print progress and validation messages
-VERBOSE = 1
+VERBOSE = 2
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
@@ -120,7 +120,6 @@ if __name__ == "__main__":
                 
         elif MODEL == "bridge":
             input_units = units.cmps2
-            print(input_units)
 
             inputs, dt = get_inputs(i,
                                     events=events,
@@ -169,7 +168,11 @@ if __name__ == "__main__":
                 model = apply_load_bridge(model,
                                         inputx=inputs[0],
                                         inputy=inputs[1],
-                                        dt=dt)
+                                        dt=dt,
+                                        # multisupport=MULTISUPPORT,
+                                        # input_nodes=input_nodes,
+                                        # input_channels=input_channels
+                                        )
                 
             elif False:
                 # TODO NG: After clean apply_load_bridge,
@@ -215,37 +218,6 @@ if __name__ == "__main__":
         # System identification outputs (displacement, inches)
         outputs = get_node_displacements(disp, nodes=output_nodes, dt=dt)[:,1:]
 
-        if False: # TODO NG: Explain or remove
-            # peak + simple corr checks (assume outputs are [X1,Y1,X2,Y2,...])
-            a0 = inputs[0] - np.mean(inputs[0])
-            a1 = inputs[1] - np.mean(inputs[1])
-            # print every output channel stats (no labels, just index)
-            for ch in range(outputs.shape[0]):
-                y = outputs[ch]
-                imax = int(np.argmax(np.abs(y)))
-                print(f"out[{ch:02d}]  std={np.std(y):.3e}  peakAbs={y[imax]:+.3e} @ t={imax*dt:.3f}s")
-            # split X/Y pairs if possible
-            if outputs.shape[0] % 2 == 0:
-                x_outputs = outputs[0::2]
-                y_outputs = outputs[1::2]
-                mx = np.mean(x_outputs, axis=0) - np.mean(np.mean(x_outputs, axis=0))
-                my = np.mean(y_outputs, axis=0) - np.mean(np.mean(y_outputs, axis=0))
-                denom = (np.linalg.norm(a0) * np.linalg.norm(mx))
-                c_x_mx = (a0 @ mx) / denom if denom > 0 else np.nan
-                denom = (np.linalg.norm(a0) * np.linalg.norm(my))
-                c_x_my = (a0 @ my) / denom if denom > 0 else np.nan
-                denom = (np.linalg.norm(a1) * np.linalg.norm(mx))
-                c_y_mx = (a1 @ mx) / denom if denom > 0 else np.nan
-                denom = (np.linalg.norm(a1) * np.linalg.norm(my))
-                c_y_my = (a1 @ my) / denom if denom > 0 else np.nan
-
-                print("corr(inputX, mean X outputs) =", c_x_mx)
-                print("corr(inputX, mean Y outputs) =", c_x_my)
-                print("corr(inputY, mean X outputs) =", c_y_mx)
-                print("corr(inputY, mean Y outputs) =", c_y_my)
-            else:
-                print(f"WARNING: outputs has odd channels ({outputs.shape[0]}), cannot split X/Y pairs cleanly.")
-
 
         assert inputs.shape[1] == outputs.shape[1], (
             "system identification inputs and outputs have different length of time samples.")
@@ -275,22 +247,6 @@ if __name__ == "__main__":
             j           = 4400
         )
 
-        if False: # TODO NG: Explain or remove
-            n = 3
-            options = Config(
-                m           = 120,       
-                horizon     = 25,       
-                nc          = 25,
-                order       = 3,       
-                period_band = (0.15, 0.8),
-                damping     = 0.05,
-                pseudo      = True,
-                outlook     = 25,
-                threads     = 4,       
-                chunk       = 200,
-                i           = 250,
-                j           = 3500    
-            )
 
         system_full = sysid(inputs, outputs, method=SID_METHOD, **options)
         A,B,C,D, *rest = system_full
