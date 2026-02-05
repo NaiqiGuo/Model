@@ -11,14 +11,14 @@ from utilities import (
     get_inputs,
     get_node_displacements,
     create_frame,
-    create_bridge,
     apply_load_frame,
     analyze,
     )
 from utilities_experimental import(
+    create_bridge, # TODO CC: update this
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
-    apply_gravity_static, # TODO CC+NG: clean this; clarify wipe analysis commands
+    apply_gravity_static, # TODO NG: clean this; clarify wipe analysis commands
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
     )
