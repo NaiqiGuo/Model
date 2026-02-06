@@ -18,7 +18,7 @@ from utilities_experimental import(
     create_bridge, # TODO CC: update this
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
-    apply_gravity_static, # TODO NG: clean this; clarify wipe analysis commands
+    apply_gravity_static, # Check CC: I remove wipeanalysis part. You can see the comments in this function.
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
     )
@@ -121,11 +121,11 @@ if __name__ == "__main__":
                 
         elif MODEL == "bridge":
             input_units = units.cmps2
-
+            scale = 1/2.54
             inputs, dt = get_inputs(i,
                                     events=events,
                                     input_channels=input_channels,
-                                    scale=sensor_units
+                                    scale=scale
                                     )
         
         # For uniform excitation, inputs shape should be (2, nt)
@@ -152,6 +152,16 @@ if __name__ == "__main__":
                                     inputx=inputs[0],
                                     inputy=inputs[1],
                                     dt=dt)
+            
+            # I add this for testing. If you think this part is good. We can move this function to utilities.
+            model = apply_gravity_static(
+                model,
+                output_nodes=output_nodes,
+                fixed_nodes=[1,2,3,4],  
+                tol=1e-8,
+                max_iter=50,
+                n_steps=10,
+            )
 
         elif MODEL == 'bridge':
             output_nodes = [3,5]

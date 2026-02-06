@@ -13,7 +13,7 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]  #"elastic",
 WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
@@ -45,7 +45,7 @@ if __name__ == "__main__":
             print(f"\nComputing {elas} case.")
 
         if MODEL == "frame":
-            event_ids = list(range(1, 23))  # 226..247 (226, 248)
+            event_ids = list(range(226, 248))  # 226..247 (226, 248)
         else:
             n_events = len(glob.glob(str(OUT_DIR/elas/"[0-9]*")))
             event_ids = list(range(1, n_events+1))

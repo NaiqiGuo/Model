@@ -9,6 +9,12 @@ import cvxpy as cp
 import plotly.graph_objects as go
 from pathlib import Path
 
+# Verbosity
+# False means print nothing;
+# True or 1 means print progress messages only;
+# 2 means print progress and validation messages
+VERBOSE = 2
+
 
 def create_bridge(elastic:bool,
                         multisupport:bool,
@@ -1097,6 +1103,7 @@ def apply_gravity_static(
     tol=1e-8,
     max_iter=50,
     n_steps=10,
+    do_wipe=True
 ):
     """
     Solve gravity equilibrium (static), then fix gravity loads as constant.
@@ -1106,12 +1113,12 @@ def apply_gravity_static(
     if fixed_nodes is None:
         fixed_nodes = []  # [0,1,4,6] for bridge, [1,2,3,4] for frame
 
-    print("pre-gravity disp")
-    for n in output_nodes:
-        print(n, model.nodeDisp(n))
+    if VERBOSE >= 2:
+        print("pre-gravity disp")
+        for n in output_nodes:
+            print(n, model.nodeDisp(n))
 
-    # fresh analysis objects
-    model.wipeAnalysis() # TODO NG: confirm this is necessary
+    # Check CC: Wipeanalysis is unnecssary. I test all events and outputs are same(with wipeanalysis/without wipeanalysis).
 
     # static analysis setup
     model.system("BandGen")
@@ -1129,37 +1136,23 @@ def apply_gravity_static(
             raise RuntimeError(f"gravity static failed at step {k+1}/{n_steps}")
 
     # check reactions 
-    if fixed_nodes:
-        try:
-            model.reactions()
-            print("gravity reactions at fixed nodes")
-            for nd in fixed_nodes:
-                print(nd, model.nodeReaction(nd))
-        except Exception as e:
-            print("reaction check failed:", e)
+    if VERBOSE >= 2:
+        if fixed_nodes:
+            try:
+                model.reactions()
+                print("gravity reactions at fixed nodes")
+                for nd in fixed_nodes:
+                    print(nd, model.nodeReaction(nd))
+            except Exception as e:
+                print("reaction check failed:", e)
 
-    print("post-gravity disp")
-    for n in output_nodes:
-        print(n, model.nodeDisp(n))
-
-    # #check
-    # check_nodes = [0,1,2,3,4,5,6,9,10]
-    # print("\n[gravity check] nodeDisp for key nodes")
-    # for n in check_nodes:
-    #     print(n, model.nodeDisp(n))
-    # print("\n[gravity check] du = top - base")
-    # for top, base in [(3,4),(5,6)]:
-    #     uT = model.nodeDisp(top)
-    #     uB = model.nodeDisp(base)
-    #     du = [uT[i]-uB[i] for i in range(6)]
-    #     print(f"{top}-{base} du_XY=({du[0]:+.6e}, {du[1]:+.6e}), du_Z={du[2]:+.6e}, du_R=({du[3]:+.6e},{du[4]:+.6e},{du[5]:+.6e})")
-    
-
+    if VERBOSE >= 2:
+        print("post-gravity disp")
+        for n in output_nodes:
+            print(n, model.nodeDisp(n))
+        
     # fix gravity loads as constant and reset time
     model.loadConst("-time", 0.0)
-
-    # wipe analysis again so transient can be configured cleanly
-    model.wipeAnalysis() # TODO NG: Verify why this is here
 
     return model
 
