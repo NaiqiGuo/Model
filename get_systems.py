@@ -1,6 +1,6 @@
 from pathlib import Path
 import os, glob
-from get_249_data import get_249_data#, scale_249_units # TODO NG: Add unit scaling function, scale_249_units(units,standard='iks')->xara.units.iks object
+from get_249_data import get_249_data, scale_249_units # Check CC: Add unit scaling function, scale_249_units(units,standard='iks')->xara.units.iks object(do we need scale mV)
 import pickle
 import numpy as np
 import quakeio
@@ -103,10 +103,11 @@ if __name__ == "__main__":
         if MODEL == "frame":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
-            input_units = sensor_units[input_channels[0]]
-            assert all([unit==input_units for unit in [sensor_units[i] for i in input_channels]])
+            input_units = sensor_units[input_channels[0]].strip()
+            assert all(sensor_units[i].strip() == input_units for i in input_channels)
 
-            inputs = array[input_channels]*units.gravity # TODO NG: Change this to scale_249_units(units=input_units)
+            scale = float(scale_249_units([input_units], standard="iks")[0])
+            inputs = array[input_channels] * scale # Check CC: Change this to scale_249_units(units=input_units)
 
             if VERBOSE >= 2:
                 print(
