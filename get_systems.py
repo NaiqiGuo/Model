@@ -1,6 +1,6 @@
 from pathlib import Path
 import os, glob
-from get_249_data import get_249_data, scale_249_units # Check CC: Add unit scaling function, scale_249_units(units,standard='iks')->xara.units.iks object(do we need scale mV)
+from get_249_data import get_249_data, scale_249_units # CHECK NG: See updated scale_249_units. No need to scale mV.
 import pickle
 import numpy as np
 import quakeio
@@ -18,7 +18,7 @@ from utilities_experimental import(
     create_bridge, # TODO CC: update this
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
-    apply_gravity_static, # Check CC: I remove wipeanalysis part. You can see the comments in this function.
+    apply_gravity_static, # TODO CC: verify and move to utilities
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
     )
@@ -103,11 +103,10 @@ if __name__ == "__main__":
         if MODEL == "frame":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
-            input_units = sensor_units[input_channels[0]].strip()
-            assert all(sensor_units[i].strip() == input_units for i in input_channels)
+            input_units = sensor_units[input_channels[0]] # CHECK NG: I don't think .strip() is necessary
+            assert all(sensor_units[i] == input_units for i in input_channels)
 
-            scale = float(scale_249_units([input_units], standard="iks")[0])
-            inputs = array[input_channels] * scale # Check CC: Change this to scale_249_units(units=input_units)
+            inputs = array[input_channels]*scale_249_units(units=input_units) # CHECK NG: Output of scale_249_units should already be float.
 
             if VERBOSE >= 2:
                 print(
@@ -153,7 +152,7 @@ if __name__ == "__main__":
                                     inputy=inputs[1],
                                     dt=dt)
             
-            # I add this for testing. If you think this part is good. We can move this function to utilities.
+            # TODO CC: verify
             model = apply_gravity_static(
                 model,
                 output_nodes=output_nodes,

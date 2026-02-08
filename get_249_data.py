@@ -20,27 +20,43 @@ def _parse_time_to_seconds(t: str) -> float:
     return hh * 3600.0 + mm * 60.0 + ss
 
 
-def _norm(u: str) -> str:
+def _clean_249_unit_string(u: str) -> str:
     return (u or "").strip().lower().replace(" ", "")
 
-def scale_249_units(sensor_units, standard="iks"):
-    if (standard or "").lower() != "iks":
-        raise ValueError(f"Only standard='iks' supported, got {standard!r}")
-    scales = []
-    for u in sensor_units:
-        uu = _norm(u)
-        if uu in ("g's", "gs", "g"):          #  "g's"
-            scales.append(units.gravity)       # g --> in/s^2
-        elif uu in ("in/s", "ips"):
-            scales.append(1.0)                # already in/s
-        elif uu in ("inches", "inch", "in"):
-            scales.append(1.0)                # already inch
-        elif uu in ("mv",):
-            scales.append(1.0)                # need check
-        else:
-            raise ValueError(f"Unhandled unit in 249 file: {u!r} (normalized {uu!r})")
-        
-    return np.asarray(scales, dtype=float)
+
+def scale_249_units(units: str, standard='iks')->float:
+    # CHECK NG: My intention was for this to take
+    # a single string and return a single float,
+    # so no need to use lists and arrays.
+
+    # CHECK NG: just FYI xara has a few options for
+    # unit systems so I included those.
+    import xara.units.iks
+    import xara.units.ips 
+    import xara.units.fks
+    unit_system = getattr(xara.units, standard)
+    units = _clean_249_unit_string(units)
+
+    # CHECK NG: just FYI sets, {}, are designed for
+    # efficient searching, so they're a little better
+    # for use with "if X in Y"
+    if units in {"g", "gs", "g's"}:
+        return unit_system.gravity
+    elif units in {"m/s", "mps"}:
+        return unit_system.m/unit_system.second
+    elif units in {"m/s2", "mps2", "m/s/s", "m/s^2"}:
+        return unit_system.m/unit_system.second/unit_system.second
+    # CHECK NG: xara.units.iks has inch and second,
+    # so we can use those in these cases.
+    elif units in {"in/s", "ips"}:
+        return unit_system.inch/unit_system.second
+    elif units in {"in/s2", "inps2", "in/s/s", "in/s^2"}:
+        return unit_system.inch/unit_system.second/unit_system.second
+    elif units in {"in", "inch", "inches"}:
+        return unit_system.inch
+    else:
+        raise NotImplementedError(f"Unhandled unit: {units}")
+
 
 def get_249_data(path):
     with open(path) as f:
