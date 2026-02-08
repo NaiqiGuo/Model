@@ -1118,8 +1118,6 @@ def apply_gravity_static(
         for n in output_nodes:
             print(n, model.nodeDisp(n))
 
-    # Check CC: Wipeanalysis is unnecssary. I test all events and outputs are same(with wipeanalysis/without wipeanalysis).
-
     # static analysis setup
     model.system("BandGen")
     model.numberer("RCM")

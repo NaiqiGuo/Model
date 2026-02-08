@@ -34,6 +34,7 @@ def scale_249_units(units: str, standard='iks')->float:
     import xara.units.iks
     import xara.units.ips 
     import xara.units.fks
+    # See https://github.com/chrystalchern/xara_units/tree/main/src/xara_units
     unit_system = getattr(xara.units, standard)
     units = _clean_249_unit_string(units)
 
