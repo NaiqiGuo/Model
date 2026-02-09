@@ -1,7 +1,6 @@
 from pathlib import Path
 import os, glob
-from get_249_data import get_249_data, scale_249_units # CHECK NG: See updated scale_249_units. No need to scale mV.
-import pickle
+from get_249_data import get_249_data, scale_249_units
 import numpy as np
 import quakeio
 from mdof import sysid
@@ -103,10 +102,9 @@ if __name__ == "__main__":
         if MODEL == "frame":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
-            input_units = sensor_units[input_channels[0]] # CHECK NG: I don't think .strip() is necessary
+            input_units = sensor_units[input_channels[0]]
             assert all(sensor_units[i] == input_units for i in input_channels)
-
-            inputs = array[input_channels]*scale_249_units(units=input_units) # CHECK NG: Output of scale_249_units should already be float.
+            inputs = array[input_channels]*scale_249_units(units=input_units)
 
             if VERBOSE >= 2:
                 print(

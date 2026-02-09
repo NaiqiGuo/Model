@@ -25,12 +25,7 @@ def _clean_249_unit_string(u: str) -> str:
 
 
 def scale_249_units(units: str, standard='iks')->float:
-    # CHECK NG: My intention was for this to take
-    # a single string and return a single float,
-    # so no need to use lists and arrays.
 
-    # CHECK NG: just FYI xara has a few options for
-    # unit systems so I included those.
     import xara.units.iks
     import xara.units.ips 
     import xara.units.fks
@@ -38,17 +33,12 @@ def scale_249_units(units: str, standard='iks')->float:
     unit_system = getattr(xara.units, standard)
     units = _clean_249_unit_string(units)
 
-    # CHECK NG: just FYI sets, {}, are designed for
-    # efficient searching, so they're a little better
-    # for use with "if X in Y"
     if units in {"g", "gs", "g's"}:
         return unit_system.gravity
     elif units in {"m/s", "mps"}:
         return unit_system.m/unit_system.second
     elif units in {"m/s2", "mps2", "m/s/s", "m/s^2"}:
         return unit_system.m/unit_system.second/unit_system.second
-    # CHECK NG: xara.units.iks has inch and second,
-    # so we can use those in these cases.
     elif units in {"in/s", "ips"}:
         return unit_system.inch/unit_system.second
     elif units in {"in/s2", "inps2", "in/s/s", "in/s^2"}:
@@ -57,7 +47,7 @@ def scale_249_units(units: str, standard='iks')->float:
         return unit_system.inch
     else:
         raise NotImplementedError(f"Unhandled unit: {units}")
-
+    
 
 def get_249_data(path):
     with open(path) as f:
@@ -97,4 +87,7 @@ if __name__ == "__main__":
         print(path)
         array, sensor_names, sensor_units, time, dt = get_249_data(path)
         print("unique units:", sorted(set(sensor_units)))
+
+    s = scale_249_units("g's")
+    print(s, type(s))
 
