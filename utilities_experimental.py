@@ -865,7 +865,7 @@ def apply_gravity_static(
     tol=1e-8,
     max_iter=50,
     n_steps=10,
-    do_wipe=True
+    verbose=False
 ):
     """
     Solve gravity equilibrium (static), then fix gravity loads as constant.
@@ -875,7 +875,7 @@ def apply_gravity_static(
     if fixed_nodes is None:
         fixed_nodes = []  # [0,1,4,6] for bridge, [1,2,3,4] for frame
 
-    if VERBOSE >= 2:
+    if verbose >= 2:
         print("pre-gravity disp")
         for n in output_nodes:
             print(n, model.nodeDisp(n))
@@ -896,7 +896,7 @@ def apply_gravity_static(
             raise RuntimeError(f"gravity static failed at step {k+1}/{n_steps}")
 
     # check reactions 
-    if VERBOSE >= 2:
+    if verbose >= 2:
         if fixed_nodes:
             try:
                 model.reactions()
@@ -906,7 +906,7 @@ def apply_gravity_static(
             except Exception as e:
                 print("reaction check failed:", e)
 
-    if VERBOSE >= 2:
+    if verbose >= 2:
         print("post-gravity disp")
         for n in output_nodes:
             print(n, model.nodeDisp(n))

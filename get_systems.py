@@ -8,6 +8,7 @@ import quakeio
 from mdof import sysid
 from mdof.utilities.config import Config
 import xara.units.iks as units
+import pickle
 from utilities import (
     get_inputs,
     get_node_displacements,
@@ -29,14 +30,14 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 MODEL = "bridge" # "frame" #
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Verbosity
 # False means print nothing;
 # True or 1 means print progress messages only;
 # 2 means print progress and validation messages
-VERBOSE = 2
+VERBOSE = 1
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
@@ -165,6 +166,7 @@ if __name__ == "__main__":
                 tol=1e-8,
                 max_iter=50,
                 n_steps=10,
+                verbose=VERBOSE
             )
 
         elif MODEL == 'bridge':
