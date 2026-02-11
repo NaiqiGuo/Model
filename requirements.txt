@@ -2,5 +2,5 @@ mdof
 xsection>=0.0.26
 xara
 veux
-numba
+#numba
 

@@ -48,7 +48,8 @@ class Painter:
         self.Ec = 57.0 * math.sqrt(self.fc_unconf/units.psi)*units.ksi
         self.Gc = self.Ec / (2*(1+self.poisson))
 
-        print(f"Ec: {self.Ec/units.ksi:.2f} ksi, Gc: {self.Gc/units.ksi:.2f} ksi")
+        if VERBOSE >= 2:
+            print(f"Ec: {self.Ec/units.ksi:.2f} ksi, Gc: {self.Gc/units.ksi:.2f} ksi")
 
 
     
@@ -130,8 +131,8 @@ class Painter:
 
     def create_column(self):
         units = self.units
-        # D_total = 5.0*units.ft  # total diameter in inches (5 ft)
-        # return Circle(radius=D_total/2, mesh_scale=1/8, divisions=24)
+        D_total = 5.0*units.ft  # total diameter in inches (5 ft)
+        return Circle(radius=D_total/2, mesh_scale=1/8, divisions=24)
 
         d =  (11/8)*units.inch # diameter of longitudinal rebar
         ds = ( 4/8)*units.inch # diameter of the shear spiral
@@ -140,12 +141,12 @@ class Painter:
         nr = 36
 
         octagon  = Equigon(5.0*units.foot/2, z=0,
-                            name="cover", divisions=8)
+                            name="cover", divisions=8, mesh_type="T3")
 
         interior = Equigon(core_radius, z=1,
-                            name="core", divisions=nr)
+                            name="core", divisions=nr, mesh_type="T3")
 
-        bar = Circle(d/2, z=2, mesh_scale=1/2, divisions=4, name="rebar")
+        bar = Circle(d/2, z=2, mesh_scale=1/2, divisions=4, name="rebar", mesh_type="T3")
 
         xr = ((5*units.foot/2) - cover - ds - d/2, 0)
 
@@ -334,7 +335,6 @@ class Painter:
                 verbose=False,
                 ):
 
-        input_units = self.units.cmps2
         inputs, dt = self.load_event(event, scale=scale)
         nin,nt = inputs.shape
 
@@ -473,5 +473,6 @@ if __name__ == "__main__":
 
     disp, stresses, strains, freqs_before = painter.analyze(model, event,
                                                     output_nodes=painter.output_nodes,
+                                                    scale=units.cmps2,
                                                     verbose=VERBOSE
                                                 )

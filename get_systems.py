@@ -18,6 +18,7 @@ from utilities import (
 )
 
 from models.painter import create_bridge
+
 from utilities_experimental import(
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
@@ -28,9 +29,9 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame" #
+MODEL = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True
 LOAD_EVENTS = False
 
 # Verbosity
@@ -122,12 +123,12 @@ if __name__ == "__main__":
                 
         elif MODEL == "bridge":
             input_units = units.cmps2
-            scale = 1/2.54
+            print(f"{input_units=}")
             try:
                 inputs, dt = get_inputs(i,
                                     events=events,
                                     input_channels=input_channels,
-                                    scale=scale
+                                    scale=input_units
                                     )
             except:
                 print(f"Error getting inputs for event {event_id}. Skipping event.")

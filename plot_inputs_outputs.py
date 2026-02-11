@@ -11,6 +11,7 @@ import utilities_visualization
 WINDOWED_PLOT = True
 MODEL = "frame" # "frame", "bridge"
 ELASTIC = True
+MULTISUPPORT = False
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
@@ -18,12 +19,14 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 if __name__ == "__main__":
 
-    input_labels = ['Channel 1', 'Channel 3']
     if MODEL == "frame":
+        input_labels = ['Channel 0 (X)', 'Channel 2 (Y)']
         output_nodes = [5,10,15]
         # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
         # output_labels = ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y', ]
     elif MODEL == "bridge":
+        if not MULTISUPPORT:
+            input_labels = ['Channel 1 (X)', 'Channel 3 (Y)']
         output_nodes = [2,3,5]
         # output_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
     output_labels = [f'Node{i}{dof}' for i in output_nodes for dof in ['X','Y']]

@@ -21,6 +21,18 @@ A suite of structures, their vibration responses to strong ground motion events,
             - inputs array
             - outputs array
             - system matrices (A,B,C,D)
+2. `plot_inputs_outputs.py`: plot the inputs and outputs used for system ID. Primarily used for debugging.
+
+
+## Environment
+
+#### Method 1
+1. Install numba: `conda install numba`
+2. Install requirements: `pip install -r requirements.txt`
+
+#### Method 2
+1. Set up a xara-friendly environment: https://xara.so/user/guides/compile.html
+2. Install requirements: `pip install -r requirements.txt`
 
 
 
