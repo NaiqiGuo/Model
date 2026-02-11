@@ -1,5 +1,7 @@
 from pathlib import Path
-import os, glob
+import os
+import glob
+import pickle
 from get_249_data import get_249_data, scale_249_units
 import numpy as np
 import quakeio
@@ -13,19 +15,20 @@ from utilities import (
     create_frame,
     apply_load_frame,
     analyze,
-    )
+)
+
+from models.painter import create_bridge
 from utilities_experimental import(
-    create_bridge, # TODO CC: update this
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     apply_gravity_static, # TODO CC: verify and move to utilities
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
-    )
+)
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame" #
 MULTISUPPORT = False
 ELASTIC = False
 LOAD_EVENTS = False
@@ -57,7 +60,7 @@ if __name__ == "__main__":
         if LOAD_EVENTS:
             events = sorted([
                 print(file) or quakeio.read(file, exclusions=["*filter*"])
-                for file in list(Path(f"../uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+                for file in list(Path(f"uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
             ], key=lambda event: abs(event["peak_accel"]))
             with open("events.pkl","wb") as f:
                 pickle.dump(events,f)
@@ -120,11 +123,15 @@ if __name__ == "__main__":
         elif MODEL == "bridge":
             input_units = units.cmps2
             scale = 1/2.54
-            inputs, dt = get_inputs(i,
+            try:
+                inputs, dt = get_inputs(i,
                                     events=events,
                                     input_channels=input_channels,
                                     scale=scale
                                     )
+            except:
+                print(f"Error getting inputs for event {event_id}. Skipping event.")
+                continue
         
         # For uniform excitation, inputs shape should be (2, nt)
         # For multi-support excitation, inputs shape should be (len(input_channels), nt)
@@ -147,9 +154,9 @@ if __name__ == "__main__":
                                        verbose=VERBOSE)
 
             model = apply_load_frame(model,
-                                    inputx=inputs[0],
-                                    inputy=inputs[1],
-                                    dt=dt)
+                                     inputx=inputs[0],
+                                     inputy=inputs[1],
+                                     dt=dt)
             
             # TODO CC: verify
             model = apply_gravity_static(
