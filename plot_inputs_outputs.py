@@ -7,8 +7,6 @@ import glob
 import plotly.graph_objects as go
 import utilities_visualization
 
-# TODO CC + NG: Incorporate plotting acceleration in addition to current displacement plots
-
 # Analysis configuration
 WINDOWED_PLOT = True
 MODEL = "bridge" # "frame", "bridge"
@@ -40,24 +38,27 @@ if __name__ == "__main__":
         event_dir = OUT_DIR/str(event_id)
 
         inputs = np.loadtxt(event_dir/"inputs.csv")
-        outputs = np.loadtxt(event_dir/"outputs.csv")
+        outputs_displ = np.loadtxt(event_dir/"outputs.csv")
+        outputs_accel = np.loadtxt(event_dir/"outputs_acc.csv")
         with open(event_dir/"dt.txt", "r") as f:
             dt = float(f.read())
         nt = inputs.shape[1]
 
         t_in = np.arange(inputs.shape[1]) * dt
-        t_out = np.arange(outputs.shape[1]) * dt
+        t_out = np.arange(outputs_displ.shape[1]) * dt
 
         if WINDOWED_PLOT:
-            bounds = intensity_bounds(outputs[0], lb=0.001, ub=0.999)
+            bounds = intensity_bounds(outputs_displ[0], lb=0.001, ub=0.999)
             inputs_trunc = truncate_by_bounds(inputs, bounds)
             t_in_trunc = t_in[bounds[0]:bounds[1]]
-            outputs_trunc = truncate_by_bounds(outputs, bounds)
+            outputs_displ_trunc = truncate_by_bounds(outputs_displ, bounds)
+            outputs_accel_trunc = truncate_by_bounds(outputs_accel, bounds)
             t_out_trunc = t_out[bounds[0]:bounds[1]]
         else:
             inputs_trunc = inputs
             t_in_trunc = t_in
-            outputs_trunc = outputs
+            outputs_displ_trunc = outputs_displ
+            outputs_accel_trunc = outputs_accel
             t_out_trunc = t_out
 
         # --------- input ---------
@@ -81,10 +82,10 @@ if __name__ == "__main__":
                           width=800,height=300)
         fig.write_html(event_dir/"inputs.html", include_plotlyjs="cdn")
 
-        # --------- output ---------
+        # --------- output, displacement ---------
         plt.figure(figsize=(8,4))
-        for ch in range(outputs_trunc.shape[0]):
-            plt.plot(t_out_trunc, outputs_trunc[ch], alpha=0.7, label=output_labels[ch])
+        for ch in range(outputs_displ_trunc.shape[0]):
+            plt.plot(t_out_trunc, outputs_displ_trunc[ch], alpha=0.7, label=output_labels[ch])
         plt.title(f"Event {event_id} Outputs")
         plt.xlabel("Time (s)")
         plt.ylabel("Output Displacement (in)")
@@ -94,10 +95,33 @@ if __name__ == "__main__":
         plt.close()
 
         fig = go.Figure()
-        for ch in range(outputs_trunc.shape[0]):
-            fig.add_scatter(x=t_out_trunc, y=outputs_trunc[ch], mode="lines", name=output_labels[ch])
+        for ch in range(outputs_displ_trunc.shape[0]):
+            fig.add_scatter(x=t_out_trunc, y=outputs_displ_trunc[ch], mode="lines", name=output_labels[ch])
         fig.update_layout(title=f"Event {event_id} Outputs",
                           xaxis_title="Time (s)",
                           yaxis_title="Output Displacement (in)",
                           width=800,height=300)
         fig.write_html(event_dir/"outputs.html", include_plotlyjs="cdn")
+
+        # CHECK NG: Added acceleration output plots
+        
+        # --------- output, acceleration ---------
+        plt.figure(figsize=(8,4))
+        for ch in range(outputs_accel_trunc.shape[0]):
+            plt.plot(t_out_trunc, outputs_accel_trunc[ch], alpha=0.7, label=output_labels[ch])
+        plt.title(f"Event {event_id} Outputs")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Output Acceleration (in/s²)")
+        plt.legend(loc='lower right', ncol=len(output_nodes))
+        plt.tight_layout()
+        plt.savefig(event_dir/"outputs_acc.png", dpi=350)
+        plt.close()
+
+        fig = go.Figure()
+        for ch in range(outputs_accel_trunc.shape[0]):
+            fig.add_scatter(x=t_out_trunc, y=outputs_accel_trunc[ch], mode="lines", name=output_labels[ch])
+        fig.update_layout(title=f"Event {event_id} Outputs",
+                          xaxis_title="Time (s)",
+                          yaxis_title="Output Acceleration (in/s²)",
+                          width=800,height=300)
+        fig.write_html(event_dir/"outputs_acc.html", include_plotlyjs="cdn")

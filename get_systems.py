@@ -11,17 +11,16 @@ import xara.units.iks as units
 import pickle
 from utilities import (
     get_inputs,
-    get_node_displacements,
+    get_node_outputs,
     create_frame,
     apply_load_frame,
     analyze,
+    get_node_outputs,
 )
 
 from models.painter import create_bridge
 
 from utilities_experimental import(
-    get_node_accelerations,
-    analyze_experimental, # TODO NG: Test
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     apply_gravity_static, # TODO CC: verify and move to utilities
@@ -202,8 +201,7 @@ if __name__ == "__main__":
                 )
 
         try:
-            # TODO Check CC:  it can run with no issue
-            disp, acc, stresses, strains, freqs_before, freqs_after = analyze_experimental(model,
+            disp, acc, stresses, strains, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
                                                                     dt=dt,
                                                                     output_nodes=output_nodes,
@@ -226,9 +224,9 @@ if __name__ == "__main__":
         save_strain_stress(stresses, strains, dt, filename=event_dir/"strain_stress.csv")
 
         # System identification outputs (displacement, inches)
-        outputs = get_node_displacements(disp, nodes=output_nodes, dt=dt)[:,1:]
-        # TODO Check CC: it can work now
-        outputs_acc = get_node_accelerations(acc, nodes=output_nodes, dt=dt)[:,1:]
+        outputs = get_node_outputs(disp, nodes=output_nodes)[:,1:]
+        # Acceleration outputs (inches/second/second)
+        outputs_acc = get_node_outputs(acc, nodes=output_nodes)[:,1:]
 
 
         assert inputs.shape[1] == outputs.shape[1], (
@@ -241,7 +239,6 @@ if __name__ == "__main__":
         np.savetxt(event_dir/"time.csv", time)
         np.savetxt(event_dir/"inputs.csv", inputs)
         np.savetxt(event_dir/"outputs.csv", outputs)
-        # TODO Check CC it can work now
         np.savetxt(event_dir/"outputs_acc.csv", outputs_acc)
 
         if False: # TODO CC: Debug

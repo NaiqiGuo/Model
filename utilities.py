@@ -328,7 +328,8 @@ def get_material_response(model, element, sec_tag, y, z):
     except Exception as e:
         print(e)
         return None
-    
+
+# CHECK NG: consolidated new analyze here
 def analyze(model, nt, dt, 
             output_nodes=[5,10,15],
             output_elements=[1,5,9],
@@ -375,6 +376,9 @@ def analyze(model, nt, dt,
     displacements = {
         node: [model.nodeDisp(node)] for node in output_nodes
     }
+    accelerations = {
+        node: [model.nodeAccel(node)] for node in output_nodes
+    }
     strains = {
         element: [get_material_response(model, element, 1, yFiber, zFiber)[0]] for element in output_elements
     }
@@ -401,6 +405,7 @@ def analyze(model, nt, dt,
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))
+            accelerations[node].append(model.nodeAccel(node))
         
         for element in output_elements:
             strains[element].append(get_material_response(model, element, 1, yFiber, zFiber)[0])
@@ -410,7 +415,7 @@ def analyze(model, nt, dt,
     omega_after = np.sqrt(np.abs(lambdas_after))   
     freqs_after = omega_after/(2*np.pi)
            
-    return displacements, stresses, strains, freqs_before, freqs_after
+    return displacements, accelerations, stresses, strains, freqs_before, freqs_after
 
 
 def write_freq_csv(event_id,
@@ -433,22 +438,23 @@ def write_freq_csv(event_id,
         writer.writerow(row)
 
 
-def get_node_displacements(displacements,
+# CHECK NG: consolidated both get_node_displacements and get_node_accelerations; removed dt argument
+def get_node_outputs(outputs,
                 #nodes=[5,10,15], # building (3 story frame)
                 nodes=[2,3,5], # bridge
-                dt=None,
                 ):
     """
-    displacements: { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
+    outputs, e.g. displacements or accelerations:
+      { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
     Returns outputs: ndarray, shape=(n_nodes*2, nt), row order:
       [Node1 X, Node1 Y, Node2 X, Node2 Y, ...]
     """
     
     rows = []
     for node in nodes:
-        arr = np.array(displacements[node])  # shape (nt+1, 6)
-        rows.append(arr[:, 0])  # X displacement 
-        rows.append(arr[:, 1])  # Y displacement
+        arr = np.array(outputs[node])  # shape (nt+1, 6)
+        rows.append(arr[:, 0])  # X output 
+        rows.append(arr[:, 1])  # Y output
 
     outputs = np.vstack(rows)
     return outputs     # shape (2*n_nodes, nt)
