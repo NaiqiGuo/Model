@@ -1441,6 +1441,7 @@ def get_node_accelerations(accelerations,
     return outputs     # shape (2*n_nodes, nt)
 
 from utilities import get_material_response
+import tqdm
 def analyze_experimental(model, nt, dt, 
             output_nodes=[5,10,15],
             output_elements=[1,5,9],
