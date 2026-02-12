@@ -7,6 +7,8 @@ import glob
 import plotly.graph_objects as go
 import utilities_visualization
 
+# TODO CC + NG: Incorporate plotting acceleration in addition to current displacement plots
+
 # Analysis configuration
 WINDOWED_PLOT = True
 MODEL = "bridge" # "frame", "bridge"

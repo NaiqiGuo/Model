@@ -72,6 +72,7 @@ def get_249_data(path):
         data.append([float(x) for x in parts[2:]])
 
     array = np.array(data).T
+    # TODO NG: baseline correct by subtracting average of first five seconds, for all channels
     sensor_names = list(sensor_names)
     sensor_units = list(sensor_units)
 

@@ -286,13 +286,6 @@ def create_frame(elastic:bool,
     model.mass( 17, (m, m, m, 0.0, 0.0, 0.0))
     model.mass( 18, (m, m, m, 0.0, 0.0, 0.0))
 
-    # Define gravity loads
-    # create a Plain load pattern with Constant scaling
-    model.pattern("Plain", 1, "Constant")
-
-    for i in [5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18]:
-        model.load(i, (0.0, 0.0, -p, 0.0, 0.0, 0.0), pattern=1)
-
     # set rayleigh damping factors
     model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
 

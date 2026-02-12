@@ -20,6 +20,8 @@ from utilities import (
 from models.painter import create_bridge
 
 from utilities_experimental import(
+    get_node_accelerations,
+    analyze_experimental, # TODO NG: Test
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     apply_gravity_static, # TODO CC: verify and move to utilities
@@ -29,7 +31,7 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
@@ -158,16 +160,6 @@ if __name__ == "__main__":
                                      inputy=inputs[1],
                                      dt=dt)
             
-            # TODO CC: verify
-            model = apply_gravity_static(
-                model,
-                output_nodes=output_nodes,
-                fixed_nodes=[1,2,3,4],  
-                tol=1e-8,
-                max_iter=50,
-                n_steps=10,
-                verbose=VERBOSE
-            )
 
         elif MODEL == 'bridge':
             output_nodes = [3,5]
@@ -210,6 +202,7 @@ if __name__ == "__main__":
                 )
 
         try:
+            # TODO NG: Update to analyze_experimental and see if it runs with no issue
             disp, stresses, strains, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
                                                                     dt=dt,
@@ -234,6 +227,8 @@ if __name__ == "__main__":
 
         # System identification outputs (displacement, inches)
         outputs = get_node_displacements(disp, nodes=output_nodes, dt=dt)[:,1:]
+        # TODO CC + NG: See if this works
+        # outputs_acc = get_node_accelerations(acc, nodes=output_nodes, dt=dt)[:,1:]
 
 
         assert inputs.shape[1] == outputs.shape[1], (
@@ -246,27 +241,30 @@ if __name__ == "__main__":
         np.savetxt(event_dir/"time.csv", time)
         np.savetxt(event_dir/"inputs.csv", inputs)
         np.savetxt(event_dir/"outputs.csv", outputs)
+        # TODO CC + NG: See if this works
+        # np.savetxt(event_dir/"outputs_acc.csv", outputs_acc)
 
-        # Perform system identification and save systems
-        n = 3
-        options = Config(
-            m           = 500,
-            horizon     = 190,
-            nc          = 190,
-            order       = 2*n,
-            period_band = (0.1,0.6),
-            damping     = 0.06,
-            pseudo      = True,
-            outlook     = 190,
-            threads     = 8,
-            chunk       = 200,
-            i           = 250,
-            j           = 4400
-        )
+        if False: # TODO CC: Debug
+            # Perform system identification and save systems
+            n = 3
+            options = Config(
+                m           = 500,
+                horizon     = 190,
+                nc          = 190,
+                order       = 2*n,
+                period_band = (0.1,0.6),
+                damping     = 0.06,
+                pseudo      = True,
+                outlook     = 190,
+                threads     = 8,
+                chunk       = 200,
+                i           = 250,
+                j           = 4400
+            )
 
 
-        system_full = sysid(inputs, outputs, method=SID_METHOD, **options)
-        A,B,C,D, *rest = system_full
-        system = (A,B,C,D)
-        with open(event_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
-            pickle.dump(system, f)
+            system_full = sysid(inputs, outputs, method=SID_METHOD, **options)
+            A,B,C,D, *rest = system_full
+            system = (A,B,C,D)
+            with open(event_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
+                pickle.dump(system, f)

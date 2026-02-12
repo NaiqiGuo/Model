@@ -1418,3 +1418,112 @@ def apply_load_bridge_multi_support(
         model.imposedMotion(node, 1, gm_x)
         model.imposedMotion(node, 2, gm_y)
     return model
+
+
+def get_node_accelerations(accelerations,
+                #nodes=[5,10,15], # building (3 story frame)
+                nodes=[2,3,5], # bridge
+                dt=None,
+                ):
+    """
+    accelerations: { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
+    Returns outputs: ndarray, shape=(n_nodes*2, nt), row order:
+      [Node1 X, Node1 Y, Node2 X, Node2 Y, ...]
+    """
+    
+    rows = []
+    for node in nodes:
+        arr = np.array(accelerations[node])  # shape (nt+1, 6)
+        rows.append(arr[:, 0])  # X displacement 
+        rows.append(arr[:, 1])  # Y displacement
+
+    outputs = np.vstack(rows)
+    return outputs     # shape (2*n_nodes, nt)
+
+from utilities import get_material_response
+def analyze_experimental(model, nt, dt, 
+            output_nodes=[5,10,15],
+            output_elements=[1,5,9],
+            n_modes=3,
+            yFiber=9.0,
+            zFiber=0.0,
+            verbose=False,
+            ):
+
+    # ----------------------------
+    # 1. Configure the analysis
+    # ----------------------------
+
+    # create the system of equation
+    model.system("BandGen")
+
+    # create the DOF numberer
+    model.numberer("RCM")
+
+    # create the constraint handler
+    model.constraints("Transformation")
+
+    # Configure the analysis such that iterations are performed until either:
+    # 1. the energy increment is less than 1.0e-14 (success)
+    # 2. the number of iterations surpasses 20 (failure)
+    #model.test("EnergyIncr", 1.0e-14, 40)
+    model.test("NormDispIncr", 1.0e-6, 40)
+
+    # Perform iterations with the Newton-Raphson algorithm
+    #model.algorithm("Newton")
+    model.algorithm("NewtonLineSearch")
+
+    # define the integration scheme, the Newmark with gamma=0.5 and beta=0.25
+    model.integrator("Newmark", 0.5, 0.25)
+
+    # Define the analysis
+    model.analysis("Transient")
+
+    # -----------------------
+    # 3. Perform the analysis
+    # -----------------------
+
+    # record once at time 0
+    displacements = {
+        node: [model.nodeDisp(node)] for node in output_nodes
+    }
+    accelerations = {
+        node: [model.nodeAcc(node)] for node in output_nodes
+    }
+    strains = {
+        element: [get_material_response(model, element, 1, yFiber, zFiber)[0]] for element in output_elements
+    }
+    stresses = {
+        element: [get_material_response(model, element, 1, yFiber, zFiber)[1]] for element in output_elements
+    }
+
+    # get modes
+    lambdas = model.eigen(n_modes, "fullGenLapack")  
+    omega = np.sqrt(np.abs(lambdas))
+    freqs_before = omega/(2*np.pi) 
+
+    # Perform nt analysis steps with a time step of dt
+    if verbose:
+        print(f"Analysis Progress ({nt} timesteps)")
+        timesteps = tqdm.tqdm(range(nt))
+    else:
+        timesteps = range(nt)
+    for i in timesteps:
+        status = model.analyze(1, dt) 
+        if status != 0:
+            raise RuntimeError(f"analysis failed at time {model.getTime()}")
+        
+        # Save displacements at the current time
+        for node in output_nodes:
+            displacements[node].append(model.nodeDisp(node))
+            accelerations[node].append(model.nodeAcc(node))
+        
+        for element in output_elements:
+            strains[element].append(get_material_response(model, element, 1, yFiber, zFiber)[0])
+            stresses[element].append(get_material_response(model, element, 1, yFiber, zFiber)[1])
+
+    lambdas_after = model.eigen(n_modes, "fullGenLapack") 
+    omega_after = np.sqrt(np.abs(lambdas_after))   
+    freqs_after = omega_after/(2*np.pi)
+           
+    return displacements, accelerations, stresses, strains, freqs_before, freqs_after
