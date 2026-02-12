@@ -31,7 +31,7 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
@@ -202,8 +202,8 @@ if __name__ == "__main__":
                 )
 
         try:
-            # TODO NG: Update to analyze_experimental and see if it runs with no issue
-            disp, stresses, strains, freqs_before, freqs_after = analyze(model,
+            # TODO Check CC:  it can run with no issue
+            disp, acc, stresses, strains, freqs_before, freqs_after = analyze_experimental(model,
                                                                     nt=nt,
                                                                     dt=dt,
                                                                     output_nodes=output_nodes,
@@ -227,8 +227,8 @@ if __name__ == "__main__":
 
         # System identification outputs (displacement, inches)
         outputs = get_node_displacements(disp, nodes=output_nodes, dt=dt)[:,1:]
-        # TODO CC + NG: See if this works
-        # outputs_acc = get_node_accelerations(acc, nodes=output_nodes, dt=dt)[:,1:]
+        # TODO Check CC: it can work now
+        outputs_acc = get_node_accelerations(acc, nodes=output_nodes, dt=dt)[:,1:]
 
 
         assert inputs.shape[1] == outputs.shape[1], (
@@ -241,8 +241,8 @@ if __name__ == "__main__":
         np.savetxt(event_dir/"time.csv", time)
         np.savetxt(event_dir/"inputs.csv", inputs)
         np.savetxt(event_dir/"outputs.csv", outputs)
-        # TODO CC + NG: See if this works
-        # np.savetxt(event_dir/"outputs_acc.csv", outputs_acc)
+        # TODO Check CC it can work now
+        np.savetxt(event_dir/"outputs_acc.csv", outputs_acc)
 
         if False: # TODO CC: Debug
             # Perform system identification and save systems

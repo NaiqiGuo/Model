@@ -1488,8 +1488,9 @@ def analyze_experimental(model, nt, dt,
     displacements = {
         node: [model.nodeDisp(node)] for node in output_nodes
     }
+    #TODO Check CC: change nodeAcc to nodeAccel
     accelerations = {
-        node: [model.nodeAcc(node)] for node in output_nodes
+        node: [model.nodeAccel(node)] for node in output_nodes
     }
     strains = {
         element: [get_material_response(model, element, 1, yFiber, zFiber)[0]] for element in output_elements
@@ -1517,7 +1518,7 @@ def analyze_experimental(model, nt, dt,
         # Save displacements at the current time
         for node in output_nodes:
             displacements[node].append(model.nodeDisp(node))
-            accelerations[node].append(model.nodeAcc(node))
+            accelerations[node].append(model.nodeAccel(node))
         
         for element in output_elements:
             strains[element].append(get_material_response(model, element, 1, yFiber, zFiber)[0])
