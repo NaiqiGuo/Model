@@ -123,7 +123,6 @@ if __name__ == "__main__":
                 
         elif MODEL == "bridge":
             input_units = units.cmps2
-            print(f"{input_units=}")
             try:
                 inputs, dt = get_inputs(i,
                                     events=events,
