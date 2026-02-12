@@ -9,18 +9,18 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 ELASTIC = True
 MULTISUPPORT = False
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
-os.makedirs(OUT_DIR, exist_ok=True)
 
 if __name__ == "__main__":
 
     if MODEL == "frame":
-        input_labels = ['Channel 0 (X)', 'Channel 2 (Y)']
+        if not MULTISUPPORT:
+            input_labels = ['Channel 0 (X)', 'Channel 2 (Y)']
         output_nodes = [5,10,15]
         # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
         # output_labels = ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y', ]
@@ -31,10 +31,12 @@ if __name__ == "__main__":
         # output_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
     output_labels = [f'Node{i}{dof}' for i in output_nodes for dof in ['X','Y']]
         
-    num_events = len(glob.glob(str(OUT_DIR/"[0-9]*")))
-    for event_id in range(1, num_events+1):
+    event_files = glob.glob(str(OUT_DIR/"[0-9]*"))
+    event_ids = [Path(event).stem.replace("ce249Run", "") for event in event_files]
+    for event_id in event_ids:
         print(f"Plotting Event {event_id}")
         event_dir = OUT_DIR/str(event_id)
+
         inputs = np.loadtxt(event_dir/"inputs.csv")
         outputs = np.loadtxt(event_dir/"outputs.csv")
         with open(event_dir/"dt.txt", "r") as f:
