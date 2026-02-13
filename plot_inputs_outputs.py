@@ -9,7 +9,7 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 ELASTIC = True
 MULTISUPPORT = False
 
@@ -102,8 +102,6 @@ if __name__ == "__main__":
                           yaxis_title="Output Displacement (in)",
                           width=800,height=300)
         fig.write_html(event_dir/"outputs.html", include_plotlyjs="cdn")
-
-        # CHECK NG: Added acceleration output plots
         
         # --------- output, acceleration ---------
         plt.figure(figsize=(8,4))

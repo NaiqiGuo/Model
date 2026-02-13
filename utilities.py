@@ -329,7 +329,7 @@ def get_material_response(model, element, sec_tag, y, z):
         print(e)
         return None
 
-# CHECK NG: consolidated new analyze here
+
 def analyze(model, nt, dt, 
             output_nodes=[5,10,15],
             output_elements=[1,5,9],

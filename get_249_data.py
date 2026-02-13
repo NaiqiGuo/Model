@@ -72,12 +72,16 @@ def get_249_data(path):
         data.append([float(x) for x in parts[2:]])
 
     array = np.array(data).T
-    # TODO NG: baseline correct by subtracting average of first five seconds, for all channels
+    
     sensor_names = list(sensor_names)
     sensor_units = list(sensor_units)
 
     time = np.array(time)            # (nt,)
     dt = float(np.median(np.diff(time))) if time.size >= 2 else None
+    # TODO Check CC: baseline correct by subtracting average of first five seconds, for all channels
+    mask_5s = (time - time[0]) <= 5.0
+    baseline = array[:, mask_5s].mean(axis=1, keepdims=True)  # (n_channels, 1)
+    array = array - baseline
 
     return array, sensor_names, sensor_units, time, dt
 

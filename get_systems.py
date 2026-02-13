@@ -30,7 +30,7 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
