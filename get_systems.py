@@ -23,7 +23,6 @@ from models.painter import create_bridge
 from utilities_experimental import(
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
-    apply_gravity_static, # TODO CC: verify and move to utilities
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
 )
@@ -32,7 +31,7 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 MODEL = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Verbosity
@@ -79,10 +78,14 @@ if __name__ == "__main__":
         if not MULTISUPPORT:
             # Rows in data array parsed from txt file
             input_channels = [0,2] # x, y
+            # TODO NG: Fill in
+            output_channels = []
     elif MODEL == "bridge":
         if not MULTISUPPORT:
             # Labeled channel numbers from quakeio object
             input_channels = [1,3] # x, y
+            # TODO NG: Fill in
+            output_channels = []
         else:
             # Labeled channel numbers from quakeio object
             input_channels = [1,3,15,17,18,20] # ordered arbitrarily
@@ -111,6 +114,9 @@ if __name__ == "__main__":
             input_units = sensor_units[input_channels[0]]
             assert all(sensor_units[i] == input_units for i in input_channels)
             inputs = array[input_channels]*scale_249_units(units=input_units)
+            # TODO NG: Get in-field outputs. fill in the below
+            outputs_displ_field = ...
+            outputs_accel_field = ...
 
             if VERBOSE >= 2:
                 print(
@@ -125,11 +131,21 @@ if __name__ == "__main__":
         elif MODEL == "bridge":
             input_units = units.cmps2
             try:
+                # TODO NG: refactor get_inputs
+                # to allow intepretation as something to 
+                # get any in-field measurement from a quakeio record.
+                # rename all the variables to remove reference to an "input"
+                # return a dictionary instead of an array
+                # the dictionary keys are channel numbers, the values
+                # are timeseries
                 inputs, dt = get_inputs(i,
                                     events=events,
                                     input_channels=input_channels,
                                     scale=input_units
                                     )
+                # TODO NG: Get in-field outputs. fill in the below
+                outputs_displ_field = ...
+                outputs_accel_field = ...
             except:
                 print(f"Error getting inputs for event {event_id}. Skipping event.")
                 continue
@@ -145,7 +161,8 @@ if __name__ == "__main__":
 
         # Finite element model
         if MODEL == 'frame':
-            output_nodes = [5,10,15]
+            output_nodes = [5,10,15] # TODO NG: edit
+            output_dofs = [] # TODO NG: Fill in
             output_elements = [1,5,9]
             yFiber = 7.5
             zFiber = 0.0
@@ -161,7 +178,8 @@ if __name__ == "__main__":
             
 
         elif MODEL == 'bridge':
-            output_nodes = [3,5]
+            output_nodes = [3,5] # TODO NG: edit
+            output_dofs = [] # TODO NG: Fill in
             output_elements = [3]
             yFiber = 22.5
             zFiber = 0.0
@@ -201,7 +219,7 @@ if __name__ == "__main__":
                 )
 
         try:
-            disp, acc, stresses, strains, freqs_before, freqs_after = analyze(model,
+            displ, accel, stresses, strains, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
                                                                     dt=dt,
                                                                     output_nodes=output_nodes,
@@ -212,7 +230,7 @@ if __name__ == "__main__":
                                                                 )
 
         except RuntimeError as e:
-            print(f"Error encounted when analyzing event {event_id}:")
+            print(f"Error encountered when analyzing event {event_id}:")
             print(e)
             continue
 
@@ -220,16 +238,18 @@ if __name__ == "__main__":
         # Save frequencies, displacements, strains, and stresses
         np.savetxt(event_dir/"pre_eq_natural_frequencies.csv", freqs_before)
         np.savetxt(event_dir/"post_eq_natural_frequencies.csv", freqs_after)
-        save_displacements(disp, dt, filename=event_dir/"displacements.csv")
+        save_displacements(displ, dt, filename=event_dir/"displacements.csv") # TODO CC: Check if we use this file anywhere
         save_strain_stress(stresses, strains, dt, filename=event_dir/"strain_stress.csv")
 
-        # System identification outputs (displacement, inches)
-        outputs = get_node_outputs(disp, nodes=output_nodes)[:,1:]
+        # System identification outputs 
+        # TODO NG: add the dofs argument to get the correct outputs
+        # Displacement outputs (inches)
+        outputs_displ = get_node_outputs(displ, nodes=output_nodes)[:,1:]
         # Acceleration outputs (inches/second/second)
-        outputs_acc = get_node_outputs(acc, nodes=output_nodes)[:,1:]
+        outputs_accel = get_node_outputs(accel, nodes=output_nodes)[:,1:]
 
 
-        assert inputs.shape[1] == outputs.shape[1], (
+        assert inputs.shape[1] == outputs_displ.shape[1], (
             "system identification inputs and outputs have different length of time samples.")
         time = np.arange(nt) * dt
 
@@ -238,8 +258,8 @@ if __name__ == "__main__":
             f.write(str(dt))
         np.savetxt(event_dir/"time.csv", time)
         np.savetxt(event_dir/"inputs.csv", inputs)
-        np.savetxt(event_dir/"outputs.csv", outputs)
-        np.savetxt(event_dir/"outputs_acc.csv", outputs_acc)
+        np.savetxt(event_dir/"outputs_displ.csv", outputs_displ)
+        np.savetxt(event_dir/"outputs_accel.csv", outputs_accel)
 
         if False: # TODO CC: Debug
             # Perform system identification and save systems
@@ -260,7 +280,7 @@ if __name__ == "__main__":
             )
 
 
-            system_full = sysid(inputs, outputs, method=SID_METHOD, **options)
+            system_full = sysid(inputs, outputs_displ, method=SID_METHOD, **options)
             A,B,C,D, *rest = system_full
             system = (A,B,C,D)
             with open(event_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
