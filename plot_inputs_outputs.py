@@ -34,6 +34,7 @@ if __name__ == "__main__":
             input_labels = ['Channel 1 (X)', 'Channel 3 (Y)']
         output_nodes = [2,3,5]
         # output_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
+    # TODO NG: Fix this accordingly
     output_labels = [f'Node{i}{dof}' for i in output_nodes for dof in ['X','Y']]
         
     event_files = glob.glob(str(OUT_DIR/"[0-9]*"))
