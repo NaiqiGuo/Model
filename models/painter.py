@@ -279,7 +279,9 @@ class Painter:
         model.element(beam_type, 105, ( 3,  2), **girder_element)
         model.element(beam_type, 106, ( 5,  2), **girder_element)
 
-
+        # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
+        model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
+        
         return model
 
         # Mass, damping and earthquake excitation
