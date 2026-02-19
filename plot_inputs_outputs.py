@@ -9,9 +9,10 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 ELASTIC = True
 MULTISUPPORT = False
+VERBOSE = 1
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
@@ -19,6 +20,10 @@ OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
 if __name__ == "__main__":
 
     if MODEL == "frame":
+        # TODO NG: Change this to require both output_nodes and output_dofs. Each output must
+        # be separately and explicitly defined, e.g.
+        # output_nodes = [5,5,10,10,15,15]
+        # output_dofs = ['X','Y','X','Y','X','Y']
         if not MULTISUPPORT:
             input_labels = ['Channel 0 (X)', 'Channel 2 (Y)']
         output_nodes = [5,10,15]
@@ -37,9 +42,15 @@ if __name__ == "__main__":
         print(f"Plotting Event {event_id}")
         event_dir = OUT_DIR/str(event_id)
 
-        inputs = np.loadtxt(event_dir/"inputs.csv")
-        outputs_displ = np.loadtxt(event_dir/"outputs.csv")
-        outputs_accel = np.loadtxt(event_dir/"outputs_acc.csv")
+        try:
+            inputs = np.loadtxt(event_dir/"inputs.csv")
+            outputs_displ = np.loadtxt(event_dir/"outputs.csv")
+            outputs_accel = np.loadtxt(event_dir/"outputs_acc.csv")
+        except FileNotFoundError:
+            if VERBOSE:
+                print(f"No data for event {event_id}; skipping")
+            continue
+
         with open(event_dir/"dt.txt", "r") as f:
             dt = float(f.read())
         nt = inputs.shape[1]
@@ -85,7 +96,7 @@ if __name__ == "__main__":
         # --------- output, displacement ---------
         plt.figure(figsize=(8,4))
         for ch in range(outputs_displ_trunc.shape[0]):
-            plt.plot(t_out_trunc, outputs_displ_trunc[ch], alpha=0.7, label=output_labels[ch])
+            plt.plot(t_out_trunc, outputs_displ_trunc[ch], alpha=1.0, label=output_labels[ch])
         plt.title(f"Event {event_id} Outputs")
         plt.xlabel("Time (s)")
         plt.ylabel("Output Displacement (in)")
@@ -106,7 +117,7 @@ if __name__ == "__main__":
         # --------- output, acceleration ---------
         plt.figure(figsize=(8,4))
         for ch in range(outputs_accel_trunc.shape[0]):
-            plt.plot(t_out_trunc, outputs_accel_trunc[ch], alpha=0.7, label=output_labels[ch])
+            plt.plot(t_out_trunc, outputs_accel_trunc[ch], alpha=1.0, label=output_labels[ch])
         plt.title(f"Event {event_id} Outputs")
         plt.xlabel("Time (s)")
         plt.ylabel("Output Acceleration (in/s²)")
