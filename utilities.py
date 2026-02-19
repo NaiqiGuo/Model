@@ -437,8 +437,10 @@ def write_freq_csv(event_id,
         row = [event_id] + list(freqs_before) + list(freqs_after)
         writer.writerow(row)
 
-
-# CHECK NG: consolidated both get_node_displacements and get_node_accelerations; removed dt argument
+# TODO NG: Change this to require both nodes and dofs. Each output must
+# be separately and explicitly defined, e.g.
+# nodes = [5,5,10,10,15,15]
+# dofs = [1,2,1,2,1,2]
 def get_node_outputs(outputs,
                 #nodes=[5,10,15], # building (3 story frame)
                 nodes=[2,3,5], # bridge
