@@ -8,6 +8,7 @@ import os
 import cvxpy as cp 
 import plotly.graph_objects as go
 from pathlib import Path
+from mdof.utilities.config import extract_channels
 
 # Verbosity
 # False means print nothing;
@@ -1419,3 +1420,15 @@ def apply_load_bridge_multi_support(
         model.imposedMotion(node, 2, gm_y)
     return model
 
+
+#TODO CC: need to check this function
+def get_measurements(i, events, channels, scale=1):
+    event = events[i]
+    channel_data, dt = extract_channels(event, channels)  
+    channel_data = scale * channel_data
+
+    measurements = {
+        ch: channel_data[idx]
+        for idx, ch in enumerate(channels)
+    }
+    return measurements, dt

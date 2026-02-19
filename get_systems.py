@@ -25,6 +25,7 @@ from utilities_experimental import(
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
+    get_measurements
 )
 
 # Analysis configuration
@@ -131,18 +132,26 @@ if __name__ == "__main__":
         elif MODEL == "bridge":
             input_units = units.cmps2
             try:
-                # TODO NG: refactor get_inputs
+                # TODO CC: check get_measurement
                 # to allow intepretation as something to 
                 # get any in-field measurement from a quakeio record.
                 # rename all the variables to remove reference to an "input"
                 # return a dictionary instead of an array
                 # the dictionary keys are channel numbers, the values
                 # are timeseries
+                # i put get_measurement in utilities_experimental. You can move to utilities after checking
                 inputs, dt = get_inputs(i,
                                     events=events,
                                     input_channels=input_channels,
                                     scale=input_units
                                     )
+                measurements, dt = get_measurements(
+                    i,
+                    events=events,
+                    channels=input_channels,
+                    scale=input_units,
+                )
+                inputs = np.vstack([measurements[ch] for ch in input_channels])
                 # TODO NG: Get in-field outputs. fill in the below
                 outputs_displ_field = ...
                 outputs_accel_field = ...
