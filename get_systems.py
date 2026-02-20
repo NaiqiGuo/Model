@@ -45,7 +45,9 @@ VERBOSE = 1
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-
+# TODO CC: check
+FIELD_OUT_DIR = Path(MODEL) / "field"
+os.makedirs(FIELD_OUT_DIR, exist_ok=True)
 
 if __name__ == "__main__":
     # Print analysis configuration
@@ -79,21 +81,22 @@ if __name__ == "__main__":
         if not MULTISUPPORT:
             # Rows in data array parsed from txt file
             input_channels = [0,2] # x, y
-            # TODO NG: Fill in
-            output_channels = []
+            # TODO CC: check channel mapping/order for frame in-field accel/displ outputs
+            output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
+            output_channels_displ = [21, 22, 23, 24]
     elif MODEL == "bridge":
         if not MULTISUPPORT:
             # Labeled channel numbers from quakeio object
             input_channels = [1,3] # x, y
-            # TODO NG: Fill in
-            output_channels = []
+            # TODO CC: check channel mapping/order for bridge in-field outputs
+            output_channels = [9, 7, 4]
         else:
             # Labeled channel numbers from quakeio object
             input_channels = [1,3,15,17,18,20] # ordered arbitrarily
             # Nodes for excitation, order corresponds to input_channels
-            input_nodes = [] # TODO NG: fill in input nodes.
+            input_nodes = [6, 6, 0, 0, 1, 1] # TODO CC: check support-node mapping for each input channel
             # DOFs for excitation, order corresponds to input_channels
-            input_dofs = []  # TODO NG: fill in input dofs
+            input_dofs = [1, 2, 1, 2, 1, 2]  # TODO CC: check DOF mapping 1 is X, 2 is Y
 
     for i,event in enumerate(events):
         if MODEL == "frame":
@@ -108,6 +111,10 @@ if __name__ == "__main__":
         event_dir = OUT_DIR/event_id
         os.makedirs(event_dir, exist_ok=True)
 
+        # TODO CC: check
+        field_event_dir = FIELD_OUT_DIR / event_id
+        os.makedirs(field_event_dir, exist_ok=True)
+
         # Model and system identification inputs (acceleration, in/s²)
         if MODEL == "frame":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
@@ -115,9 +122,14 @@ if __name__ == "__main__":
             input_units = sensor_units[input_channels[0]]
             assert all(sensor_units[i] == input_units for i in input_channels)
             inputs = array[input_channels]*scale_249_units(units=input_units)
-            # TODO NG: Get in-field outputs. fill in the below
-            outputs_displ_field = ...
-            outputs_accel_field = ...
+            # TODO CC: check frame in-field unit consistency (displ in, accel in/s^2)
+            displ_units = sensor_units[output_channels_displ[0]]
+            assert all(sensor_units[i] == displ_units for i in output_channels_displ)
+            outputs_displ_field = array[output_channels_displ] 
+            output_units = sensor_units[output_channels_accel[0]]
+            assert all(sensor_units[i] == output_units for i in output_channels_accel)
+            outputs_accel_field = array[output_channels_accel] * scale_249_units(units=output_units)
+
 
             if VERBOSE >= 2:
                 print(
@@ -140,21 +152,30 @@ if __name__ == "__main__":
                 # the dictionary keys are channel numbers, the values
                 # are timeseries
                 # i put get_measurement in utilities_experimental. You can move to utilities after checking
-                inputs, dt = get_inputs(i,
-                                    events=events,
-                                    input_channels=input_channels,
-                                    scale=input_units
-                                    )
+                # i think before we use the wrong units
+                
+                CM_TO_IN = 1.0 / 2.54
+                # bridge input accel
+                input_scale = CM_TO_IN   # cm/s^2 -> in/s^2
+
                 measurements, dt = get_measurements(
                     i,
                     events=events,
                     channels=input_channels,
-                    scale=input_units,
+                    scale=input_scale,
                 )
                 inputs = np.vstack([measurements[ch] for ch in input_channels])
-                # TODO NG: Get in-field outputs. fill in the below
-                outputs_displ_field = ...
-                outputs_accel_field = ...
+
+                # TODO CC: check bridge in-field unit conversion (cm -> in, cm/s^2 -> in/s^2)
+                accel_measurements, _ = get_measurements(
+                        i, events=events, channels=output_channels, scale=input_scale, response="accel"
+                    )
+                outputs_accel_field = np.vstack([accel_measurements[ch] for ch in output_channels])
+                displ_measurements, _ = get_measurements(
+                    i, events=events, channels=output_channels, scale=CM_TO_IN, response="displ"
+                )
+                outputs_displ_field = np.vstack([displ_measurements[ch] for ch in output_channels])
+
             except:
                 print(f"Error getting inputs for event {event_id}. Skipping event.")
                 continue
@@ -168,10 +189,11 @@ if __name__ == "__main__":
             print(f"Event {event_id} time series length: {nt}, Time step dt = {dt}")
 
 
+
         # Finite element model
         if MODEL == 'frame':
-            output_nodes = [5,10,15] # TODO NG: edit
-            output_dofs = [] # TODO NG: Fill in
+            output_nodes = [5, 5, 10, 10, 15, 15] # TODO CC: check node order 
+            output_dofs = [1, 2, 1, 2, 1, 2] # TODO CC: check dof order 
             output_elements = [1,5,9]
             yFiber = 7.5
             zFiber = 0.0
@@ -187,8 +209,8 @@ if __name__ == "__main__":
             
 
         elif MODEL == 'bridge':
-            output_nodes = [3,5] # TODO NG: edit
-            output_dofs = [] # TODO NG: Fill in
+            output_nodes = [9, 9, 3, 3, 10, 10] # TODO CC: check node order 
+            output_dofs = [1, 2, 1, 2, 1, 2] # TODO CC: check dof order 
             output_elements = [3]
             yFiber = 22.5
             zFiber = 0.0
@@ -210,7 +232,7 @@ if __name__ == "__main__":
                                         )
                 
             elif False:
-                # TODO NG: After clean apply_load_bridge,
+                # TODO CC: After clean apply_load_bridge,
                 # absorb into apply_load_bridge.
                 # Supersede with input_nodes and input_dofs
                 node_channel_map = { 
@@ -251,11 +273,11 @@ if __name__ == "__main__":
         save_strain_stress(stresses, strains, dt, filename=event_dir/"strain_stress.csv")
 
         # System identification outputs 
-        # TODO NG: add the dofs argument to get the correct outputs
+        # TODO CC: verify node/dof  matches in-field channel ordering
         # Displacement outputs (inches)
-        outputs_displ = get_node_outputs(displ, nodes=output_nodes)[:,1:]
+        outputs_displ = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:]
         # Acceleration outputs (inches/second/second)
-        outputs_accel = get_node_outputs(accel, nodes=output_nodes)[:,1:]
+        outputs_accel = get_node_outputs(accel, nodes=output_nodes, dofs=output_dofs)[:, 1:]
 
 
         assert inputs.shape[1] == outputs_displ.shape[1], (
@@ -269,6 +291,11 @@ if __name__ == "__main__":
         np.savetxt(event_dir/"inputs.csv", inputs)
         np.savetxt(event_dir/"outputs_displ.csv", outputs_displ)
         np.savetxt(event_dir/"outputs_accel.csv", outputs_accel)
+        np.savetxt(field_event_dir / "outputs_displ_field.csv", outputs_displ_field)
+        np.savetxt(field_event_dir / "outputs_accel_field.csv", outputs_accel_field)
+        
+        with open(field_event_dir / "dt.txt", "w") as f:
+            f.write(str(dt))
 
         if False: # TODO CC: Debug
             # Perform system identification and save systems
