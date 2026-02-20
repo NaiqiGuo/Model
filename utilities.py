@@ -330,6 +330,7 @@ def get_material_response(model, element, sec_tag, y, z):
         return None
 
 
+# TODO CC check: output_nodes contain duplicates. So i changed some code to keep nodes only use once.
 def analyze(model, nt, dt, 
             output_nodes=[5,10,15],
             output_elements=[1,5,9],
@@ -373,11 +374,13 @@ def analyze(model, nt, dt,
     # -----------------------
 
     # record once at time 0
+    record_nodes = list(dict.fromkeys(output_nodes))
+
     displacements = {
-        node: [model.nodeDisp(node)] for node in output_nodes
+        node: [model.nodeDisp(node)] for node in record_nodes
     }
     accelerations = {
-        node: [model.nodeAccel(node)] for node in output_nodes
+        node: [model.nodeAccel(node)] for node in record_nodes
     }
     strains = {
         element: [get_material_response(model, element, 1, yFiber, zFiber)[0]] for element in output_elements
@@ -403,7 +406,7 @@ def analyze(model, nt, dt,
             raise RuntimeError(f"analysis failed at time {model.getTime()}")
         
         # Save displacements at the current time
-        for node in output_nodes:
+        for node in record_nodes:
             displacements[node].append(model.nodeDisp(node))
             accelerations[node].append(model.nodeAccel(node))
         
@@ -437,13 +440,14 @@ def write_freq_csv(event_id,
         row = [event_id] + list(freqs_before) + list(freqs_after)
         writer.writerow(row)
 
-# TODO NG: Change this to require both nodes and dofs. Each output must
+# TODO CC check: Change this to require both nodes and dofs. Each output must
 # be separately and explicitly defined, e.g.
 # nodes = [5,5,10,10,15,15]
 # dofs = [1,2,1,2,1,2]
 def get_node_outputs(outputs,
                 #nodes=[5,10,15], # building (3 story frame)
-                nodes=[2,3,5], # bridge
+                nodes, # bridge
+                dofs
                 ):
     """
     outputs, e.g. displacements or accelerations:
@@ -453,10 +457,8 @@ def get_node_outputs(outputs,
     """
     
     rows = []
-    for node in nodes:
-        arr = np.array(outputs[node])  # shape (nt+1, 6)
-        rows.append(arr[:, 0])  # X output 
-        rows.append(arr[:, 1])  # Y output
+    for node, dof in zip(nodes, dofs):
+        arr = np.asarray(outputs[node])   # shape: (nt+1, 6)
+        rows.append(arr[:, dof - 1])      # dof is 1-based
 
-    outputs = np.vstack(rows)
-    return outputs     # shape (2*n_nodes, nt)
+    return np.vstack(rows)
