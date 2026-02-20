@@ -9,13 +9,15 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-MODEL = "bridge" # "frame", "bridge"
-ELASTIC = True
+MODEL = "frame" # "frame", "bridge"
+ELASTIC = False
 MULTISUPPORT = False
 VERBOSE = 1
 
 # Main output directory
 OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
+#TODO CC: check 
+FIELD_OUT_DIR = Path(MODEL) / "field"
 
 if __name__ == "__main__":
 
@@ -23,30 +25,40 @@ if __name__ == "__main__":
         # TODO NG: Change this to require both output_nodes and output_dofs. Each output must
         # be separately and explicitly defined, e.g.
         # output_nodes = [5,5,10,10,15,15]
-        # output_dofs = ['X','Y','X','Y','X','Y']
+        # output_dofs = [1,2,1,2,1,2]
         if not MULTISUPPORT:
             input_labels = ['Channel 0 (X)', 'Channel 2 (Y)']
-        output_nodes = [5,10,15]
-        # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
-        # output_labels = ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y', ]
+        output_nodes = [5, 5, 10, 10, 15, 15]
+        output_dofs  = [1, 2, 1, 2, 1, 2]
+        output_labels = ['Node 5, X', 'Node 5, Y', 'Node 10, X', 'Node 10, Y', 'Node 15, X', 'Node 15, Y']
+
     elif MODEL == "bridge":
         if not MULTISUPPORT:
             input_labels = ['Channel 1 (X)', 'Channel 3 (Y)']
-        output_nodes = [2,3,5]
-        # output_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
+        output_nodes = [9, 9, 3, 3, 10, 10]
+        output_dofs  = [1, 2, 1, 2, 1, 2]
+        output_labels = ['Node 9, X', 'Node 9, Y', 'Node 3, X', 'Node 3, Y', 'Node 10, X', 'Node 10, Y']
+
     # TODO NG: Fix this accordingly
-    output_labels = [f'Node{i}{dof}' for i in output_nodes for dof in ['X','Y']]
+    dof_map = {1: "X", 2: "Y", 3: "Z", 4: "RX", 5: "RY", 6: "RZ"}
+    output_labels = [f"Node{n}{dof_map[d]}" for n, d in zip(output_nodes, output_dofs)]
+
         
     event_files = glob.glob(str(OUT_DIR/"[0-9]*"))
     event_ids = [Path(event).stem.replace("ce249Run", "") for event in event_files]
     for event_id in event_ids:
         print(f"Plotting Event {event_id}")
         event_dir = OUT_DIR/str(event_id)
+        #TODO CC: check 
+        field_event_dir = FIELD_OUT_DIR / str(event_id)
 
         try:
             inputs = np.loadtxt(event_dir/"inputs.csv")
-            outputs_displ = np.loadtxt(event_dir/"outputs.csv")
-            outputs_accel = np.loadtxt(event_dir/"outputs_acc.csv")
+            outputs_displ = np.loadtxt(event_dir/"outputs_displ.csv")
+            outputs_accel = np.loadtxt(event_dir/"outputs_accel.csv")
+            outputs_displ_field = np.loadtxt(field_event_dir/"outputs_displ_field.csv")
+            outputs_accel_field = np.loadtxt(field_event_dir/"outputs_accel_field.csv")
+
         except FileNotFoundError:
             if VERBOSE:
                 print(f"No data for event {event_id}; skipping")
@@ -65,12 +77,16 @@ if __name__ == "__main__":
             t_in_trunc = t_in[bounds[0]:bounds[1]]
             outputs_displ_trunc = truncate_by_bounds(outputs_displ, bounds)
             outputs_accel_trunc = truncate_by_bounds(outputs_accel, bounds)
+            outputs_displ_field_trunc = truncate_by_bounds(outputs_displ_field, bounds)
+            outputs_accel_field_trunc = truncate_by_bounds(outputs_accel_field, bounds)
             t_out_trunc = t_out[bounds[0]:bounds[1]]
         else:
             inputs_trunc = inputs
             t_in_trunc = t_in
             outputs_displ_trunc = outputs_displ
             outputs_accel_trunc = outputs_accel
+            outputs_displ_field_trunc = outputs_displ_field
+            outputs_accel_field_trunc = outputs_accel_field
             t_out_trunc = t_out
 
         # --------- input ---------
@@ -135,3 +151,49 @@ if __name__ == "__main__":
                           yaxis_title="Output Acceleration (in/s²)",
                           width=800,height=300)
         fig.write_html(event_dir/"outputs_acc.html", include_plotlyjs="cdn")
+
+        # --------- field output, displacement ---------
+        plt.figure(figsize=(8,4))
+        for ch in range(outputs_displ_field_trunc.shape[0]):
+            label = output_labels[ch] if ch < len(output_labels) else f"Field {ch}"
+            plt.plot(t_out_trunc, outputs_displ_field_trunc[ch], alpha=1.0, label=label)
+        plt.title(f"Event {event_id} Field Outputs (Displacement)")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Field Displacement (in)")
+        plt.legend(loc='lower right', ncol=min(len(output_labels), 3))
+        plt.tight_layout()
+        plt.savefig(field_event_dir/"outputs_field_displ.png", dpi=350)
+        plt.close()
+
+        fig = go.Figure()
+        for ch in range(outputs_displ_field_trunc.shape[0]):
+            label = output_labels[ch] if ch < len(output_labels) else f"Field {ch}"
+            fig.add_scatter(x=t_out_trunc, y=outputs_displ_field_trunc[ch], mode="lines", name=label)
+        fig.update_layout(title=f"Event {event_id} Field Outputs (Displacement)",
+                        xaxis_title="Time (s)",
+                        yaxis_title="Field Displacement (in)",
+                        width=800, height=300)
+        fig.write_html(field_event_dir/"outputs_field_displ.html", include_plotlyjs="cdn")
+
+        # --------- field output, acceleration ---------
+        plt.figure(figsize=(8,4))
+        for ch in range(outputs_accel_field_trunc.shape[0]):
+            label = output_labels[ch] if ch < len(output_labels) else f"Field {ch}"
+            plt.plot(t_out_trunc, outputs_accel_field_trunc[ch], alpha=1.0, label=label)
+        plt.title(f"Event {event_id} Field Outputs (Acceleration)")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Field Acceleration (in/s²)")
+        plt.legend(loc='lower right', ncol=min(len(output_labels), 3))
+        plt.tight_layout()
+        plt.savefig(field_event_dir/"outputs_field_accel.png", dpi=350)
+        plt.close()
+
+        fig = go.Figure()
+        for ch in range(outputs_accel_field_trunc.shape[0]):
+            label = output_labels[ch] if ch < len(output_labels) else f"Field {ch}"
+            fig.add_scatter(x=t_out_trunc, y=outputs_accel_field_trunc[ch], mode="lines", name=label)
+        fig.update_layout(title=f"Event {event_id} Field Outputs (Acceleration)",
+                        xaxis_title="Time (s)",
+                        yaxis_title="Field Acceleration (in/s²)",
+                        width=800, height=300)
+        fig.write_html(field_event_dir/"outputs_field_accel.html", include_plotlyjs="cdn")
