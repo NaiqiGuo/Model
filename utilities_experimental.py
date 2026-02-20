@@ -1421,14 +1421,11 @@ def apply_load_bridge_multi_support(
     return model
 
 
-#TODO CC: need to check this function
-def get_measurements(i, events, channels, scale=1):
-    event = events[i]
-    channel_data, dt = extract_channels(event, channels)  
-    channel_data = scale * channel_data
+#TODO CC: need to check this function. I added response which can chose from accel, displ.
 
-    measurements = {
-        ch: channel_data[idx]
-        for idx, ch in enumerate(channels)
-    }
+def get_measurements(i, events, channels, scale=1, response="accel"):
+    event = events[i]
+    channel_data, dt = extract_channels(event, channels, response=response)
+    channel_data = scale * channel_data
+    measurements = {ch: channel_data[idx] for idx, ch in enumerate(channels)}
     return measurements, dt
