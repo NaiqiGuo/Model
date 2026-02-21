@@ -56,8 +56,9 @@ def get_249_data(path):
     units_idx = header_idx + 1
     data_start = units_idx + 2
 
-    headers = lines[header_idx].strip().split("\t")
-    units = lines[units_idx].strip().split("\t")
+    # TODO CC check: Use rstrip(), not strip() to keep names, units, and data aligned
+    headers = lines[header_idx].rstrip().split("\t")
+    units = lines[units_idx].rstrip().split("\t")
 
     sensor_names = headers[2:]
     sensor_units = units[2:]
@@ -65,7 +66,7 @@ def get_249_data(path):
     time = []
     data = []
     for l in lines[data_start:]:
-        parts = l.strip().split("\t")
+        parts = l.rstrip().split("\t")
         if len(parts) < len(headers):
             continue
         time.append(_parse_time_to_seconds(parts[0]))
