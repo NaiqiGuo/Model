@@ -30,9 +30,9 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True
 LOAD_EVENTS = False
 
 # Verbosity
@@ -83,7 +83,7 @@ if __name__ == "__main__":
             input_channels = [0,2] # x, y
             # TODO CC: check channel mapping/order for frame in-field accel/displ outputs
             output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
-            output_channels_displ = [21, 22, 23, 24]
+            output_channels_displ = [21, 22, 23, 24, 25, 26] #WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
     elif MODEL == "bridge":
         if not MULTISUPPORT:
             # Labeled channel numbers from quakeio object
@@ -140,6 +140,13 @@ if __name__ == "__main__":
                         f"\tName = {sensor_names[input_channels[1]]}\n"
                         f"\tUnits = {sensor_units[input_channels[1]]}"
                     )
+                print("accel channels:")
+                for ch in output_channels_accel:
+                    print(ch, sensor_names[ch], sensor_units[ch])
+
+                print("displ channels:")
+                for ch in output_channels_displ:
+                    print(ch, sensor_names[ch], sensor_units[ch])
                 
         elif MODEL == "bridge":
             input_units = units.cmps2
