@@ -323,7 +323,6 @@ def get_material_response(model, element, sec_tag, y, z):
         return None
 
 
-# TODO CC check: output_nodes contain duplicates. So i changed some code to keep nodes only use once.
 def analyze(model, nt, dt, 
             output_nodes=[5,10,15],
             output_elements=[1,5,9],
@@ -367,7 +366,7 @@ def analyze(model, nt, dt,
     # -----------------------
 
     # record once at time 0
-    record_nodes = list(dict.fromkeys(output_nodes))
+    record_nodes = set(output_nodes)
 
     displacements = {
         node: [model.nodeDisp(node)] for node in record_nodes
