@@ -187,6 +187,9 @@ class Painter:
         model = xara.Model(ndm=3, ndf=6)
 
         # Geometry
+        # x: East
+        # y: North
+        # z: Up
         deck_height = 24*units.ft + (5*units.ft + 8*units.inch)/2
 
         skew_angle = np.deg2rad(38.9)
