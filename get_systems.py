@@ -148,8 +148,7 @@ if __name__ == "__main__":
                 
         elif MODEL == "bridge":
             input_units = units.cmps2
-            # TODO NG: Can you verify this? I thought units.cmps2 gives 1.0/2.54. They should be equivalent.
-            print(f"{input_units=}")
+
             try:
                 # TODO CC: check get_measurement
                 # to allow intepretation as something to 
@@ -159,12 +158,9 @@ if __name__ == "__main__":
                 # the dictionary keys are channel numbers, the values
                 # are timeseries
                 # i put get_measurement in utilities_experimental. You can move to utilities after checking
-                # i think before we use the wrong units
-                
-                CM_TO_IN = 1.0 / 2.54
+                #i changed to unit.cmps2
                 # bridge input accel
-                input_scale = CM_TO_IN   # cm/s^2 -> in/s^2
-                print(f"{input_scale=}")
+                input_scale = input_units 
 
                 measurements, dt = get_measurements(
                     i,
@@ -180,7 +176,7 @@ if __name__ == "__main__":
                     )
                 outputs_accel_field = np.vstack([accel_measurements[ch] for ch in output_channels])
                 displ_measurements, _ = get_measurements(
-                    i, events=events, channels=output_channels, scale=CM_TO_IN, response="displ"
+                    i, events=events, channels=output_channels, scale=input_scale, response="displ"
                 )
                 outputs_displ_field = np.vstack([displ_measurements[ch] for ch in output_channels])
 
