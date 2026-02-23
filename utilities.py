@@ -313,13 +313,6 @@ def apply_load_frame(model, inputx=None, inputy=None, dt=None):
     return model
 
 
-def get_inputs(i, events, input_channels, scale=1):
-    event = events[i]
-    inputs, dt = extract_channels(event, input_channels)
-    inputs = scale*inputs
-    return inputs, dt
-
-
 def get_material_response(model, element, sec_tag, y, z):
     try:
         strain =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "strain")
@@ -440,6 +433,7 @@ def write_freq_csv(event_id,
         row = [event_id] + list(freqs_before) + list(freqs_after)
         writer.writerow(row)
 
+
 def get_node_outputs(outputs, nodes, dofs):
     """
     Get an array of outputs for the given nodes and dofs. Each
@@ -472,3 +466,11 @@ def get_node_outputs(outputs, nodes, dofs):
         rows.append(arr[:, dof - 1])      # dof is 1-based
 
     return np.vstack(rows)
+
+
+def get_measurements(i, events, channels, scale=1, response="accel"):
+    event = events[i]
+    channel_data, dt = extract_channels(event, channels, response=response)
+    channel_data = scale * channel_data
+    measurements = {ch: channel_data[idx] for idx, ch in enumerate(channels)}
+    return measurements, dt

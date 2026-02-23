@@ -1420,12 +1420,3 @@ def apply_load_bridge_multi_support(
         model.imposedMotion(node, 2, gm_y)
     return model
 
-
-#TODO CC: need to check this function. I added response which can chose from accel, displ.
-
-def get_measurements(i, events, channels, scale=1, response="accel"):
-    event = events[i]
-    channel_data, dt = extract_channels(event, channels, response=response)
-    channel_data = scale * channel_data
-    measurements = {ch: channel_data[idx] for idx, ch in enumerate(channels)}
-    return measurements, dt

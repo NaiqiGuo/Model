@@ -10,7 +10,7 @@ from mdof.utilities.config import Config
 import xara.units.iks as units
 import pickle
 from utilities import (
-    get_inputs,
+    get_measurements,
     get_node_outputs,
     create_frame,
     apply_load_frame,
@@ -24,7 +24,6 @@ from utilities_experimental import(
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
-    get_measurements
 )
 
 # Analysis configuration
