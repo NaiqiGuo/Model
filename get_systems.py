@@ -149,6 +149,8 @@ if __name__ == "__main__":
                 
         elif MODEL == "bridge":
             input_units = units.cmps2
+            # TODO NG: Can you verify this? I thought units.cmps2 gives 1.0/2.54. They should be equivalent.
+            print(f"{input_units=}")
             try:
                 # TODO CC: check get_measurement
                 # to allow intepretation as something to 
@@ -163,6 +165,7 @@ if __name__ == "__main__":
                 CM_TO_IN = 1.0 / 2.54
                 # bridge input accel
                 input_scale = CM_TO_IN   # cm/s^2 -> in/s^2
+                print(f"{input_scale=}")
 
                 measurements, dt = get_measurements(
                     i,
