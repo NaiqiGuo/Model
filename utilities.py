@@ -440,20 +440,30 @@ def write_freq_csv(event_id,
         row = [event_id] + list(freqs_before) + list(freqs_after)
         writer.writerow(row)
 
-# TODO CC check: Change this to require both nodes and dofs. Each output must
-# be separately and explicitly defined, e.g.
-# nodes = [5,5,10,10,15,15]
-# dofs = [1,2,1,2,1,2]
-def get_node_outputs(outputs,
-                #nodes=[5,10,15], # building (3 story frame)
-                nodes, # bridge
-                dofs
-                ):
+def get_node_outputs(outputs, nodes, dofs):
     """
-    outputs, e.g. displacements or accelerations:
-      { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
-    Returns outputs: ndarray, shape=(n_nodes*2, nt), row order:
-      [Node1 X, Node1 Y, Node2 X, Node2 Y, ...]
+    Get an array of outputs for the given nodes and dofs. Each
+    output must be separately and explicity defined (see param
+    definitions below)
+
+    :param outputs: dictionary of node output time series, e.g.
+                    displacements or accelerations:
+                    { node_id: [ [u1,u2,u3,u4,u5,u6], ... ] }
+
+    :param nodes: desired output nodes, e.g. [5,5,10,10,15,15]
+    
+    :param dofs:  desired output dofs, e.g. [1,2,1,2,1,2]
+                  where
+                  1 = X translation
+                  2 = Y translation
+                  3 = Z translation
+                  4 = X rotation
+                  5 = Y rotation
+                  6 = Z rotation
+                  
+    Returns an ndarray, shape=(sum(dofs per node), nt). Row order:
+      [Node1 DOF1, Node2 DOF2, Node3 DOF3, ...]
+      
     """
     
     rows = []

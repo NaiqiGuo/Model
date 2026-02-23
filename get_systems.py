@@ -15,7 +15,6 @@ from utilities import (
     create_frame,
     apply_load_frame,
     analyze,
-    get_node_outputs,
 )
 
 from models.painter import create_bridge
@@ -282,7 +281,7 @@ if __name__ == "__main__":
         # System identification outputs 
         # TODO CC: verify node/dof  matches in-field channel ordering
         # Displacement outputs (inches)
-        outputs_displ = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:]
+        outputs_displ = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:] # [1:] is because extra first timestep is recorded during analysis
         # Acceleration outputs (inches/second/second)
         outputs_accel = get_node_outputs(accel, nodes=output_nodes, dofs=output_dofs)[:, 1:]
 
