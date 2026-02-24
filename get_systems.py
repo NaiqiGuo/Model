@@ -75,26 +75,37 @@ if __name__ == "__main__":
 
     # Perform model analysis and system identification and record responses
 
+    # Set input channels, input dofs, output channels, and output dofs
     if MODEL == "frame":
         if not MULTISUPPORT:
             # Rows in data array parsed from txt file
             input_channels = [0,2] # x, y
             # TODO CC: check channel mapping/order for frame in-field accel/displ outputs
             output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
-            output_channels_displ = [21, 22, 23, 24, 25, 26] #WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
+            output_channels_displ = [21, 22, 23, 24, 25, 26] # WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
     elif MODEL == "bridge":
+            # `input_channels` are labeled channel numbers from quakeio
+            # object, parsed from CESMD.
+            # See https://www.strongmotioncenter.org/NCESMD/photos/CGS/lllayouts/ll89324.pdf
+            # Note that X = East, Y = North, and Z = Up in FE model
+            # `input_dofs` are FEM DOFs for excitation, order corresponds
+            # to input_channels.
+            # X=1, 2=Y, 3=Z; Negative values indicate flipped coordinates.
+            # If coordinates are flipped, the sensor time series are
+            # sign-flipped when retrieved.
         if not MULTISUPPORT:
-            # Labeled channel numbers from quakeio object
-            input_channels = [1,3] # x, y
-            # TODO CC: check channel mapping/order for bridge in-field outputs
-            output_channels = [9, 7, 4]
+            input_channels = [1, 3]
+            input_dofs = [-1, 2] # CHECK NG: I had to add some logic for the X direction (it is opposite from the channel direction)
         else:
-            # Labeled channel numbers from quakeio object
-            input_channels = [1,3,15,17,18,20] # ordered arbitrarily
-            # Nodes for excitation, order corresponds to input_channels
-            input_nodes = [6, 6, 0, 0, 1, 1] # TODO CC: check support-node mapping for each input channel
-            # DOFs for excitation, order corresponds to input_channels
-            input_dofs = [1, 2, 1, 2, 1, 2]  # TODO CC: check DOF mapping 1 is X, 2 is Y
+            # `input_nodes` are FE model nodes for excitation; order
+            # corresponds to `input_channels`
+            input_channels = [1, 3, 15, 17, 18, 20]
+            input_nodes = [4, 4, 1, 1, 0, 0] # CHECK NG: should be node 4 instead of node 6, and nodes 1 and 0 were flipped
+            input_dofs = [-1, 2, -1, 2, -1, 2, -1, 2]  # CHECK NG: I had to add some logic for the X direction (it is opposite from the channel direction)
+        # CHECK NG: order was opposite; nodes 4 and 9 were flipped. (X goes from west to east)
+        output_channels = [4, 7, 9]
+        # CHECK NG: moved output dofs here. Note: Y direction only.
+        output_dofs = [2, 2, 2]
 
     for i,event in enumerate(events):
         if MODEL == "frame":
@@ -113,7 +124,10 @@ if __name__ == "__main__":
         field_event_dir = FIELD_OUT_DIR / event_id
         os.makedirs(field_event_dir, exist_ok=True)
 
-        # Model and system identification inputs (acceleration, in/s²)
+        # Measurements from the field.
+        # Input acceleration (in/s²) is used as model and system identification inputs 
+        # Output displacement (in) and acceleration (in/s²) are used to compare
+        # with FE model outputs and system identification outputs. 
         if MODEL == "frame":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
@@ -150,44 +164,30 @@ if __name__ == "__main__":
             input_units = units.cmps2
 
             try:
-                # TODO CC: check get_measurement
-                # to allow intepretation as something to 
-                # get any in-field measurement from a quakeio record.
-                # rename all the variables to remove reference to an "input"
-                # return a dictionary instead of an array
-                # the dictionary keys are channel numbers, the values
-                # are timeseries
-                # i put get_measurement in utilities_experimental. You can move to utilities after checking
-                #i changed to unit.cmps2
-                # bridge input accel
-                input_scale = input_units 
+                # Read in-field measurements. Scale by units and flip sign where needed.
+                inputs_accel, dt = get_measurements(
+                    i, events=events, channels=input_channels, scale=input_units)
+                # CHECK NG: This is I where incorporated the logic for flipping the sign of the sensors
+                inputs = np.vstack([np.sign(dof)*inputs_accel[ch]
+                                    for ch,dof in zip(input_channels,input_dofs)])
 
-                measurements, dt = get_measurements(
-                    i,
-                    events=events,
-                    channels=input_channels,
-                    scale=input_scale,
-                )
-                inputs = np.vstack([measurements[ch] for ch in input_channels])
-
-                # TODO CC: check bridge in-field unit conversion (cm -> in, cm/s^2 -> in/s^2)
-                accel_measurements, _ = get_measurements(
-                        i, events=events, channels=output_channels, scale=input_scale, response="accel"
-                    )
-                outputs_accel_field = np.vstack([accel_measurements[ch] for ch in output_channels])
-                displ_measurements, _ = get_measurements(
-                    i, events=events, channels=output_channels, scale=input_scale, response="displ"
-                )
-                outputs_displ_field = np.vstack([displ_measurements[ch] for ch in output_channels])
+                outputs_accel_field, _ = get_measurements(
+                    i, events=events, channels=output_channels, scale=input_units, response="accel")
+                outputs_accel_field = np.vstack([np.sign(dof)*outputs_accel_field[ch]
+                                                 for ch,dof in zip(output_channels,output_dofs)])
+                
+                outputs_displ_field, _ = get_measurements(
+                    i, events=events, channels=output_channels, scale=input_units, response="displ")
+                outputs_displ_field = np.vstack([np.sign(dof)*outputs_displ_field[ch] 
+                                                 for ch,dof in zip(output_channels,output_dofs)])
 
             except:
-                print(f"Error getting inputs for event {event_id}. Skipping event.")
+                print(f"Error getting measurements for event {event_id}. Skipping event.")
                 continue
         
-        # For uniform excitation, inputs shape should be (2, nt)
-        # For multi-support excitation, inputs shape should be (len(input_channels), nt)
+        # Check inputs; shape should be (len(input_channels), nt)
         nin,nt = inputs.shape
-        assert nin==len(input_channels) if MULTISUPPORT else nin==2
+        assert nin==len(input_channels)
         if VERBOSE >= 2:
             print("Requested input channels:", input_channels)
             print(f"Event {event_id} time series length: {nt}, Time step dt = {dt}")
@@ -213,8 +213,7 @@ if __name__ == "__main__":
             
 
         elif MODEL == 'bridge':
-            output_nodes = [9, 9, 3, 3, 10, 10] # TODO CC: check node order 
-            output_dofs = [1, 2, 1, 2, 1, 2] # TODO CC: check dof order 
+            output_nodes = [9, 3, 10] # CHECK NG: We are only using Y direction, so no repeat
             output_elements = [3]
             yFiber = 22.5
             zFiber = 0.0
@@ -276,19 +275,19 @@ if __name__ == "__main__":
         save_displacements(displ, dt, filename=event_dir/"displacements.csv") # TODO CC: Check if we use this file anywhere
         save_strain_stress(stresses, strains, dt, filename=event_dir/"strain_stress.csv")
 
-        # System identification outputs 
-        # TODO CC: verify node/dof  matches in-field channel ordering
+        # FE model outputs, used as true outputs in system identification 
         # Displacement outputs (inches)
-        outputs_displ = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:] # [1:] is because extra first timestep is recorded during analysis
+        # Note, slice [1:] is because extra first timestep is recorded during analysis
+        outputs_displ = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:]
         # Acceleration outputs (inches/second/second)
         outputs_accel = get_node_outputs(accel, nodes=output_nodes, dofs=output_dofs)[:, 1:]
 
 
         assert inputs.shape[1] == outputs_displ.shape[1], (
-            "system identification inputs and outputs have different length of time samples.")
+            "system identification training inputs and outputs have different length of time samples.")
         time = np.arange(nt) * dt
 
-        # Save dt, time, and system identification inputs and outputs
+        # Save dt, time, FE model inputs and outputs, and in-field inputs and outputs
         with open(event_dir/"dt.txt", "w") as f:
             f.write(str(dt))
         np.savetxt(event_dir/"time.csv", time)
