@@ -28,7 +28,7 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
@@ -79,10 +79,11 @@ if __name__ == "__main__":
     if MODEL == "frame":
         if not MULTISUPPORT:
             # Rows in data array parsed from txt file
-            input_channels = [0,2] # x, y
-            # TODO CC: check channel mapping/order for frame in-field accel/displ outputs
-            output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
-            output_channels_displ = [21, 22, 23, 24, 25, 26] # WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
+            input_channels = [0, 2] # x, y
+            input_dofs = [1, 2]
+        output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
+        output_channels_displ = [21, 22, 23, 24, 25, 26] # WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
+        output_dofs = [1, 2, 1, 2, 1, 2]
     elif MODEL == "bridge":
             # `input_channels` are labeled channel numbers from quakeio
             # object, parsed from CESMD.
@@ -114,7 +115,7 @@ if __name__ == "__main__":
         elif MODEL == "bridge":
             event_id = str(i+1)
         if VERBOSE:
-            print(f"Event: {event}; Event ID: {event_id}")
+            print(f"\nEvent: {event}; Event ID: {event_id}")
 
         # Result output directory
         event_dir = OUT_DIR/event_id
@@ -125,38 +126,43 @@ if __name__ == "__main__":
         os.makedirs(field_event_dir, exist_ok=True)
 
         # Measurements from the field.
-        # Input acceleration (in/s²) is used as model and system identification inputs 
+        # Input acceleration (in/s²) is used as model and system identification input 
         # Output displacement (in) and acceleration (in/s²) are used to compare
         # with FE model outputs and system identification outputs. 
         if MODEL == "frame":
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
-            input_units = sensor_units[input_channels[0]]
-            assert all(sensor_units[i] == input_units for i in input_channels)
-            inputs = array[input_channels]*scale_249_units(units=input_units)
-            # TODO CC: check frame in-field unit consistency (displ in, accel in/s^2)
-            displ_units = sensor_units[output_channels_displ[0]]
-            assert all(sensor_units[i] == displ_units for i in output_channels_displ)
-            outputs_displ_field = array[output_channels_displ] 
-            output_units = sensor_units[output_channels_accel[0]]
-            assert all(sensor_units[i] == output_units for i in output_channels_accel)
-            outputs_accel_field = array[output_channels_accel] * scale_249_units(units=output_units)
+            # Check NG: I added in the logic for flipping the sign of the sensor time series
+            # here (not needed for the frame, but included for consistency).
+            # Also, I consolidated the units into this computation.
+            inputs = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
+                                for ch,dof in zip(input_channels,input_dofs)])
+            
+            outputs_displ_field = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
+                                             for ch in output_channels_displ])
+            # TODO NG: The measurements from the wirepots are not X & Y displacements.
+            # Create a function, triangulate_wirepot that computes 2D triangulation 
+            # to obtain X & Y displacements.
+            # Note that in Lab 4 you were given ReadDAQ_2Dtriangulation.m and getTriXY.m
+            # outputs_displ_field = triangulate_wirepot(outputs_displ_field)
 
+            outputs_accel_field = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
+                                             for ch,dof in zip(output_channels_accel,output_dofs)])
 
             if VERBOSE >= 2:
-                print(
-                    f"frame sensor x: \n"
-                        f"\tName = {sensor_names[input_channels[0]]}\n"
-                        f"\tUnits = {sensor_units[input_channels[0]]}\n"
-                    f"frame sensor y: \n"
-                        f"\tName = {sensor_names[input_channels[1]]}\n"
-                        f"\tUnits = {sensor_units[input_channels[1]]}"
-                    )
-                print("accel channels:")
+                if not MULTISUPPORT:
+                    print(
+                        f"input sensor x: \n"
+                            f"\tName = {sensor_names[input_channels[0]]}\n"
+                            f"\tUnits = {sensor_units[input_channels[0]]}\n"
+                        f"input sensor y: \n"
+                            f"\tName = {sensor_names[input_channels[1]]}\n"
+                            f"\tUnits = {sensor_units[input_channels[1]]}"
+                        )
+                print("output accel channels:")
                 for ch in output_channels_accel:
                     print(ch, sensor_names[ch], sensor_units[ch])
-
-                print("displ channels:")
+                print("output displ channels:")
                 for ch in output_channels_displ:
                     print(ch, sensor_names[ch], sensor_units[ch])
                 
@@ -196,9 +202,8 @@ if __name__ == "__main__":
 
         # Finite element model
         if MODEL == 'frame':
-            output_nodes = [5, 5, 10, 10, 15, 15] # TODO CC: check node order 
-            output_dofs = [1, 2, 1, 2, 1, 2] # TODO CC: check dof order 
-            output_elements = [1,5,9]
+            output_nodes = [5, 5, 10, 10, 15, 15]
+            output_elements = [1, 5, 9]
             yFiber = 7.5
             zFiber = 0.0
 

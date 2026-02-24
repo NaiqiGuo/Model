@@ -49,14 +49,13 @@ def scale_249_units(units: str, standard='iks')->float:
         raise NotImplementedError(f"Unhandled unit: {units}")
     
 
-def get_249_data(path):
+def get_249_data(path, baseline_correct=True):
     with open(path) as f:
         lines = f.readlines()
     header_idx = next(i for i,l in enumerate(lines) if l.startswith("Time\t"))
     units_idx = header_idx + 1
     data_start = units_idx + 2
 
-    # TODO CC check: Use rstrip(), not strip() to keep names, units, and data aligned
     headers = lines[header_idx].rstrip().split("\t")
     units = lines[units_idx].rstrip().split("\t")
 
@@ -79,10 +78,11 @@ def get_249_data(path):
 
     time = np.array(time)            # (nt,)
     dt = float(np.median(np.diff(time))) if time.size >= 2 else None
-    # TODO Check CC: baseline correct by subtracting average of first five seconds, for all channels
-    mask_5s = (time - time[0]) <= 5.0
-    baseline = array[:, mask_5s].mean(axis=1, keepdims=True)  # (n_channels, 1)
-    array = array - baseline
+    if baseline_correct:
+        # Baseline correct by subtracting average of first five seconds, for all channels
+        mask_5s = (time - time[0]) <= 5.0
+        baseline = array[:, mask_5s].mean(axis=1, keepdims=True)  # (n_channels, 1)
+        array = array - baseline
 
     return array, sensor_names, sensor_units, time, dt
 
