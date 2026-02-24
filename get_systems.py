@@ -28,7 +28,7 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
@@ -167,25 +167,30 @@ if __name__ == "__main__":
                     print(ch, sensor_names[ch], sensor_units[ch])
                 
         elif MODEL == "bridge":
-            input_units = units.cmps2
+            measurement_units_accel = units.cmps2
+            measurement_units_displ = units.cm
 
             try:
                 # Read in-field measurements. Scale by units and flip sign where needed.
-                inputs_accel, dt = get_measurements(
-                    i, events=events, channels=input_channels, scale=input_units)
-                # CHECK NG: This is I where incorporated the logic for flipping the sign of the sensors
-                inputs = np.vstack([np.sign(dof)*inputs_accel[ch]
-                                    for ch,dof in zip(input_channels,input_dofs)])
 
-                outputs_accel_field, _ = get_measurements(
-                    i, events=events, channels=output_channels, scale=input_units, response="accel")
-                outputs_accel_field = np.vstack([np.sign(dof)*outputs_accel_field[ch]
-                                                 for ch,dof in zip(output_channels,output_dofs)])
+                # CHECK NG: limit calls to get_measurements,
+                # because the parsing done inside it in extract_channels is slow.
+                measurements_accel, dt = get_measurements(
+                    i, events=events, channels=[*input_channels, *output_channels],
+                    scale=measurement_units_accel, response="accel")
+                measurements_displ, dt = get_measurements(
+                    i, events=events, channels=[*input_channels, *output_channels],
+                    scale=measurement_units_displ, response="displ")
+
+                # CHECK NG: This is I where incorporated the logic for flipping the sign of the sensors
+                inputs =                np.vstack([np.sign(dof)*measurements_accel[ch]
+                                                   for ch,dof in zip(input_channels,input_dofs)])
+
+                outputs_accel_field =   np.vstack([np.sign(dof)*measurements_accel[ch]
+                                                   for ch,dof in zip(output_channels,output_dofs)])
                 
-                outputs_displ_field, _ = get_measurements(
-                    i, events=events, channels=output_channels, scale=input_units, response="displ")
-                outputs_displ_field = np.vstack([np.sign(dof)*outputs_displ_field[ch] 
-                                                 for ch,dof in zip(output_channels,output_dofs)])
+                outputs_displ_field =   np.vstack([np.sign(dof)*measurements_displ[ch] 
+                                                   for ch,dof in zip(output_channels,output_dofs)])
 
             except:
                 print(f"Error getting measurements for event {event_id}. Skipping event.")
