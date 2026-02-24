@@ -185,7 +185,7 @@ if __name__ == "__main__":
                 print(f"Error getting measurements for event {event_id}. Skipping event.")
                 continue
         
-        # Check inputs; shape should be (len(input_channels), nt)
+        # Verify inputs; shape should be (len(input_channels), nt)
         nin,nt = inputs.shape
         assert nin==len(input_channels)
         if VERBOSE >= 2:
@@ -294,11 +294,9 @@ if __name__ == "__main__":
         np.savetxt(event_dir/"inputs.csv", inputs)
         np.savetxt(event_dir/"outputs_displ.csv", outputs_displ)
         np.savetxt(event_dir/"outputs_accel.csv", outputs_accel)
-        np.savetxt(field_event_dir / "outputs_displ_field.csv", outputs_displ_field)
-        np.savetxt(field_event_dir / "outputs_accel_field.csv", outputs_accel_field)
-        
-        with open(field_event_dir / "dt.txt", "w") as f:
-            f.write(str(dt))
+        np.savetxt(field_event_dir/"outputs_displ.csv", outputs_displ_field)
+        np.savetxt(field_event_dir/"outputs_accel.csv", outputs_accel_field)
+
 
         if False: # TODO CC: Debug
             # Perform system identification and save systems
