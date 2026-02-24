@@ -16,7 +16,7 @@ from mdof.utilities.config import extract_channels
 # False means print nothing;
 # True or 1 means print progress messages only;
 # 2 means print progress and validation messages
-VERBOSE = 2
+VERBOSE = 1
 
 
 
@@ -461,7 +461,7 @@ if __name__ == "__main__":
 
     painter = Painter(units)
 
-    model = painter.create_model(elastic=True, separate_deck_ends=True, verbose=True)
+    model = painter.create_model(elastic=True, separate_deck_ends=True, verbose=VERBOSE)
 
     artist = veux.create_artist(model, vertical=3)
     artist.draw_axes(extrude=True)
