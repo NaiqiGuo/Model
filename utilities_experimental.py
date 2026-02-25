@@ -1454,7 +1454,6 @@ def triangulate_wirepot(
         dumx0, dumy0 = getTriXY(a0, b0, cf[floor])
         x_init = -dumx0
         y_init = dumy0
-
         for k in range(nt):
             a = float(wp[i1, k] + af[floor])
             b = float(wp[i2, k] + bf[floor])

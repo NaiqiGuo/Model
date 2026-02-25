@@ -85,6 +85,13 @@ if __name__ == "__main__":
         output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
         output_channels_displ = [21, 22, 23, 24, 25, 26] # WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
         output_dofs = [1, 2, 1, 2, 1, 2]
+
+        wirepot_ref_226 = None
+        ref_event = "uploads/CE249_2024_Lab4data/ce249Run226.txt"
+        array_ref, sensor_names_ref, sensor_units_ref, time_raw_ref, dt_ref = get_249_data(ref_event)
+        wirepot_ref_226 = np.vstack([array_ref[ch] * scale_249_units(units=sensor_units_ref[ch])
+            for ch in output_channels_displ])
+        
     elif MODEL == "bridge":
             # `input_channels` are labeled channel numbers from quakeio
             # object, parsed from CESMD.
@@ -130,7 +137,7 @@ if __name__ == "__main__":
         # Input acceleration (in/s²) is used as model and system identification input 
         # Output displacement (in) and acceleration (in/s²) are used to compare
         # with FE model outputs and system identification outputs. 
-        if MODEL == "frame":
+        if MODEL == "frame":     
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
             # Check NG: I added in the logic for flipping the sign of the sensor time series
@@ -145,7 +152,7 @@ if __name__ == "__main__":
             # Created a function, triangulate_wirepot that computes 2D triangulation 
             # to obtain X & Y displacements.
             # Note that in Lab 4 you were given ReadDAQ_2Dtriangulation.m and getTriXY.m
-            outputs_displ_field = triangulate_wirepot(outputs_displ_field)
+            outputs_displ_field = triangulate_wirepot(outputs_displ_field, wirepot_ref=wirepot_ref_226)
 
             outputs_accel_field = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch,dof in zip(output_channels_accel,output_dofs)])
