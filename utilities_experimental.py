@@ -1420,3 +1420,48 @@ def apply_load_bridge_multi_support(
         model.imposedMotion(node, 2, gm_y)
     return model
 
+
+# TODO CC check: same as matlab code
+def getTriXY(a, b, c):
+    x = (a * a + c * c - b * b) / (2.0 * c)
+    y2 = a * a - x * x
+    if y2 < 0.0:
+        y2 = 0.0
+    y = math.sqrt(y2)
+    return x, y
+
+
+def triangulate_wirepot(
+    wirepot_elong,
+    wirepot_ref=None,
+):
+    af = np.array([212.0, 212.0, 228.0], dtype=float)
+    bf = np.array([197.0, 197.0, 218.0], dtype=float)
+    cf = np.array([238.0, 238.0, 238.0], dtype=float)
+
+    wp = np.asarray(wirepot_elong, dtype=float)  # rows: [WP11,WP12,WP21,WP22,WP31,WP32]
+    ref = wp if wirepot_ref is None else np.asarray(wirepot_ref, dtype=float)
+    nt = wp.shape[1]
+    out = np.zeros((6, nt), dtype=float)         # rows: [x1,y1,x2,y2,x3,y3]
+
+    for floor in range(3):
+        i1 = 2 * floor
+        i2 = i1 + 1
+
+        # Initial offset from first 10 samples of reference event
+        a0 = float(np.mean(ref[i1, :10]) + af[floor])
+        b0 = float(np.mean(ref[i2, :10]) + bf[floor])
+        dumx0, dumy0 = getTriXY(a0, b0, cf[floor])
+        x_init = -dumx0
+        y_init = dumy0
+
+        for k in range(nt):
+            a = float(wp[i1, k] + af[floor])
+            b = float(wp[i2, k] + bf[floor])
+            dumx, dumy = getTriXY(a, b, cf[floor])
+            out[i1, k] = -dumx - x_init
+            out[i2, k] = dumy - y_init
+
+    return out
+
+    

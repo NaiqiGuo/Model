@@ -24,6 +24,7 @@ from utilities_experimental import(
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
+    triangulate_wirepot
 )
 
 # Analysis configuration
@@ -140,11 +141,11 @@ if __name__ == "__main__":
             
             outputs_displ_field = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch in output_channels_displ])
-            # TODO NG: The measurements from the wirepots are not X & Y displacements.
-            # Create a function, triangulate_wirepot that computes 2D triangulation 
+            # TODO CC check: 
+            # Created a function, triangulate_wirepot that computes 2D triangulation 
             # to obtain X & Y displacements.
             # Note that in Lab 4 you were given ReadDAQ_2Dtriangulation.m and getTriXY.m
-            # outputs_displ_field = triangulate_wirepot(outputs_displ_field)
+            outputs_displ_field = triangulate_wirepot(outputs_displ_field)
 
             outputs_accel_field = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch,dof in zip(output_channels_accel,output_dofs)])
