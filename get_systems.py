@@ -41,12 +41,7 @@ LOAD_EVENTS = False
 VERBOSE = 1
 
 # Main output directory
-OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
-os.makedirs(OUT_DIR, exist_ok=True)
-
-# TODO CC: check
-FIELD_OUT_DIR = Path(MODEL) / "field"
-os.makedirs(FIELD_OUT_DIR, exist_ok=True)
+BASE_DIR = Path("Modeling")
 
 if __name__ == "__main__":
     # Print analysis configuration
@@ -126,12 +121,10 @@ if __name__ == "__main__":
             print(f"\nEvent: {event}; Event ID: {event_id}")
 
         # Result output directory
-        event_dir = OUT_DIR/event_id
-        os.makedirs(event_dir, exist_ok=True)
-
-        # TODO CC: check
-        field_event_dir = FIELD_OUT_DIR / event_id
-        os.makedirs(field_event_dir, exist_ok=True)
+        field_root = BASE_DIR / MODEL / "field"
+        model_root = BASE_DIR / MODEL / ("elastic" if ELASTIC else "inelastic")
+        field_root.mkdir(parents=True, exist_ok=True)
+        model_root.mkdir(parents=True, exist_ok=True)
 
         # Measurements from the field.
         # Input acceleration (in/s²) is used as model and system identification input 
@@ -288,10 +281,29 @@ if __name__ == "__main__":
 
 
         # Save frequencies, displacements, strains, and stresses
-        np.savetxt(event_dir/"pre_eq_natural_frequencies.csv", freqs_before)
-        np.savetxt(event_dir/"post_eq_natural_frequencies.csv", freqs_after)
-        save_displacements(displ, dt, filename=event_dir/"displacements.csv") # TODO CC: Check if we use this file anywhere
-        save_strain_stress(stresses, strains, dt, filename=event_dir/"strain_stress.csv")
+        def _mkdir(path: Path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        time = np.arange(nt) * dt
+
+        structure = MODEL  # "frame" or "bridge"
+        source = "elastic" if ELASTIC else "inelastic"  # field/elastic/inelastic
+
+        pre_path  = BASE_DIR / structure / source / "frequency_pre_eq"  / "structure" / f"{event_id}.csv"
+        post_path = BASE_DIR / structure / source / "frequency_post_eq" / "structure" / f"{event_id}.csv"
+
+        pre_path.parent.mkdir(parents=True, exist_ok=True)
+        post_path.parent.mkdir(parents=True, exist_ok=True)
+
+        np.savetxt(pre_path,  freqs_before, delimiter=",")
+        np.savetxt(post_path, freqs_after,  delimiter=",")
+        
+        disp_path = BASE_DIR / MODEL / source / "displacement_raw" / "structure" / f"{event_id}.csv"
+        disp_path.parent.mkdir(parents=True, exist_ok=True)
+        save_displacements(displ, dt, filename=disp_path) # TODO CC: Check if we use this file anywhere
+
+        ss_path = BASE_DIR / MODEL / source / "strain_stress" / "structure" / f"{event_id}.csv"
+        ss_path.parent.mkdir(parents=True, exist_ok=True)
+        save_strain_stress(stresses, strains, dt, filename=ss_path)
 
         # FE model outputs, used as true outputs in system identification 
         # Displacement outputs (inches)
@@ -306,14 +318,41 @@ if __name__ == "__main__":
         time = np.arange(nt) * dt
 
         # Save dt, time, FE model inputs and outputs, and in-field inputs and outputs
-        with open(event_dir/"dt.txt", "w") as f:
-            f.write(str(dt))
-        np.savetxt(event_dir/"time.csv", time)
-        np.savetxt(event_dir/"inputs.csv", inputs)
-        np.savetxt(event_dir/"outputs_displ.csv", outputs_displ)
-        np.savetxt(event_dir/"outputs_accel.csv", outputs_accel)
-        np.savetxt(field_event_dir/"outputs_displ.csv", outputs_displ_field)
-        np.savetxt(field_event_dir/"outputs_accel.csv", outputs_accel_field)
+        field_root = BASE_DIR / structure / "field"
+        model_root = BASE_DIR / structure / source
+        def _mkdir(p: Path):
+            p.parent.mkdir(parents=True, exist_ok=True)
+
+        p = field_root / "dt" / "ground" / f"{event_id}.txt"
+        _mkdir(p); open(p, "w").write(str(dt))
+
+        p = field_root / "time" / "ground" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, time, delimiter=",")
+
+        p = field_root / "dt" / "structure" / f"{event_id}.txt"
+        _mkdir(p); open(p, "w").write(str(dt))
+
+        p = field_root / "time" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, time, delimiter=",")
+
+        # inputs: ground acceleration (system ID input)
+        p = field_root / "acceleration" / "ground" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, inputs, delimiter=",")
+
+        # outputs: structure displacement/acceleration (system ID outputs)
+        p = model_root / "displacement" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_displ, delimiter=",")
+
+        p = model_root / "acceleration" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_accel, delimiter=",")
+
+        # field outputs: structure displacement/acceleration
+        p = field_root / "displacement" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_displ_field, delimiter=",")
+
+        p = field_root / "acceleration" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_accel_field, delimiter=",")
+
 
 
         if False: # TODO CC: Debug
