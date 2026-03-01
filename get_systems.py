@@ -29,9 +29,9 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Verbosity
