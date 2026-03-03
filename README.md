@@ -38,46 +38,149 @@ A suite of structures, their vibration responses to strong ground motion events,
 
 ```
 .
-└── Modeling/
+├── Modeling/
+│   ├── frame/
+│   │   ├── field/
+│   │   │   ├── time/
+│   │   │   │   ├── ground/
+│   │   │   │   │   ├── 226.csv
+│   │   │   │   │   ├── 227.csv
+│   │   │   │   │   └── ...
+│   │   │   │   └── structure/
+│   │   │   │       ├── 226.csv
+│   │   │   │       └── ...
+│   │   │   ├── dt/
+│   │   │   │   ├── ground/
+│   │   │   │   │   ├── 226.txt
+│   │   │   │   │   └── ...
+│   │   │   │   └── ...
+│   │   │   └── ...
+│   │   ├── elastic/
+│   │   │   ├── displacement/
+│   │   │   │   └── structure/
+│   │   │   │       ├── 226.csv
+│   │   │   │       └── ...
+│   │   │   └── ...
+│   │   └── inelastic/
+│   │       └── ...
+│   └── bridge/
+│       ├── field/
+│       │   ├── time/
+│       │   │   ├── ground/
+│       │   │   │   ├── 226.csv
+│       │   │   │   └── ...
+│       │   │   └── ...
+│       │   └── ...
+│       ├── elastic/
+│       │   ├── displacement/
+│       │   │   └── structure/
+│       │   │       ├── 226.csv
+│       │   │       └── ...
+│       │   └── ...
+│       └── ...
+└── System ID/
     ├── frame/
     │   ├── field/
-    │   │   ├── time/
-    │   │   │   ├── ground/
-    │   │   │   │   ├── 226.csv
-    │   │   │   │   ├── 227.csv
-    │   │   │   │   └── ...
-    │   │   │   └── structure/
-    │   │   │       ├── 226.csv
-    │   │   │       └── ...
-    │   │   ├── dt/
-    │   │   │   ├── ground/
-    │   │   │   │   ├── 226.txt
-    │   │   │   │   └── ...
-    │   │   │   └── ...
-    │   │   └── ...
-    │   ├── elastic/
     │   │   ├── displacement/
-    │   │   │   └── structure/
-    │   │   │       ├── 226.csv
+    │   │   │   ├── System ID Training Data/  
+    │   │   │   │   └── structure/
+    │   │   │   │       ├── 226.csv/
+    │   │   │   │       └── ...
+    │   │   │   └── System ID Results/
+    │   │   │       ├── system realization/
+    │   │   │       │   ├── 226.csv/
+    │   │   │       │   └── ...
     │   │   │       └── ...
-    │   │   └── ...
+    │   │   └── acceleration/
+    │   │       ├── System ID Training Data/  
+    │   │       │   ├── time/
+    │   │       │   │   └── 226.csv/
+    │   │       │   ├── dt/
+    │   │       │   │   └── 226.csv/
+    │   │       │   └── ...
+    │   │       └── System ID Results/
+    │   │           ├── system realization/
+    │   │           │   ├── 226.csv/
+    │   │           │   └── ...
+    │   │           └── ...
+    │   ├── elastic/
+    │   │   ├── field/
+    │   │   ├── displacement/
+    │   │   │   ├── System ID Training Data/  
+    │   │   │   │   └── structure/
+    │   │   │   │       ├── 226.csv/
+    │   │   │   │       └── ...
+    │   │   │   └── System ID Results/
+    │   │   │       ├── system realization/
+    │   │   │       │   ├── 226.csv/
+    │   │   │       │   └── ...
+    │   │   │       └── ...
+    │   │   └── acceleration/
+    │   │       ├── System ID Training Data/  
+    │   │       │   ├── time/
+    │   │       │   │   └── 226.csv/
+    │   │       │   ├── dt/
+    │   │       │   │   └── 226.csv/
+    │   │       │   └── ...
+    │   │       └── System ID Results/
+    │   │           ├── system realization/
+    │   │           │   ├── 226.csv/
+    │   │           │   └── ...
+    │   │           └── ...
     │   └── inelastic/
-    │       └── ...
+    │       ├── field/
+    │       ├── displacement/
+    │       │   ├── System ID Training Data/  
+    │       │   │   └── structure/
+    │       │   │       ├── 226.csv/
+    │       │   │       └── ...
+    │       │   └── System ID Results/
+    │       │       ├── system realization/
+    │       │       │   ├── 226.csv/
+    │       │       │   └── ...
+    │       │       └── ...
+    │       └── acceleration/
+    │           ├── System ID Training Data/  
+    │           │   └── ...
+    │           └── System ID Results/
+    │               └── ...
     └── bridge/
         ├── field/
-        │   ├── time/
-        │   │   ├── ground/
-        │   │   │   ├── 226.csv
-        │   │   │   └── ...
-        │   │   └── ...
-        │   └── ...
+        │   ├── displacement/
+        │   │   ├── System ID Training Data/  
+        │   │   │   └── structure/
+        │   │   │       ├── 226.csv/
+        │   │   │       └── ...
+        │   │   └── System ID Results/
+        │   │       ├── system realization/
+        │   │       │   ├── 226.csv/
+        │   │       │   └── ...
+        │   │       └── ...
+        │   └── acceleration/
+        │       ├── System ID Training Data/  
+        │       │   ├── time/
+        │       │   │   └── 226.csv/
+        │       │   ├── dt/
+        │       │   │   └── 226.csv/
+        │       │   └── ...
+        │       └── System ID Results/
+        │           ├── system realization/
+        │           │   ├── 226.csv/
+        │           │   └── ...
+        │           └── ...
         ├── elastic/
         │   ├── displacement/
-        │   │   └── structure/
-        │   │       ├── 226.csv
+        │   │   ├── System ID Training Data/  
+        │   │   │   └── structure/
+        │   │   │       └── ...
+        │   │   └── System ID Results/
+        │   │       ├── system realization/
+        │   │       │   └── ...
         │   │       └── ...
-        │   └── ...
-        └── ...
+        │   └── acceleration/
+        │       └── ...
+        └── inelastic/
+            └── ...
 ```
 
 ## Modeling Directory Structure
@@ -103,7 +206,7 @@ inelastic  | displacement, acceleration, stress, strain, frequency pre-eq, frequ
 Needed for system ID
 1. true input (truncated and aligned)
 2. true output displacement (truncated and aligned)
-3. true output acceleration (truncated and aligned)
+3. true  aoutputcceleration (truncated and aligned)
 4. time array (truncated and aligned)
 
 Results of system ID
@@ -124,6 +227,13 @@ Level | Name      | Quantities
 4a     | System ID Training Data | time, dt, ground (true input), structure (true output), structure (predicted output)
 4b     | System ID Results  | system realization, frequency ID, mode shapes, heatmap, prediction, prediction error
 5     | Event     | 1, 2, 3, ... or 226, 227, 228, ... etc.
+
+See below for list of System ID Training Data in each Quantities' subdirectory.
+
+Quantities      | System ID Training Data 
+----------------|-------------------------------------------------------------------------------------
+displacement    | structure (true output), structure (predicted output) 
+acceleration    | time, dt, ground (true input), structure (true output), structure (predicted output) 
 
 ## Environment
 
