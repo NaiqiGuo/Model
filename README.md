@@ -206,7 +206,7 @@ inelastic  | displacement, acceleration, stress, strain, frequency pre-eq, frequ
 Needed for system ID
 1. true input (truncated and aligned)
 2. true output displacement (truncated and aligned)
-3. true  aoutputcceleration (truncated and aligned)
+3. true output acceleration (truncated and aligned)
 4. time array (truncated and aligned)
 
 Results of system ID
@@ -224,8 +224,8 @@ Level | Name      | Quantities
 1     | Structure | frame, bridge
 2     | Source    | field, elastic, inelastic
 3     | Quantity  | displacement, acceleration
-4a     | System ID Training Data | time, dt, ground (true input), structure (true output), structure (predicted output)
-4b     | System ID Results  | system realization, frequency ID, mode shapes, heatmap, prediction, prediction error
+4a    | System ID Training Data | time, dt, ground (true input), structure (true output), structure (predicted output)
+4b    | System ID Results  | system realization, frequency ID, mode shapes, heatmap, prediction, prediction error
 5     | Event     | 1, 2, 3, ... or 226, 227, 228, ... etc.
 
 See below for list of System ID Training Data in each Quantities' subdirectory.
