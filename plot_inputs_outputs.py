@@ -1,9 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
-import os
 from pathlib import Path
-import glob
 import plotly.graph_objects as go
 import utilities_visualization
 
@@ -15,13 +13,14 @@ MULTISUPPORT = False
 VERBOSE = 1
 
 # Main output directory
-OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
-#TODO CC: check 
-FIELD_OUT_DIR = Path(MODEL) / "field"
+BASE_DIR = Path("Modeling")
+SOURCE = "elastic" if ELASTIC else "inelastic"
+MODEL_OUT_DIR = BASE_DIR / MODEL / SOURCE
+FIELD_OUT_DIR = BASE_DIR / MODEL / "field"
 
 Q_MAP = {
-    'accel': {'name': "Acceleration", 'units': "in/s²"},
-    'displ': {'name': "Displacement", 'units': "in"}
+    "acceleration": {"name": "Acceleration", "units": "in/s²"},
+    "displacement": {"name": "Displacement", "units": "in"},
         }
 
 if __name__ == "__main__":
@@ -41,41 +40,60 @@ if __name__ == "__main__":
     dof_map = {1: "X", 2: "Y", 3: "Z", 4: "RX", 5: "RY", 6: "RZ"}
     output_labels = [f"Node{n}{dof_map[d]}" for n,d in zip(output_nodes,output_dofs)]
 
-    outputs = {'model': {}, 'field': {}}
-    quantities = ['displ', 'accel']
+    outputs = {"model": {}, "field": {}}
+    quantities = ["displacement", "acceleration"]
 
-    event_files = glob.glob(str(OUT_DIR/"[0-9]*"))
-    event_ids = [Path(event).stem.replace("ce249Run", "") for event in event_files]
+    # Event ids are file names from saved field ground acceleration.
+    event_files = sorted((FIELD_OUT_DIR / "acceleration" / "ground").glob("*.csv"))
+    event_ids = [event.stem for event in event_files]
     for event_id in event_ids:
         print(f"Plotting Event {event_id}")
-        event_dir = OUT_DIR/str(event_id)
-        #TODO CC: check 
-        field_event_dir = FIELD_OUT_DIR / str(event_id)
-        source_dirs = {'model': event_dir, 'field': field_event_dir}
 
         try:
-            inputs = np.loadtxt(event_dir/"inputs.csv")
-            for source,source_dir in source_dirs.items():
+            inputs = np.loadtxt(
+                FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.csv",
+                delimiter=","
+            )
+            if inputs.ndim == 1:
+                inputs = inputs[np.newaxis, :]
+
+            outputs["model"]["displacement"] = np.loadtxt(
+                MODEL_OUT_DIR / "displacement" / "structure" / f"{event_id}.csv",
+                delimiter=","
+            )
+            outputs["model"]["acceleration"] = np.loadtxt(
+                MODEL_OUT_DIR / "acceleration" / "structure" / f"{event_id}.csv",
+                delimiter=","
+            )
+            outputs["field"]["displacement"] = np.loadtxt(
+                FIELD_OUT_DIR / "displacement" / "structure" / f"{event_id}.csv",
+                delimiter=","
+            )
+            outputs["field"]["acceleration"] = np.loadtxt(
+                FIELD_OUT_DIR / "acceleration" / "structure" / f"{event_id}.csv",
+                delimiter=","
+            )
+            for source in outputs:
                 for q in quantities:
-                    outputs[source][q] = np.loadtxt(source_dir/f"outputs_{q}.csv")
+                    if outputs[source][q].ndim == 1:
+                        outputs[source][q] = outputs[source][q][np.newaxis, :]
 
         except FileNotFoundError:
             if VERBOSE:
                 print(f"No data for event {event_id}; skipping")
             continue
 
-        with open(event_dir/"dt.txt", "r") as f:
+        with open(FIELD_OUT_DIR / "dt" / "ground" / f"{event_id}.txt", "r") as f:
             dt = float(f.read())
-        nt = inputs.shape[1]
 
         t_in = np.arange(inputs.shape[1]) * dt
-        t_out = np.arange(outputs['model']['displ'].shape[1]) * dt
+        t_out = np.arange(outputs["model"]["displacement"].shape[1]) * dt
 
         if WINDOWED_PLOT:
-            bounds = intensity_bounds(outputs['model']['displ'][0], lb=0.001, ub=0.999)
+            bounds = intensity_bounds(outputs["model"]["displacement"][0], lb=0.001, ub=0.999)
             inputs = truncate_by_bounds(inputs, bounds)
             t_in = t_in[bounds[0]:bounds[1]]
-            for source in source_dirs.keys():
+            for source in outputs.keys():
                 for q in quantities:
                     outputs[source][q] = truncate_by_bounds(outputs[source][q], bounds)
             t_out = t_out[bounds[0]:bounds[1]]
@@ -90,7 +108,7 @@ if __name__ == "__main__":
         plt.ylabel("Input Acceleration (in/s²)")
         plt.legend(loc='lower right')
         plt.tight_layout()
-        plt.savefig(event_dir/"inputs.png", dpi=350)
+        plt.savefig(FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.png", dpi=350)
         plt.close()
 
         fig = go.Figure()
@@ -100,10 +118,14 @@ if __name__ == "__main__":
                           xaxis_title="Time (s)",
                           yaxis_title="Input Acceleration (in/s²)",
                           width=800,height=300)
-        fig.write_html(event_dir/"inputs.html", include_plotlyjs="cdn")
+        fig.write_html(
+            FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.html",
+            include_plotlyjs="cdn"
+        )
 
         # --------- output ---------
-        for source,source_dir in source_dirs.items():
+        source_dirs = {"model": MODEL_OUT_DIR, "field": FIELD_OUT_DIR}
+        for source, source_dir in source_dirs.items():
             for q in quantities:
                 plt.figure(figsize=(8,4))
                 for ch in range(outputs[source][q].shape[0]):
@@ -113,7 +135,7 @@ if __name__ == "__main__":
                 plt.ylabel(f"Output {Q_MAP[q]['name']} ({Q_MAP[q]['units']})")
                 plt.legend(loc='lower right', ncol=len(output_nodes))
                 plt.tight_layout()
-                plt.savefig(source_dir/f"outputs_{q}.png", dpi=350)
+                plt.savefig(source_dir / q / "structure" / f"{event_id}.png", dpi=350)
                 plt.close()
 
                 fig = go.Figure()
@@ -123,5 +145,7 @@ if __name__ == "__main__":
                                 xaxis_title="Time (s)",
                                 yaxis_title=f"Output {Q_MAP[q]['name']} ({Q_MAP[q]['units']})",
                                 width=800,height=300)
-                fig.write_html(event_dir/f"outputs_{q}.html", include_plotlyjs="cdn")
-
+                fig.write_html(
+                    source_dir / q / "structure" / f"{event_id}.html",
+                    include_plotlyjs="cdn"
+                )

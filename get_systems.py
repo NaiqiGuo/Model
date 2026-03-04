@@ -24,13 +24,14 @@ from utilities_experimental import(
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
+    triangulate_wirepot
 )
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Verbosity
@@ -40,12 +41,7 @@ LOAD_EVENTS = False
 VERBOSE = 1
 
 # Main output directory
-OUT_DIR = Path(f"{MODEL}")/("elastic" if ELASTIC else "inelastic")
-os.makedirs(OUT_DIR, exist_ok=True)
-
-# TODO CC: check
-FIELD_OUT_DIR = Path(MODEL) / "field"
-os.makedirs(FIELD_OUT_DIR, exist_ok=True)
+BASE_DIR = Path("Modeling")
 
 if __name__ == "__main__":
     # Print analysis configuration
@@ -84,6 +80,13 @@ if __name__ == "__main__":
         output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
         output_channels_displ = [21, 22, 23, 24, 25, 26] # WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
         output_dofs = [1, 2, 1, 2, 1, 2]
+
+        wirepot_ref_226 = None
+        ref_event = "uploads/CE249_2024_Lab4data/ce249Run226.txt"
+        array_ref, sensor_names_ref, sensor_units_ref, time_raw_ref, dt_ref = get_249_data(ref_event)
+        wirepot_ref_226 = np.vstack([array_ref[ch] * scale_249_units(units=sensor_units_ref[ch])
+            for ch in output_channels_displ])
+        
     elif MODEL == "bridge":
             # `input_channels` are labeled channel numbers from quakeio
             # object, parsed from CESMD.
@@ -118,18 +121,16 @@ if __name__ == "__main__":
             print(f"\nEvent: {event}; Event ID: {event_id}")
 
         # Result output directory
-        event_dir = OUT_DIR/event_id
-        os.makedirs(event_dir, exist_ok=True)
-
-        # TODO CC: check
-        field_event_dir = FIELD_OUT_DIR / event_id
-        os.makedirs(field_event_dir, exist_ok=True)
+        field_root = BASE_DIR / MODEL / "field"
+        model_root = BASE_DIR / MODEL / ("elastic" if ELASTIC else "inelastic")
+        field_root.mkdir(parents=True, exist_ok=True)
+        model_root.mkdir(parents=True, exist_ok=True)
 
         # Measurements from the field.
         # Input acceleration (in/s²) is used as model and system identification input 
         # Output displacement (in) and acceleration (in/s²) are used to compare
         # with FE model outputs and system identification outputs. 
-        if MODEL == "frame":
+        if MODEL == "frame":     
             array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
 
             # Check NG: I added in the logic for flipping the sign of the sensor time series
@@ -140,11 +141,11 @@ if __name__ == "__main__":
             
             outputs_displ_field = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch in output_channels_displ])
-            # TODO NG: The measurements from the wirepots are not X & Y displacements.
-            # Create a function, triangulate_wirepot that computes 2D triangulation 
+            # TODO CC check: 
+            # Created a function, triangulate_wirepot that computes 2D triangulation 
             # to obtain X & Y displacements.
             # Note that in Lab 4 you were given ReadDAQ_2Dtriangulation.m and getTriXY.m
-            # outputs_displ_field = triangulate_wirepot(outputs_displ_field)
+            outputs_displ_field = triangulate_wirepot(outputs_displ_field, wirepot_ref=wirepot_ref_226)
 
             outputs_accel_field = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch,dof in zip(output_channels_accel,output_dofs)])
@@ -280,10 +281,29 @@ if __name__ == "__main__":
 
 
         # Save frequencies, displacements, strains, and stresses
-        np.savetxt(event_dir/"pre_eq_natural_frequencies.csv", freqs_before)
-        np.savetxt(event_dir/"post_eq_natural_frequencies.csv", freqs_after)
-        save_displacements(displ, dt, filename=event_dir/"displacements.csv") # TODO CC: Check if we use this file anywhere
-        save_strain_stress(stresses, strains, dt, filename=event_dir/"strain_stress.csv")
+        def _mkdir(path: Path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+        time = np.arange(nt) * dt
+
+        structure = MODEL  # "frame" or "bridge"
+        source = "elastic" if ELASTIC else "inelastic"  # field/elastic/inelastic
+
+        pre_path  = BASE_DIR / structure / source / "frequency_pre_eq"  / "structure" / f"{event_id}.csv"
+        post_path = BASE_DIR / structure / source / "frequency_post_eq" / "structure" / f"{event_id}.csv"
+
+        pre_path.parent.mkdir(parents=True, exist_ok=True)
+        post_path.parent.mkdir(parents=True, exist_ok=True)
+
+        np.savetxt(pre_path,  freqs_before, delimiter=",")
+        np.savetxt(post_path, freqs_after,  delimiter=",")
+        
+        disp_path = BASE_DIR / MODEL / source / "displacement_raw" / "structure" / f"{event_id}.csv"
+        disp_path.parent.mkdir(parents=True, exist_ok=True)
+        save_displacements(displ, dt, filename=disp_path) # TODO CC: Check if we use this file anywhere
+
+        ss_path = BASE_DIR / MODEL / source / "strain_stress" / "structure" / f"{event_id}.csv"
+        ss_path.parent.mkdir(parents=True, exist_ok=True)
+        save_strain_stress(stresses, strains, dt, filename=ss_path)
 
         # FE model outputs, used as true outputs in system identification 
         # Displacement outputs (inches)
@@ -298,14 +318,41 @@ if __name__ == "__main__":
         time = np.arange(nt) * dt
 
         # Save dt, time, FE model inputs and outputs, and in-field inputs and outputs
-        with open(event_dir/"dt.txt", "w") as f:
-            f.write(str(dt))
-        np.savetxt(event_dir/"time.csv", time)
-        np.savetxt(event_dir/"inputs.csv", inputs)
-        np.savetxt(event_dir/"outputs_displ.csv", outputs_displ)
-        np.savetxt(event_dir/"outputs_accel.csv", outputs_accel)
-        np.savetxt(field_event_dir/"outputs_displ.csv", outputs_displ_field)
-        np.savetxt(field_event_dir/"outputs_accel.csv", outputs_accel_field)
+        field_root = BASE_DIR / structure / "field"
+        model_root = BASE_DIR / structure / source
+        def _mkdir(p: Path):
+            p.parent.mkdir(parents=True, exist_ok=True)
+
+        p = field_root / "dt" / "ground" / f"{event_id}.txt"
+        _mkdir(p); open(p, "w").write(str(dt))
+
+        p = field_root / "time" / "ground" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, time, delimiter=",")
+
+        p = field_root / "dt" / "structure" / f"{event_id}.txt"
+        _mkdir(p); open(p, "w").write(str(dt))
+
+        p = field_root / "time" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, time, delimiter=",")
+
+        # inputs: ground acceleration (system ID input)
+        p = field_root / "acceleration" / "ground" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, inputs, delimiter=",")
+
+        # outputs: structure displacement/acceleration (system ID outputs)
+        p = model_root / "displacement" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_displ, delimiter=",")
+
+        p = model_root / "acceleration" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_accel, delimiter=",")
+
+        # field outputs: structure displacement/acceleration
+        p = field_root / "displacement" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_displ_field, delimiter=",")
+
+        p = field_root / "acceleration" / "structure" / f"{event_id}.csv"
+        _mkdir(p); np.savetxt(p, outputs_accel_field, delimiter=",")
+
 
 
         if False: # TODO CC: Debug
