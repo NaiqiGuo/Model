@@ -228,7 +228,7 @@ Level | Name      | Quantities
 4b    | System ID Results  | system realization, frequency ID, mode shapes, heatmap, prediction, prediction error
 5     | Event     | 1, 2, 3, ... or 226, 227, 228, ... etc.
 
-See below for list of System ID Training Data in each Quantities' subdirectory.
+See below for list of System ID Training Data in each Quantity's subdirectory.
 
 Quantities      | System ID Training Data 
 ----------------|-------------------------------------------------------------------------------------
