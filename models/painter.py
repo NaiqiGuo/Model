@@ -39,6 +39,7 @@ class Painter:
 
         self.fy = 60.0*units.ksi   # ksi
         self.Es = 30e3*units.ksi
+        self.Gs = self.Es / (2*(1+0.3))
 
         self.fc_unconf = 4.0*units.ksi   # unconfined concrete
         self.fc_conf   = 5.0*units.ksi  # confined concrete
@@ -47,6 +48,12 @@ class Painter:
 
         self.Ec = 57.0 * math.sqrt(self.fc_unconf/units.psi)*units.ksi
         self.Gc = self.Ec / (2*(1+self.poisson))
+
+        self.materials = {
+            "core":  xara.Material(E=self.Ec, G=self.Gc, fc=self.fc_conf, type="Concrete01", tag=1),
+            "cover": xara.Material(E=self.Ec, G=self.Gc, fc=self.fc_unconf, type="Concrete01", tag=2),
+            "steel": xara.Material(E=self.Es, G=self.Gs, Fy=self.fy, b=0.02, type="Steel01", tag=3)
+        }
 
         if VERBOSE >= 2:
             print(f"Ec: {self.Ec/units.ksi:.2f} ksi, Gc: {self.Gc/units.ksi:.2f} ksi")
@@ -61,34 +68,32 @@ class Painter:
         Ec = self.Ec
         Gc = self.Gc
 
-        if fiber or not elastic:
-            raise NotImplementedError("Fiber and nonlinear sections not implemented yet.")
-
-
         if not fiber: #elastic:
-            e = shape.elastic
-            model.section("Elastic", tag, E=Ec, A=e.A, Iy=e.Iy, Iz=e.Iz, G=Gc, J=e.J)
+            model.section("Elastic", tag, shape)
+            # e = shape.elastic
+            # model.section("Elastic", tag, E=Ec, A=e.A, Iy=e.Iy, Iz=e.Iz, G=Gc, J=e.J)
             return
 
-        core = 1 
+
+        core  = 1 
         cover = 2
         steel = 3
-
-        if not elastic:
+        if elastic:
+            model.uniaxialMaterial("Elastic", core,  Ec)
+            model.uniaxialMaterial("Elastic", cover, Ec)
+            model.uniaxialMaterial("Elastic", steel, Es)
+        else:
             # Nonlinear concrete (core and cover) using Concrete01
             #                                   tag  f'c       epsc0         f'cu   epscu
-            model.uniaxialMaterial("Concrete01", core, -fc_conf,   -2*fc_conf/Ec,  -3.5,  -0.02)
+            model.uniaxialMaterial("Concrete01", core,  -fc_conf,   -2*fc_conf/Ec,  -3.5,  -0.02)
             model.uniaxialMaterial("Concrete01", cover, -fc_unconf, -2*fc_unconf/Ec, 0.0,  -0.006)
 
             # Nonlinear reinforcing steel
             #                                tag fy  E0   b
             model.uniaxialMaterial("Steel01", steel, fy, Es, 0.02)
-        else:
-            # Elastic concrete for both core and cover
-            model.uniaxialMaterial("Elastic", core, Ec)
-            model.uniaxialMaterial("Elastic", cover, Ec)
-            # Elastic steel
-            model.uniaxialMaterial("Elastic", steel, Es)
+
+        model.section("AxialFiber", tag, shape)
+        return
         
         # mesh subdivisions for nonlinear fiber section
         numSubdivCirc = 32
@@ -132,7 +137,7 @@ class Painter:
     def create_column(self):
         units = self.units
         D_total = 5.0*units.ft  # total diameter in inches (5 ft)
-        return Circle(radius=D_total/2, mesh_scale=1/8, divisions=24)
+        # return Circle(radius=D_total/2, mesh_scale=1/8, divisions=24, material=self.materials["core"])
 
         d =  (11/8)*units.inch # diameter of longitudinal rebar
         ds = ( 4/8)*units.inch # diameter of the shear spiral
@@ -141,12 +146,19 @@ class Painter:
         nr = 36
 
         octagon  = Equigon(5.0*units.foot/2, z=0,
-                            name="cover", divisions=8, mesh_type="T3")
+                            material=self.materials["cover"],
+                            # name="cover", 
+                            divisions=8, mesh_type="T3")
 
         interior = Equigon(core_radius, z=1,
-                            name="core", divisions=nr, mesh_type="T3")
+                            material=self.materials["core"],
+                            # name="core", 
+                            divisions=nr, mesh_type="T3")
 
-        bar = Circle(d/2, z=2, mesh_scale=1/2, divisions=4, name="rebar", mesh_type="T3")
+        bar = Circle(d/2, z=2, mesh_scale=1/2, divisions=4, 
+                     material=self.materials["steel"],
+                    #  name="rebar", 
+                     mesh_type="T3")
 
         xr = ((5*units.foot/2) - cover - ds - d/2, 0)
 
@@ -170,8 +182,8 @@ class Painter:
             width_webs     = [12*u.inch]*7,
             web_spacing    = 7*u.ft + 9*u.inch,
             overhang       = 2*u.ft + 6*u.inch,
+            material=self.materials["core"],
             mesh_scale     = 1,
-            poisson=self.poisson,
         )
 
 
@@ -236,7 +248,7 @@ class Painter:
         girder = self.create_girder()
         # if verbose:
         #     print(girder.summary())
-        self.add_section(model, column_tag, column, elastic=elastic)
+        self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
 
@@ -249,7 +261,7 @@ class Painter:
 
 
         # columns as elasticBeamColumn with elastic section
-        col_type = "forceBeamColumn"
+        col_type = "ForceFrame" #"forceBeamColumn" # 
         column_element = {
             "section": column_tag,
             "transform": colTransf,
@@ -461,7 +473,7 @@ if __name__ == "__main__":
 
     painter = Painter(units)
 
-    model = painter.create_model(elastic=True, separate_deck_ends=True, verbose=VERBOSE)
+    model = painter.create_model(elastic=False, separate_deck_ends=True, verbose=VERBOSE)
 
     artist = veux.create_artist(model, vertical=3)
     artist.draw_axes(extrude=True)
