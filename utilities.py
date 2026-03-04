@@ -5,6 +5,7 @@ import math
 import tqdm
 import csv
 import os
+from pathlib import Path
 
 from mdof.utilities.config import extract_channels
 
@@ -476,3 +477,9 @@ def get_measurements(i, events, channels, scale=1, response="accel"):
     channel_data = scale * channel_data
     measurements = {ch: channel_data[idx] for idx, ch in enumerate(channels)}
     return measurements, dt
+
+def create_and_save_csv(path:Path, array, rewrite=False):
+    if not rewrite and path.exists():
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savetxt(path, np.atleast_1d(array))

@@ -7,16 +7,15 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-MODEL = "bridge" # "frame", "bridge"
+STRUCTURE = "bridge" # "frame", "bridge"
 ELASTIC = True
 MULTISUPPORT = False
 VERBOSE = 1
 
 # Main output directory
 BASE_DIR = Path("Modeling")
-SOURCE = "elastic" if ELASTIC else "inelastic"
-MODEL_OUT_DIR = BASE_DIR / MODEL / SOURCE
-FIELD_OUT_DIR = BASE_DIR / MODEL / "field"
+MODEL_OUT_DIR = BASE_DIR / STRUCTURE / ("elastic" if ELASTIC else "inelastic")
+FIELD_OUT_DIR = BASE_DIR / STRUCTURE / "field"
 
 Q_MAP = {
     "acceleration": {"name": "Acceleration", "units": "in/s²"},
@@ -25,13 +24,13 @@ Q_MAP = {
 
 if __name__ == "__main__":
 
-    if MODEL == "frame":
+    if STRUCTURE == "frame":
         if not MULTISUPPORT:
             input_labels = ['Channel 0 (X)', 'Channel 2 (Y)']
         output_nodes = [5, 5, 10, 10, 15, 15]
         output_dofs  = [1, 2, 1, 2, 1, 2]
 
-    elif MODEL == "bridge":
+    elif STRUCTURE == "bridge":
         if not MULTISUPPORT:
             input_labels = ['Channel 1 (-X)', 'Channel 3 (Y)']
         output_nodes = [9, 3, 10]
@@ -90,6 +89,7 @@ if __name__ == "__main__":
         t_out = np.arange(outputs["model"]["displacement"].shape[1]) * dt
 
         if WINDOWED_PLOT:
+            print(outputs["model"]["displacement"][0])
             bounds = intensity_bounds(outputs["model"]["displacement"][0], lb=0.001, ub=0.999)
             inputs = truncate_by_bounds(inputs, bounds)
             t_in = t_in[bounds[0]:bounds[1]]

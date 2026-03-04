@@ -15,6 +15,7 @@ from utilities import (
     create_frame,
     apply_load_frame,
     analyze,
+    create_and_save_csv, # CHECK NG: new function
 )
 
 from models.painter import create_bridge
@@ -22,17 +23,17 @@ from models.painter import create_bridge
 from utilities_experimental import(
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
-    save_displacements, # TODO CC: verify and move to utilities
     save_strain_stress, # TODO CC: verify and move to utilities
     triangulate_wirepot
 )
 
 # Analysis configuration
 SID_METHOD = 'srim'
-MODEL = "frame" # "frame", "bridge"
+STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True
 LOAD_EVENTS = False
+REWRITE = False # rewrite saved quantities # CHECK NG: Added this so that field quantities are only saved once
 
 # Verbosity
 # False means print nothing;
@@ -42,18 +43,23 @@ VERBOSE = 1
 
 # Main output directory
 BASE_DIR = Path("Modeling")
+MODEL_OUT_DIR = BASE_DIR / STRUCTURE / ("elastic" if ELASTIC else "inelastic")
+os.makedirs(MODEL_OUT_DIR, exist_ok=True)
+FIELD_OUT_DIR = BASE_DIR / STRUCTURE / "field"
+os.makedirs(FIELD_OUT_DIR, exist_ok=True)
+
 
 if __name__ == "__main__":
     # Print analysis configuration
     if VERBOSE:
-        print(f"{MODEL=}")
+        print(f"{STRUCTURE=}")
         print(f"{ELASTIC=}")
 
     # Load events
-    if MODEL == "frame":
+    if STRUCTURE == "frame":
         # events are a list of filepaths to txt
         events = sorted(glob.glob("uploads/CE249_2024_Lab4data/ce249Run*.txt"))
-    if MODEL == "bridge":
+    elif STRUCTURE == "bridge":
         # events are a list of quakeio objects
         if LOAD_EVENTS:
             events = sorted([
@@ -72,7 +78,7 @@ if __name__ == "__main__":
     # Perform model analysis and system identification and record responses
 
     # Set input channels, input dofs, output channels, and output dofs
-    if MODEL == "frame":
+    if STRUCTURE == "frame":
         if not MULTISUPPORT:
             # Rows in data array parsed from txt file
             input_channels = [0, 2] # x, y
@@ -87,7 +93,7 @@ if __name__ == "__main__":
         wirepot_ref_226 = np.vstack([array_ref[ch] * scale_249_units(units=sensor_units_ref[ch])
             for ch in output_channels_displ])
         
-    elif MODEL == "bridge":
+    elif STRUCTURE == "bridge":
             # `input_channels` are labeled channel numbers from quakeio
             # object, parsed from CESMD.
             # See https://www.strongmotioncenter.org/NCESMD/photos/CGS/lllayouts/ll89324.pdf
@@ -112,42 +118,39 @@ if __name__ == "__main__":
         output_dofs = [2, 2, 2]
 
     for i,event in enumerate(events):
-        if MODEL == "frame":
+        if STRUCTURE == "frame":
             # filepaths are like .../ce249Run244.txt
             event_id = Path(event).stem.replace("ce249Run", "")  # "244"
-        elif MODEL == "bridge":
+        elif STRUCTURE == "bridge":
             event_id = str(i+1)
         if VERBOSE:
             print(f"\nEvent: {event}; Event ID: {event_id}")
 
-        # Result output directory
-        field_root = BASE_DIR / MODEL / "field"
-        model_root = BASE_DIR / MODEL / ("elastic" if ELASTIC else "inelastic")
-        field_root.mkdir(parents=True, exist_ok=True)
-        model_root.mkdir(parents=True, exist_ok=True)
+        inputs = {"field": {}}
+        outputs = {"model": {}, "field": {}}
 
         # Measurements from the field.
         # Input acceleration (in/s²) is used as model and system identification input 
         # Output displacement (in) and acceleration (in/s²) are used to compare
         # with FE model outputs and system identification outputs. 
-        if MODEL == "frame":     
-            array, sensor_names, sensor_units, time_raw, dt = get_249_data(event)
+        if STRUCTURE == "frame":     
+            array, sensor_names, sensor_units, time_raw, inputs["field"]["dt"] = get_249_data(event)
 
             # Check NG: I added in the logic for flipping the sign of the sensor time series
             # here (not needed for the frame, but included for consistency).
             # Also, I consolidated the units into this computation.
-            inputs = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
-                                for ch,dof in zip(input_channels,input_dofs)])
+            inputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
+                                                         for ch,dof in zip(input_channels,input_dofs)])
             
-            outputs_displ_field = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
+            outputs["field"]["displacement"] = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch in output_channels_displ])
-            # TODO CC check: 
-            # Created a function, triangulate_wirepot that computes 2D triangulation 
-            # to obtain X & Y displacements.
-            # Note that in Lab 4 you were given ReadDAQ_2Dtriangulation.m and getTriXY.m
-            outputs_displ_field = triangulate_wirepot(outputs_displ_field, wirepot_ref=wirepot_ref_226)
+            # triangulate_wirepot computes 2D triangulation to obtain X & Y displacements.
+            # TODO NG: Verify whether the wirepot_ref makes a difference in displacement results.
+            # If not, remove the wirepot_ref from the triangulate_wirepot function
+            outputs["field"]["displacement"] = triangulate_wirepot(outputs["field"]["displacement"],
+                                                                   wirepot_ref=wirepot_ref_226)
 
-            outputs_accel_field = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
+            outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch,dof in zip(output_channels_accel,output_dofs)])
 
             if VERBOSE >= 2:
@@ -167,7 +170,7 @@ if __name__ == "__main__":
                 for ch in output_channels_displ:
                     print(ch, sensor_names[ch], sensor_units[ch])
                 
-        elif MODEL == "bridge":
+        elif STRUCTURE == "bridge":
             measurement_units_accel = units.cmps2
             measurement_units_displ = units.cm
 
@@ -176,21 +179,21 @@ if __name__ == "__main__":
 
                 # CHECK NG: limit calls to get_measurements,
                 # because the parsing done inside it in extract_channels is slow.
-                measurements_accel, dt = get_measurements(
+                measurements_accel, inputs["field"]["dt"] = get_measurements(
                     i, events=events, channels=[*input_channels, *output_channels],
                     scale=measurement_units_accel, response="accel")
-                measurements_displ, dt = get_measurements(
+                measurements_displ, _  = get_measurements(
                     i, events=events, channels=[*input_channels, *output_channels],
                     scale=measurement_units_displ, response="displ")
 
                 # CHECK NG: This is I where incorporated the logic for flipping the sign of the sensors
-                inputs =                np.vstack([np.sign(dof)*measurements_accel[ch]
+                inputs["field"]["acceleration"] =  np.vstack([np.sign(dof)*measurements_accel[ch]
                                                    for ch,dof in zip(input_channels,input_dofs)])
 
-                outputs_accel_field =   np.vstack([np.sign(dof)*measurements_accel[ch]
+                outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*measurements_accel[ch]
                                                    for ch,dof in zip(output_channels,output_dofs)])
                 
-                outputs_displ_field =   np.vstack([np.sign(dof)*measurements_displ[ch] 
+                outputs["field"]["displacement"] = np.vstack([np.sign(dof)*measurements_displ[ch] 
                                                    for ch,dof in zip(output_channels,output_dofs)])
 
             except:
@@ -198,16 +201,16 @@ if __name__ == "__main__":
                 continue
         
         # Verify inputs; shape should be (len(input_channels), nt)
-        nin,nt = inputs.shape
+        nin,nt = inputs["field"]["acceleration"].shape
         assert nin==len(input_channels)
         if VERBOSE >= 2:
             print("Requested input channels:", input_channels)
-            print(f"Event {event_id} time series length: {nt}, Time step dt = {dt}")
+            print(f"Event {event_id} time series length: {nt}, Time step dt = {inputs['field']['dt']}")
 
 
 
         # Finite element model
-        if MODEL == 'frame':
+        if STRUCTURE == 'frame':
             output_nodes = [5, 5, 10, 10, 15, 15]
             output_elements = [1, 5, 9]
             yFiber = 7.5
@@ -218,12 +221,12 @@ if __name__ == "__main__":
                                        verbose=VERBOSE)
 
             model = apply_load_frame(model,
-                                     inputx=inputs[0],
-                                     inputy=inputs[1],
-                                     dt=dt)
+                                     inputx=inputs["field"]["acceleration"][0],
+                                     inputy=inputs["field"]["acceleration"][1],
+                                     dt=inputs["field"]["dt"])
             
 
-        elif MODEL == 'bridge':
+        elif STRUCTURE == 'bridge':
             output_nodes = [9, 3, 10] # CHECK NG: We are only using Y direction, so no repeat
             output_elements = [3]
             yFiber = 22.5
@@ -237,9 +240,9 @@ if __name__ == "__main__":
             
             if not MULTISUPPORT:
                 model = apply_load_bridge(model,
-                                        inputx=inputs[0],
-                                        inputy=inputs[1],
-                                        dt=dt,
+                                        inputx=inputs["field"]["acceleration"][0],
+                                        inputy=inputs["field"]["acceleration"][1],
+                                        dt=inputs["field"]["dt"],
                                         # multisupport=MULTISUPPORT,
                                         # input_nodes=input_nodes,
                                         # input_channels=input_channels
@@ -257,8 +260,8 @@ if __name__ == "__main__":
                 }
                 model = apply_load_bridge_multi_support(
                     model,
-                    inputs=inputs,
-                    dt=dt,
+                    inputs=inputs["field"]["acceleration"],
+                    dt=inputs["field"]["dt"],
                     node_channel_map=node_channel_map,
                     input_channels=input_channels,
                 )
@@ -266,7 +269,7 @@ if __name__ == "__main__":
         try:
             displ, accel, stresses, strains, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
-                                                                    dt=dt,
+                                                                    dt=inputs["field"]["dt"],
                                                                     output_nodes=output_nodes,
                                                                     output_elements=output_elements,
                                                                     yFiber=yFiber,
@@ -281,77 +284,62 @@ if __name__ == "__main__":
 
 
         # Save frequencies, displacements, strains, and stresses
-        def _mkdir(path: Path):
-            path.parent.mkdir(parents=True, exist_ok=True)
-        time = np.arange(nt) * dt
-
-        structure = MODEL  # "frame" or "bridge"
         source = "elastic" if ELASTIC else "inelastic"  # field/elastic/inelastic
 
-        pre_path  = BASE_DIR / structure / source / "frequency_pre_eq"  / "structure" / f"{event_id}.csv"
-        post_path = BASE_DIR / structure / source / "frequency_post_eq" / "structure" / f"{event_id}.csv"
 
-        pre_path.parent.mkdir(parents=True, exist_ok=True)
-        post_path.parent.mkdir(parents=True, exist_ok=True)
+        for quantity,label in zip(
+                                [freqs_before,freqs_after],
+                                ["frequency_pre_eq","frequency_post_eq"]):
+            create_and_save_csv(
+                path=MODEL_OUT_DIR / label  / "structure" / f"{event_id}.csv",
+                array=quantity,
+                rewrite=REWRITE
+                )
 
-        np.savetxt(pre_path,  freqs_before, delimiter=",")
-        np.savetxt(post_path, freqs_after,  delimiter=",")
-        
-        disp_path = BASE_DIR / MODEL / source / "displacement_raw" / "structure" / f"{event_id}.csv"
-        disp_path.parent.mkdir(parents=True, exist_ok=True)
-        save_displacements(displ, dt, filename=disp_path) # TODO CC: Check if we use this file anywhere
-
-        ss_path = BASE_DIR / MODEL / source / "strain_stress" / "structure" / f"{event_id}.csv"
+        ss_path = MODEL_OUT_DIR / "strain_stress" / "structure" / f"{event_id}.csv"
         ss_path.parent.mkdir(parents=True, exist_ok=True)
-        save_strain_stress(stresses, strains, dt, filename=ss_path)
+        save_strain_stress(stresses, strains, inputs["field"]["dt"], filename=ss_path)
+
 
         # FE model outputs, used as true outputs in system identification 
         # Displacement outputs (inches)
         # Note, slice [1:] is because extra first timestep is recorded during analysis
-        outputs_displ = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:]
+        outputs["model"]["displacement"] = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:]
         # Acceleration outputs (inches/second/second)
-        outputs_accel = get_node_outputs(accel, nodes=output_nodes, dofs=output_dofs)[:, 1:]
+        outputs["model"]["acceleration"] = get_node_outputs(accel, nodes=output_nodes, dofs=output_dofs)[:, 1:]
 
-
-        assert inputs.shape[1] == outputs_displ.shape[1], (
+        assert inputs["field"]["acceleration"].shape[1] == outputs["model"]["displacement"].shape[1], (
             "system identification training inputs and outputs have different length of time samples.")
-        time = np.arange(nt) * dt
+        inputs["field"]["time"] = np.arange(nt) * inputs["field"]["dt"]
 
-        # Save dt, time, FE model inputs and outputs, and in-field inputs and outputs
-        field_root = BASE_DIR / structure / "field"
-        model_root = BASE_DIR / structure / source
-        def _mkdir(p: Path):
-            p.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save inputs (ground): dt, time, and field displ/accel
+        # inputs = {
+        #     "field": {"dt":dt, "time",time, "acceleration":accel}
+        #          }
 
-        p = field_root / "dt" / "ground" / f"{event_id}.txt"
-        _mkdir(p); open(p, "w").write(str(dt))
+        # Save outputs (structure): FE model displ/accel, field displ/accel
+        # outputs = {
+        #     "model": {"displacement":displ, "acceleration":accel},
+        #     "field": {"displacement":displ, "acceleration":accel}
+        #           }
 
-        p = field_root / "time" / "ground" / f"{event_id}.csv"
-        _mkdir(p); np.savetxt(p, time, delimiter=",")
+        if VERBOSE >= 2:
+            for qdict,qdict_name in zip([inputs,outputs],["inputs","outputs"]):
+                print(qdict_name, "saved:")
+                for source,quantities in qdict.items():
+                    print(source, list(quantities.keys()))
 
-        p = field_root / "dt" / "structure" / f"{event_id}.txt"
-        _mkdir(p); open(p, "w").write(str(dt))
-
-        p = field_root / "time" / "structure" / f"{event_id}.csv"
-        _mkdir(p); np.savetxt(p, time, delimiter=",")
-
-        # inputs: ground acceleration (system ID input)
-        p = field_root / "acceleration" / "ground" / f"{event_id}.csv"
-        _mkdir(p); np.savetxt(p, inputs, delimiter=",")
-
-        # outputs: structure displacement/acceleration (system ID outputs)
-        p = model_root / "displacement" / "structure" / f"{event_id}.csv"
-        _mkdir(p); np.savetxt(p, outputs_displ, delimiter=",")
-
-        p = model_root / "acceleration" / "structure" / f"{event_id}.csv"
-        _mkdir(p); np.savetxt(p, outputs_accel, delimiter=",")
-
-        # field outputs: structure displacement/acceleration
-        p = field_root / "displacement" / "structure" / f"{event_id}.csv"
-        _mkdir(p); np.savetxt(p, outputs_displ_field, delimiter=",")
-
-        p = field_root / "acceleration" / "structure" / f"{event_id}.csv"
-        _mkdir(p); np.savetxt(p, outputs_accel_field, delimiter=",")
+        # CHECK NG: use create_and_save_csv to save csvs, with argument rewrite=REWRITE
+        for location,location_dict in zip(["ground","structure"],[inputs,outputs]):
+            for source,quantities in location_dict.items():
+                SOURCE_DIR = FIELD_OUT_DIR if source=="field" else MODEL_OUT_DIR
+                for q_name,q in quantities.items():
+                    create_and_save_csv(
+                        path = SOURCE_DIR / q_name / location / f"{event_id}.csv",
+                        array = q,
+                        rewrite=REWRITE
+                    )
 
 
 
@@ -374,7 +362,7 @@ if __name__ == "__main__":
             )
 
 
-            system_full = sysid(inputs, outputs_displ, method=SID_METHOD, **options)
+            system_full = sysid(inputs["field"]["acceleration"], outputs["model"]["displacement"], method=SID_METHOD, **options)
             A,B,C,D, *rest = system_full
             system = (A,B,C,D)
             with open(event_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
