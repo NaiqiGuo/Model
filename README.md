@@ -34,7 +34,7 @@ A suite of structures, their vibration responses to strong ground motion events,
 
 
 ## Overall Directory Structure
-[tree.nathanfriend](https://tree.nathanfriend.com/?s=(%27options!(%27fancyC~fullPath!false~trailingSlashC~rootDotC)~G(%27G%27ModelingJ8AE227.E5B0dtHAtxt4*545KL30LinF59*bridg80*59KL30L599System%20IDJe%27)~version!%271%27)*%20%20-9**0AE5K3FdisplacementB4K*5...8e-fieldKtimeH9%5CnA4*226.B4structureC!trueEcsv4*FelasticKGsource!H4groundJ9*framK-*L5-%01LKJHGFECBA985430-*)
+[tree.nathanfriend][(https://tree.nathanfriend.com/?s=(%27options!(%27fancyC~fullPath!false~trailingSlashC~rootDotC)~G(%27G%27ModelingJ8AE227.E5B0dtHAtxt4*545KL30LinF59*bridg80*59KL30L599System%20IDJe%27)~version!%271%27)*%20%20-9**0AE5K3FdisplacementB4K*5...8e-fieldKtimeH9%5CnA4*226.B4structureC!trueEcsv4*FelasticKGsource!H4groundJ9*framK-*L5-%01LKJHGFECBA985430-*)](https://tree.nathanfriend.com/?s=(%27optjs!(%27fancyX~fullPath!false~trail_gSlashX~rootDotX)~k(%27k%27Model_g8framKC*227.csvFWBCwdtFgroundFYtxtFwwLOE9FBCwLO_E-L8bridgKCw5V-LOE9FBCwL85VVG8frame%2FOJ3BHW04A3QHLF04W5Oq-J3BHW04A3QHLF04W5OO_q-J3BHW04A3LFU58bridge%2FOJ3BHW04A3QHLF04W5Oq93BN*W0F*AN5OO_EN58%27)~versj!%271%27)*%20%20-O*0U*sZrealizatj%2F3NG%20Tra__g%20Data%2F*F*4F*YcsvN*5*L8V*9-displacementAWwacceleratjBstructureCFYcsvFEelasticF-*GSZIDH%2F4Jfield%2F9KeOfield-timeFgroundL...N%2FFO8*QtimeHdtUG%20ResultsNV%5CnW5FX!trueY*226.Zystem%20_injionksource!qE%2Fw5-%01wqkj_ZYXWVUQONLKJHGFECBA985430-*)
 
 ```
 .
