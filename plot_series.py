@@ -218,9 +218,9 @@ def load_series_array(path_used: Path):
     suffix = path_used.suffix.lower()
     if suffix == ".csv":
         try:
-            arr = np.loadtxt(path_used, delimiter=",")
+            arr = np.loadtxt(path_used)
         except ValueError:
-            arr = np.loadtxt(path_used, delimiter=",", skiprows=1)
+            arr = np.loadtxt(path_used, skiprows=1)
         return arr
     if suffix == ".txt":
         return np.loadtxt(path_used)
