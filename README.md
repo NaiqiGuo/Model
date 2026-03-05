@@ -104,7 +104,6 @@ A suite of structures, their vibration responses to strong ground motion events,
     │   │           │   └── ...
     │   │           └── ...
     │   ├── elastic/
-    │   │   ├── field/
     │   │   ├── displacement/
     │   │   │   ├── System ID Training Data/  
     │   │   │   │   └── structure/
@@ -128,7 +127,6 @@ A suite of structures, their vibration responses to strong ground motion events,
     │   │           │   └── ...
     │   │           └── ...
     │   └── inelastic/
-    │       ├── field/
     │       ├── displacement/
     │       │   ├── System ID Training Data/  
     │       │   │   └── structure/
