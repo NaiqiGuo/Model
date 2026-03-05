@@ -10,13 +10,6 @@ import plotly.graph_objects as go
 from pathlib import Path
 from mdof.utilities.config import extract_channels
 
-# Verbosity
-# False means print nothing;
-# True or 1 means print progress messages only;
-# 2 means print progress and validation messages
-VERBOSE = 2
-
-
 
 def create_bridge_model1111(elastic: bool = True, girder: str = "elasticBeamColumn"):
     
