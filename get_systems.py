@@ -343,7 +343,7 @@ if __name__ == "__main__":
 
 
 
-        if False: # TODO CC: Debug
+        if True: # TODO CC: Debug
             # Perform system identification and save systems
             n = 3
             options = Config(
@@ -361,9 +361,19 @@ if __name__ == "__main__":
                 j           = 4400
             )
 
+            systems = {}
+            for quantity in ["displacement", "acceleration"]:
+                systems[quantity] = sysid(inputs["field"]["acceleration"], outputs["model"][quantity], method=SID_METHOD, **options)
+                A,B,C,D, *rest = systems[quantity] 
+                systems[quantity]  = (A,B,C,D)
 
-            system_full = sysid(inputs["field"]["acceleration"], outputs["model"]["displacement"], method=SID_METHOD, **options)
-            A,B,C,D, *rest = system_full
-            system = (A,B,C,D)
-            with open(event_dir/f"system_{SID_METHOD}.pkl", "wb") as f:
-                pickle.dump(system, f)
+                system_path = (Path('System ID') /   
+                                STRUCTURE /
+                                ("elastic" if ELASTIC else "inelastic") / 
+                                quantity /
+                                'System ID Results' /
+                                'system realization' /
+                                f"{event_id}.pkl"
+                                )
+                with open(system_path, "wb") as f:
+                    pickle.dump(systems[quantity], f)
