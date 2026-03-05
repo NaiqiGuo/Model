@@ -375,5 +375,6 @@ if __name__ == "__main__":
                                 'system realization' /
                                 f"{event_id}.pkl"
                                 )
+                system_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(system_path, "wb") as f:
                     pickle.dump(systems[quantity], f)
