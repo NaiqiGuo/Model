@@ -75,10 +75,7 @@ if __name__ == "__main__":
 
             # Window signals
             if WINDOWED:
-                pre_sec = 5.0
-                n0 = int(pre_sec / dt)
                 sig = out_true[0].copy()
-                sig = sig - np.mean(sig[:n0])
                 bounds = intensity_bounds(sig, lb=0.01, ub=0.99)
                 inputs_trunc = truncate_by_bounds(inputs, bounds)
                 out_true_trunc = truncate_by_bounds(out_true, bounds)
