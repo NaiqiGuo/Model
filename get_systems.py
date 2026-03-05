@@ -310,8 +310,8 @@ if __name__ == "__main__":
 
 
         # FE model outputs, used as true outputs in system identification 
-        # Displacement outputs (inches)
         # Note, slice [1:] is because extra first timestep is recorded during analysis
+        # Displacement outputs (inches)
         outputs["model"]["displacement"] = get_node_outputs(displ, nodes=output_nodes, dofs=output_dofs)[:, 1:]
         # Acceleration outputs (inches/second/second)
         outputs["model"]["acceleration"] = get_node_outputs(accel, nodes=output_nodes, dofs=output_dofs)[:, 1:]

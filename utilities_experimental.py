@@ -8,7 +8,6 @@ import os
 import cvxpy as cp 
 import plotly.graph_objects as go
 from pathlib import Path
-from mdof.utilities.config import extract_channels
 
 
 def create_bridge_model1111(elastic: bool = True, girder: str = "elasticBeamColumn"):
