@@ -7,7 +7,7 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-STRUCTURE = "bridge" # "frame", "bridge"
+STRUCTURE = "frame" # "frame", "bridge"
 ELASTIC = True
 MULTISUPPORT = False
 VERBOSE = 1
@@ -51,26 +51,21 @@ if __name__ == "__main__":
         try:
             inputs = np.loadtxt(
                 FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.csv",
-                delimiter=","
             )
             if inputs.ndim == 1:
                 inputs = inputs[np.newaxis, :]
 
             outputs["model"]["displacement"] = np.loadtxt(
                 MODEL_OUT_DIR / "displacement" / "structure" / f"{event_id}.csv",
-                delimiter=","
             )
             outputs["model"]["acceleration"] = np.loadtxt(
                 MODEL_OUT_DIR / "acceleration" / "structure" / f"{event_id}.csv",
-                delimiter=","
             )
             outputs["field"]["displacement"] = np.loadtxt(
                 FIELD_OUT_DIR / "displacement" / "structure" / f"{event_id}.csv",
-                delimiter=","
             )
             outputs["field"]["acceleration"] = np.loadtxt(
                 FIELD_OUT_DIR / "acceleration" / "structure" / f"{event_id}.csv",
-                delimiter=","
             )
             for source in outputs:
                 for q in quantities:
@@ -82,7 +77,7 @@ if __name__ == "__main__":
                 print(f"No data for event {event_id}; skipping")
             continue
 
-        with open(FIELD_OUT_DIR / "dt" / "ground" / f"{event_id}.txt", "r") as f:
+        with open(FIELD_OUT_DIR / "dt" / "ground" / f"{event_id}.csv", "r") as f:
             dt = float(f.read())
 
         t_in = np.arange(inputs.shape[1]) * dt

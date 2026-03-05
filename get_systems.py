@@ -33,7 +33,7 @@ STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
-REWRITE = False # rewrite saved quantities # CHECK NG: Added this so that field quantities are only saved once
+REWRITE = True # rewrite saved quantities # CHECK NG: Added this so that field quantities are only saved once
 
 # Verbosity
 # False means print nothing;
@@ -62,10 +62,16 @@ if __name__ == "__main__":
     elif STRUCTURE == "bridge":
         # events are a list of quakeio objects
         if LOAD_EVENTS:
-            events = sorted([
-                print(file) or quakeio.read(file, exclusions=["*filter*"])
-                for file in list(Path(f"uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
-            ], key=lambda event: abs(event["peak_accel"]))
+            if VERBOSE:
+                events = sorted([
+                    print(file) or quakeio.read(file, exclusions=["*filter*"])
+                    for file in list(Path(f"uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+                ], key=lambda event: abs(event["peak_accel"]))
+            else:
+                events = sorted([
+                    quakeio.read(file, exclusions=["*filter*"])
+                    for file in list(Path(f"uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+                ], key=lambda event: abs(event["peak_accel"]))
             with open("events.pkl","wb") as f:
                 pickle.dump(events,f)
         else:
@@ -197,7 +203,8 @@ if __name__ == "__main__":
                                                    for ch,dof in zip(output_channels,output_dofs)])
 
             except:
-                print(f"Error getting measurements for event {event_id}. Skipping event.")
+                if VERBOSE:
+                    print(f"Error getting measurements for event {event_id}. Skipping event.")
                 continue
         
         # Verify inputs; shape should be (len(input_channels), nt)
@@ -278,8 +285,9 @@ if __name__ == "__main__":
                                                                 )
 
         except RuntimeError as e:
-            print(f"Error encountered when analyzing event {event_id}:")
-            print(e)
+            if VERBOSE:
+                print(f"Error encountered when analyzing event {event_id}:")
+                print(e)
             continue
 
 
@@ -363,18 +371,25 @@ if __name__ == "__main__":
 
             systems = {}
             for quantity in ["displacement", "acceleration"]:
-                systems[quantity] = sysid(inputs["field"]["acceleration"], outputs["model"][quantity], method=SID_METHOD, **options)
-                A,B,C,D, *rest = systems[quantity] 
-                systems[quantity]  = (A,B,C,D)
+                try:
+                    systems[quantity] = sysid(inputs["field"]["acceleration"], outputs["model"][quantity], method=SID_METHOD, **options)
+                    A,B,C,D, *rest = systems[quantity] 
+                    systems[quantity]  = (A,B,C,D)
 
-                system_path = (Path('System ID') /   
-                                STRUCTURE /
-                                ("elastic" if ELASTIC else "inelastic") / 
-                                quantity /
-                                'System ID Results' /
-                                'system realization' /
-                                f"{event_id}.pkl"
-                                )
-                system_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(system_path, "wb") as f:
-                    pickle.dump(systems[quantity], f)
+                    system_path = (Path('System ID') /   
+                                    STRUCTURE /
+                                    ("elastic" if ELASTIC else "inelastic") / 
+                                    quantity /
+                                    'System ID Results' /
+                                    'system realization' /
+                                    f"{event_id}.pkl"
+                                    )
+                    system_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(system_path, "wb") as f:
+                        pickle.dump(systems[quantity], f)
+                    if VERBOSE:
+                        print(f"\n>>>> System ID for event {event_id} SUCCEEDED for {quantity}\n")
+                except:
+                    if VERBOSE:
+                        print(f"\n>>>> System ID for event {event_id} FAILED for {quantity}\n")
+                    continue

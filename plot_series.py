@@ -56,7 +56,7 @@ def window_bounds(signal: np.ndarray, lb: float = 0.001, ub: float = 0.999):
 
 
 def parse_strain_stress(csv_path: Path, element_id: int | None = None):
-    data = np.genfromtxt(csv_path, delimiter=",", names=True, dtype=float, encoding="utf-8")
+    data = np.genfromtxt(csv_path, names=True, dtype=float, encoding="utf-8")
     names = data.dtype.names or ()
     stress_ids = {
         int(m.group(1))
@@ -90,7 +90,7 @@ def parse_strain_stress(csv_path: Path, element_id: int | None = None):
 
 
 def available_elements(csv_path: Path):
-    data = np.genfromtxt(csv_path, delimiter=",", names=True, dtype=float, encoding="utf-8")
+    data = np.genfromtxt(csv_path, names=True, dtype=float, encoding="utf-8")
     names = data.dtype.names or ()
     stress_ids = {
         int(m.group(1))
