@@ -1,10 +1,14 @@
 from pathlib import Path
 import re
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-BASE_DIR = Path("Modeling")
+MODELING_DIR = Path("Modeling")
+SYSTEM_ID_DIR = Path("System ID")
+SYSTEM_ID_TRAINING = "System ID Training Data"
+SYSTEM_ID_RESULTS = "System ID Results"
 Q_META = {
     "displacement": {"ylabel": "Displacement (in)"},
     "acceleration": {"ylabel": "Acceleration (in/s^2)"},
@@ -103,11 +107,201 @@ def available_elements(csv_path: Path):
     return sorted(stress_ids & strain_ids)
 
 
-def load_dt(structure: str, event_id: str, location: str):
+def normalize_dataset(name: str):
+    s = (name or "").strip().lower()
+    if s in {"system id", "systemid", "sid"}:
+        return "System ID"
+    return "Modeling"
+
+
+def system_id_result_dirname(result_type: str):
+    key = (result_type or "").strip().lower().replace(" ", "_")
+    mapping = {
+        "prediction": "prediction",
+        "prediction_error": "prediction error",
+        "frequency_id": "frequency ID",
+        "mode_shapes": "mode shapes",
+        "system_realization": "system realization",
+    }
+    return mapping.get(key, "prediction")
+
+
+def system_id_result_variants(dirname: str):
+    variants = {dirname}
+    variants.add(dirname.replace(" ", "_"))
+    variants.add(dirname.replace("_", " "))
+    variants.add(dirname.lower())
+    variants.add(dirname.replace(" ", "").lower())
+    return [v for v in variants if v]
+
+
+def normalize_selection(quantity: str, location: str, source: str, dataset: str, sid_section: str):
+    if dataset == "Modeling":
+        if quantity in {"strain_stress", "frequency_pre_eq", "frequency_post_eq"} and location != "structure":
+            print(f"{quantity} is only available at location=structure; switching location to structure")
+            location = "structure"
+
+        if location == "ground" and source != "field":
+            print("ground data is only available under source=field; switching source to field")
+            source = "field"
+
+        if quantity in {"dt", "time"} and source != "field":
+            print(f"{quantity} is only available under source=field; switching source to field")
+            source = "field"
+
+        if quantity in {"strain_stress", "frequency_pre_eq", "frequency_post_eq"} and source == "field":
+            print(f"{quantity} is only available under source=elastic/inelastic; switching source to elastic")
+            source = "elastic"
+    else:
+        if sid_section == "results":
+            if quantity not in {"displacement", "acceleration"}:
+                print("System ID results are organized under displacement/acceleration; switching quantity to acceleration")
+                quantity = "acceleration"
+            if location not in {"ground", "structure"}:
+                location = "structure"
+        else:
+            if quantity in {"strain_stress", "frequency_pre_eq", "frequency_post_eq"}:
+                print("System ID training data supports displacement/acceleration/time/dt; switching quantity to acceleration")
+                quantity = "acceleration"
+            if location == "ground" and source != "field":
+                print("System ID ground data is only available under source=field; switching source to field")
+                source = "field"
+    return quantity, location, source
+
+
+def series_path_candidates(
+    dataset: str,
+    structure: str,
+    source: str,
+    quantity: str,
+    location: str,
+    event_id: str,
+    sid_section: str = "results",
+    sid_result_type: str = "prediction",
+):
+    candidates = []
+    exts = [".csv", ".txt", ".npy", ".pkl"]
+    if dataset == "Modeling":
+        base = MODELING_DIR / structure / source / quantity / location
+        candidates.extend([base / f"{event_id}{ext}" for ext in exts])
+        return candidates
+
+    root = SYSTEM_ID_DIR / structure / source / quantity
+    if sid_section == "training":
+        bases = [
+            root / SYSTEM_ID_TRAINING / location,
+            root / SYSTEM_ID_TRAINING,
+        ]
+        if quantity in {"dt", "time"}:
+            bases.extend([
+                SYSTEM_ID_DIR / structure / source / "displacement" / SYSTEM_ID_TRAINING / quantity / location,
+                SYSTEM_ID_DIR / structure / source / "displacement" / SYSTEM_ID_TRAINING / quantity,
+                SYSTEM_ID_DIR / structure / source / "acceleration" / SYSTEM_ID_TRAINING / quantity / location,
+                SYSTEM_ID_DIR / structure / source / "acceleration" / SYSTEM_ID_TRAINING / quantity,
+            ])
+        for base in bases:
+            candidates.extend([base / f"{event_id}{ext}" for ext in exts])
+        return candidates
+
+    result_dir = system_id_result_dirname(sid_result_type)
+    bases = []
+    for result_variant in system_id_result_variants(result_dir):
+        base = root / SYSTEM_ID_RESULTS / result_variant
+        bases.append(base / location)
+        bases.append(base)
+    for base in bases:
+        candidates.extend([base / f"{event_id}{ext}" for ext in exts])
+    return candidates
+
+
+def load_series_array(path_used: Path):
+    suffix = path_used.suffix.lower()
+    if suffix == ".csv":
+        try:
+            arr = np.loadtxt(path_used, delimiter=",")
+        except ValueError:
+            arr = np.loadtxt(path_used, delimiter=",", skiprows=1)
+        return arr
+    if suffix == ".txt":
+        return np.loadtxt(path_used)
+    if suffix == ".npy":
+        return np.load(path_used)
+    if suffix == ".pkl":
+        with open(path_used, "rb") as f:
+            return pickle.load(f)
+    raise ValueError(f"unsupported file type: {path_used}")
+
+
+def list_event_ids(
+    dataset: str,
+    structure: str,
+    source: str,
+    quantity: str,
+    location: str,
+    sid_section: str = "results",
+    sid_result_type: str = "prediction",
+):
+    ids = set()
+    stem_target = set()
+    probe = ["1", "226", "event"]
+    for p in probe:
+        for cand in series_path_candidates(
+            dataset=dataset,
+            structure=structure,
+            source=source,
+            quantity=quantity,
+            location=location,
+            event_id=p,
+            sid_section=sid_section,
+            sid_result_type=sid_result_type,
+        ):
+            stem_target.add(cand.parent)
+
+    for directory in stem_target:
+        if not directory.exists():
+            continue
+        for ext in ("*.csv", "*.txt", "*.npy", "*.pkl"):
+            for f in directory.glob(ext):
+                ids.add(f.stem)
+    return sorted(ids)
+
+
+def load_dt(structure: str, source: str, event_id: str, location: str, dataset: str, sid_section: str):
+    if dataset == "System ID":
+        dt_candidates = series_path_candidates(
+            dataset="System ID",
+            structure=structure,
+            source=source,
+            quantity="dt",
+            location=location,
+            event_id=event_id,
+            sid_section="training",
+            sid_result_type="prediction",
+        )
+        dt_candidates.extend(
+            series_path_candidates(
+                dataset="System ID",
+                structure=structure,
+                source=source,
+                quantity="dt",
+                location="ground",
+                event_id=event_id,
+                sid_section="training",
+                sid_result_type="prediction",
+            )
+        )
+        for dt_path in dt_candidates:
+            if dt_path.exists():
+                try:
+                    return float(np.loadtxt(dt_path))
+                except ValueError:
+                    with open(dt_path, "r") as f:
+                        return float(f.read().strip())
+
     candidates = [
-        BASE_DIR / structure / "field" / "dt" / location / f"{event_id}.txt",
-        BASE_DIR / structure / "field" / "dt" / "ground" / f"{event_id}.txt",
-        BASE_DIR / structure / "field" / "dt" / "structure" / f"{event_id}.txt",
+        MODELING_DIR / structure / "field" / "dt" / location / f"{event_id}.txt",
+        MODELING_DIR / structure / "field" / "dt" / "ground" / f"{event_id}.txt",
+        MODELING_DIR / structure / "field" / "dt" / "structure" / f"{event_id}.txt",
     ]
     for dt_path in candidates:
         if dt_path.exists():
@@ -119,47 +313,52 @@ def load_dt(structure: str, event_id: str, location: str):
     return None
 
 
-def normalize_selection(quantity: str, location: str, source: str):
-    if quantity in {"strain_stress", "frequency_pre_eq", "frequency_post_eq"} and location != "structure":
-        print(f"{quantity} is only available at location=structure; switching location to structure")
-        location = "structure"
-
-    if location == "ground" and source != "field":
-        print("ground data is only available under source=field; switching source to field")
-        source = "field"
-
-    if quantity in {"dt", "time"} and source != "field":
-        print(f"{quantity} is only available under source=field; switching source to field")
-        source = "field"
-
-    if quantity in {"strain_stress", "frequency_pre_eq", "frequency_post_eq"} and source == "field":
-        print(f"{quantity} is only available under source=elastic/inelastic; switching source to elastic")
-        source = "elastic"
-
-    return location, source
-
-
 if __name__ == "__main__":
     replot = True
 
     while replot:
+        dataset_default = normalize_dataset(input("Base dataset. Modeling or System ID? [Modeling]: ").strip() or "Modeling")
         structure = input("Which structure do you want. frame or bridge? ").strip() or "frame"
         event_source = input("Which event source. field, elastic, or inelastic? ").strip() or "field"
         quantity = input("Which quantity. time, dt, displacement, acceleration, strain_stress, frequency_pre_eq, or frequency_post_eq? ").strip() or "acceleration"
         event_location = input("Which location. ground or structure? ").strip() or "ground"
-        event_location, event_source = normalize_selection(quantity, event_location, event_source)
+        sid_section_default = "results"
+        sid_result_type_default = "prediction"
+        if dataset_default == "System ID":
+            sid_section_default = (input("System ID section. training or results? [results]: ").strip().lower() or "results")
+            if sid_section_default not in {"training", "results"}:
+                sid_section_default = "results"
+            if sid_section_default == "results":
+                sid_result_type_default = (
+                    input("System ID result type. prediction, prediction_error, frequency_id, mode_shapes, or system_realization? [prediction]: ").strip().lower()
+                    or "prediction"
+                )
+        quantity, event_location, event_source = normalize_selection(
+            quantity, event_location, event_source, dataset_default, sid_section_default
+        )
         use_window = False
         selected_element = None
         element_prompted = False
-        if quantity in Q_META:
+        if quantity in Q_META and not (dataset_default == "System ID" and sid_section_default == "results" and sid_result_type_default in {"frequency_id", "mode_shapes", "system_realization"}):
             use_window = (input("Window time range by intensity bounds? [y/N]: ").strip().lower() == "y")
 
-        event_dir = BASE_DIR / structure / event_source / quantity / event_location
-        event_ids = sorted([p.stem for p in event_dir.glob("*.csv")] + [p.stem for p in event_dir.glob("*.txt")])
+        event_ids = list_event_ids(
+            dataset=dataset_default,
+            structure=structure,
+            source=event_source,
+            quantity=quantity,
+            location=event_location,
+            sid_section=sid_section_default,
+            sid_result_type=sid_result_type_default,
+        )
         print("event ids:", event_ids)
         event_id = input("event id: ").strip()
 
-        is_text_only = quantity in {"dt", "time", "frequency_pre_eq", "frequency_post_eq"}
+        is_text_only = quantity in {"dt", "time", "frequency_pre_eq", "frequency_post_eq"} or (
+            dataset_default == "System ID"
+            and sid_section_default == "results"
+            and sid_result_type_default in {"frequency_id", "mode_shapes", "system_realization"}
+        )
         fig = ax = None
         if not is_text_only:
             fig, ax = plt.subplots(figsize=(10, 4))
@@ -174,28 +373,62 @@ if __name__ == "__main__":
                 series_event_id = event_id
                 source = event_source
                 location = event_location
+                dataset = dataset_default
+                sid_section = sid_section_default
+                sid_result_type = sid_result_type_default
                 first_series = False
             else:
                 series_event_id = input(f"event id [{event_id}]: ").strip() or event_id
+                dataset = normalize_dataset(input(f"dataset (Modeling/System ID) [{dataset_default}]: ").strip() or dataset_default)
                 source = input(f"source (field/elastic/inelastic) [{event_source}]: ").strip() or event_source
                 location = input(f"location (ground/structure) [{event_location}]: ").strip() or event_location
-                location, source = normalize_selection(quantity, location, source)
+                sid_section = sid_section_default
+                sid_result_type = sid_result_type_default
+                if dataset == "System ID":
+                    sid_section = (
+                        input(f"System ID section (training/results) [{sid_section_default}]: ").strip().lower()
+                        or sid_section_default
+                    )
+                    if sid_section not in {"training", "results"}:
+                        sid_section = "results"
+                    if sid_section == "results":
+                        sid_result_type = (
+                            input(
+                                f"System ID result type (prediction/prediction_error/frequency_id/mode_shapes/system_realization) "
+                                f"[{sid_result_type_default}]: "
+                            ).strip().lower()
+                            or sid_result_type_default
+                        )
+                quantity, location, source = normalize_selection(quantity, location, source, dataset, sid_section)
 
-            base = BASE_DIR / structure / source / quantity / location
-            csv_path = base / f"{series_event_id}.csv"
-            txt_path = base / f"{series_event_id}.txt"
+            candidates = series_path_candidates(
+                dataset=dataset,
+                structure=structure,
+                source=source,
+                quantity=quantity,
+                location=location,
+                event_id=series_event_id,
+                sid_section=sid_section,
+                sid_result_type=sid_result_type,
+            )
+            path_used = next((p for p in candidates if p.exists()), None)
+            if path_used is None:
+                print(f"missing files for {dataset} | {series_event_id} | {source}/{location} | {quantity}")
+                add_series = (input("add another? [y/N]: ").strip().lower() == "y")
+                continue
+            arr = load_series_array(path_used)
 
-            if csv_path.exists():
-                try:
-                    arr = np.loadtxt(csv_path, delimiter=",")
-                except ValueError:
-                    arr = np.loadtxt(csv_path, delimiter=",", skiprows=1)
-                path_used = csv_path
-            elif txt_path.exists():
-                arr = np.loadtxt(txt_path)
-                path_used = txt_path
-            else:
-                print(f"missing: {csv_path} or {txt_path}")
+            if path_used.suffix.lower() == ".pkl":
+                if isinstance(arr, tuple) and len(arr) >= 4:
+                    print(f"{series_event_id} | {dataset} | {source}/{location} | {sid_result_type} | A,B,C,D shapes:")
+                    for name, mat in zip(["A", "B", "C", "D"], arr[:4]):
+                        shape = np.asarray(mat).shape
+                        print(f"  {name}: {shape}")
+                else:
+                    print(f"{series_event_id} | {dataset} | {source}/{location} | {sid_result_type} | pkl type={type(arr)}")
+                print(f"loaded: {path_used}")
+                loaded_count += 1
+                series_specs.append((series_event_id, source, location, dataset))
                 add_series = (input("add another? [y/N]: ").strip().lower() == "y")
                 continue
 
@@ -229,26 +462,26 @@ if __name__ == "__main__":
             elif is_text_only:
                 if quantity == "dt":
                     value = float(arr.reshape(-1)[0])
-                    print(f"{series_event_id} | {source}/{location} | dt = {value}")
+                    print(f"{series_event_id} | {dataset} | {source}/{location} | dt = {value}")
                 elif quantity == "time":
                     flat = arr.reshape(-1)
                     if flat.size <= 20:
                         shown = np.array2string(flat, separator=", ")
-                        print(f"{series_event_id} | {source}/{location} | time = {shown}")
+                        print(f"{series_event_id} | {dataset} | {source}/{location} | time = {shown}")
                     else:
                         head = np.array2string(flat[:5], separator=", ")
                         tail = np.array2string(flat[-5:], separator=", ")
                         print(
-                            f"{series_event_id} | {source}/{location} | time n={flat.size} "
+                            f"{series_event_id} | {dataset} | {source}/{location} | time n={flat.size} "
                             f"start={flat[0]} end={flat[-1]} head={head} tail={tail}"
                         )
                 else:
                     flat = arr.reshape(-1)
                     if flat.size == 0:
-                        print(f"{series_event_id} | {source}/{location} | {quantity}: empty")
+                        print(f"{series_event_id} | {dataset} | {source}/{location} | {quantity}: empty")
                     else:
                         print(
-                            f"{series_event_id} | {source}/{location} | {quantity} "
+                            f"{series_event_id} | {dataset} | {source}/{location} | {quantity} "
                             f"n_modes={flat.size} min={flat.min()} max={flat.max()}"
                         )
                         for i, f in enumerate(flat, start=1):
@@ -259,7 +492,7 @@ if __name__ == "__main__":
                     i0, i1 = window_bounds(arr)
                     arr = arr[i0:i1]
                 if quantity in Q_META:
-                    dt = load_dt(structure, series_event_id, location)
+                    dt = load_dt(structure, source, series_event_id, location, dataset, sid_section)
                     if dt is None:
                         x = np.arange(i0, i1)
                         missing_dt_count += 1
@@ -267,7 +500,10 @@ if __name__ == "__main__":
                         x = np.arange(i0, i1) * dt
                 else:
                     x = np.arange(i0, i1)
-                series_label = f"{series_event_id} | {source}/{location}"
+                if dataset == "System ID":
+                    series_label = f"{series_event_id} | {dataset}:{sid_section}:{sid_result_type} | {source}/{location}"
+                else:
+                    series_label = f"{series_event_id} | {dataset} | {source}/{location}"
                 if use_window:
                     series_label += f" window[{i0}:{i1}]"
                 ax.plot(x, arr, label=series_label)
@@ -277,7 +513,7 @@ if __name__ == "__main__":
                     i0, i1 = window_bounds(arr[0])
                     arr = arr[:, i0:i1]
                 if quantity in Q_META:
-                    dt = load_dt(structure, series_event_id, location)
+                    dt = load_dt(structure, source, series_event_id, location, dataset, sid_section)
                     if dt is None:
                         x = np.arange(i0, i1)
                         missing_dt_count += 1
@@ -287,20 +523,23 @@ if __name__ == "__main__":
                     x = np.arange(i0, i1)
                 channel_labels = get_channel_labels(structure, location, arr.shape[0])
                 for ch in range(arr.shape[0]):
-                    series_label = f"{series_event_id} | {source}/{location} {channel_labels[ch]}"
+                    if dataset == "System ID":
+                        series_label = f"{series_event_id} | {dataset}:{sid_section}:{sid_result_type} | {source}/{location} {channel_labels[ch]}"
+                    else:
+                        series_label = f"{series_event_id} | {dataset} | {source}/{location} {channel_labels[ch]}"
                     if use_window:
                         series_label += f" window[{i0}:{i1}]"
                     ax.plot(x, arr[ch], label=series_label)
 
             print(f"loaded: {path_used}")
             loaded_count += 1
-            series_specs.append((series_event_id, source, location))
+            series_specs.append((series_event_id, source, location, dataset))
             add_series = (input("add another? [y/N]: ").strip().lower() == "y")
 
         if loaded_count > 0 and not is_text_only:
-            source_set = sorted({spec[1] for spec in series_specs})
-            if len(source_set) > 1:
-                print(f"comparison plot across sources: {', '.join(source_set)}")
+            compare_groups = sorted({f"{spec[3]}::{spec[1]}" for spec in series_specs})
+            if len(compare_groups) > 1:
+                print(f"comparison plot across groups: {', '.join(compare_groups)}")
 
             ax.set_title(f"{structure} | {quantity} | {loaded_count} series")
             if quantity in Q_META and missing_dt_count == 0:
@@ -326,7 +565,7 @@ if __name__ == "__main__":
             plt.show()
 
             if input("save figure? [y/N]: ").strip().lower() == "y":
-                plots_dir = BASE_DIR / structure / "plots"
+                plots_dir = MODELING_DIR / structure / "plots"
                 plots_dir.mkdir(parents=True, exist_ok=True)
                 first_event = series_specs[0][0] if series_specs else event_id
                 out_path = plots_dir / f"{first_event}_{quantity}_series.png"

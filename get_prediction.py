@@ -16,15 +16,31 @@ import plotly.graph_objects as go
 MODEL = "frame" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]  #"elastic",
+OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
 WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
-# Output directories
-OUT_DIR = Path(f"{MODEL}")
-os.makedirs(OUT_DIR, exist_ok=True)
-for elas in elas_cases:
-    elas_dir  = OUT_DIR/elas
-    os.makedirs(elas_dir, exist_ok=True)
+# I/O directories
+MODELING_DIR = Path("Modeling")
+SYSTEM_ID_DIR = Path("System ID")
+SID_MODEL_DIR = SYSTEM_ID_DIR / MODEL
+os.makedirs(SID_MODEL_DIR, exist_ok=True)
+
+
+def modeling_path(model: str, source: str, quantity: str, location: str, event_id: int | str):
+    return MODELING_DIR / model / source / quantity / location / f"{event_id}.csv"
+
+
+def modeling_dt_path(model: str, event_id: int | str, location: str = "ground"):
+    return MODELING_DIR / model / "field" / "dt" / location / f"{event_id}.txt"
+
+
+def sid_training_dir(model: str, source: str, quantity: str, location: str):
+    return SYSTEM_ID_DIR / model / source / quantity / "System ID Training Data" / location
+
+
+def sid_results_dir(model: str, source: str, quantity: str, result_name: str):
+    return SYSTEM_ID_DIR / model / source / quantity / "System ID Results" / result_name
 
 if __name__ == "__main__":
 
@@ -47,25 +63,36 @@ if __name__ == "__main__":
         if MODEL == "frame":
             event_ids = list(range(226, 248))  # 226..247 (226, 248)
         else:
-            n_events = len(glob.glob(str(OUT_DIR/elas/"[0-9]*")))
+            n_events = len(glob.glob(str(MODELING_DIR / MODEL / elas / OUTPUT_QUANTITY / "structure" / "[0-9]*.csv")))
             event_ids = list(range(1, n_events+1))
 
         n_events = len(event_ids)
         errors = np.full((n_events, len(out_labels)), np.nan)
 
         for k, event_id in enumerate(tqdm(event_ids)):
-            # Load inputs and true outputs
-            event_dir = OUT_DIR/elas/str(event_id)
-            inputs = np.loadtxt(event_dir/"inputs.csv")
-            out_true = np.loadtxt(event_dir/"outputs.csv")
-            with open(event_dir/"dt.txt", "r") as f:
-                dt = float(f.read())
+            # Load true input (ground acceleration) and true output from Modeling/.
+            input_path = modeling_path(MODEL, "field", "acceleration", "ground", event_id)
+            out_true_path = modeling_path(MODEL, elas, OUTPUT_QUANTITY, "structure", event_id)
+            dt_path = modeling_dt_path(MODEL, event_id, "ground")
+            if not input_path.exists() or not out_true_path.exists() or not dt_path.exists():
+                if VERBOSE:
+                    print(f"skip event {event_id}: missing modeling file(s)")
+                continue
+            inputs = np.loadtxt(input_path, delimiter=",")
+            out_true = np.loadtxt(out_true_path, delimiter=",")
+            with open(dt_path, "r") as f:
+                dt = float(f.read().strip())
             nt = inputs.shape[1]
             time = np.arange(nt) * dt
             
 
-            # Load identified system
-            with open(event_dir/f"system_{SID_METHOD}.pkl", "rb") as f:
+            # Load identified system from README System ID path.
+            sys_path = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "system realization") / f"{event_id}.pkl"
+            if not sys_path.exists():
+                if VERBOSE:
+                    print(f"skip event {event_id}: missing system realization {sys_path}")
+                continue
+            with open(sys_path, "rb") as f:
                 A,B,C,D = pickle.load(f)
             # Stabilize identified system
             A_stable = stabilize_discrete(A)
@@ -114,19 +141,39 @@ if __name__ == "__main__":
                     
                 
                 nt = np.min([nt, len(out_true_aln)])
-            
-            # Prediction directory
-            pred_dir  = event_dir/SID_METHOD
-            os.makedirs(pred_dir, exist_ok=True)
 
-            # Save processed input, true output, predicted output, and time
+            # Save README-compliant System ID Training Data.
+            train_ground_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "ground")
+            train_struct_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "structure")
+            train_time_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "time")
+            train_dt_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "dt")
+            for d in [train_ground_dir, train_struct_dir, train_time_dir, train_dt_dir]:
+                d.mkdir(parents=True, exist_ok=True)
+
             input_array = np.array([input_series[:nt] for input_series in inputs_trunc])
-            np.savetxt(pred_dir/"inputs_processed.csv", input_array)
             out_true_aln_array = np.array([out_true_aln[:nt] for out_true_aln in out_true_aln_stacked])
-            np.savetxt(pred_dir/"outputs_true_processed.csv", out_true_aln_array)
             out_pred_aln_array = np.array([out_pred_aln[:nt] for out_pred_aln in out_pred_aln_stacked])
-            np.savetxt(pred_dir/"outputs_pred_processed.csv", out_pred_aln_array)
             time_aln = time_trunc[:nt]
+            np.savetxt(train_ground_dir / f"{event_id}.csv", input_array, delimiter=",")
+            np.savetxt(train_struct_dir / f"{event_id}.csv", out_true_aln_array, delimiter=",")
+            np.savetxt(train_time_dir / f"{event_id}.csv", time_aln, delimiter=",")
+            np.savetxt(train_dt_dir / f"{event_id}.txt", np.array([dt]))
+
+            # Save README-compliant System ID Results.
+            sid_pred_dir = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "prediction")
+            sid_pred_dir.mkdir(parents=True, exist_ok=True)
+            np.savetxt(sid_pred_dir / f"{event_id}.csv", out_pred_aln_array, delimiter=",")
+
+            sid_time_dir = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "time")
+            sid_time_dir.mkdir(parents=True, exist_ok=True)
+            np.savetxt(sid_time_dir / f"{event_id}.csv", time_aln, delimiter=",")
+
+            # Optional event-level artifacts for debugging.
+            pred_dir = sid_pred_dir / SID_METHOD / str(event_id)
+            pred_dir.mkdir(parents=True, exist_ok=True)
+            np.savetxt(pred_dir/"inputs_processed.csv", input_array)
+            np.savetxt(pred_dir/"outputs_true_processed.csv", out_true_aln_array)
+            np.savetxt(pred_dir/"outputs_pred_processed.csv", out_pred_aln_array)
             np.savetxt(pred_dir/"time_processed.csv", time_aln)
 
             # true to 0.0
@@ -148,6 +195,10 @@ if __name__ == "__main__":
                     denominator_averaged = True
                 ))
             np.savetxt(pred_dir/"errors.csv", np.array(errors))
+
+            sid_err_dir = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "prediction error")
+            sid_err_dir.mkdir(parents=True, exist_ok=True)
+            np.savetxt(sid_err_dir / f"{event_id}.csv", errors[k], delimiter=",")
 
             # Plot true vs predicted output timeseries
             fig_plt, axs = plt.subplots(int(len(out_labels)/2), 2,
@@ -188,7 +239,7 @@ if __name__ == "__main__":
             plt.close(fig_plt)
 
         # Heatmap non-square with numbers
-        heatmap_dir = OUT_DIR/elas/SID_METHOD
+        heatmap_dir = SYSTEM_ID_DIR / MODEL / elas / OUTPUT_QUANTITY / "System ID Results"
         os.makedirs(heatmap_dir, exist_ok=True)
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
         heatmap_data = np.nan_to_num(errors.T, nan=0.0)
@@ -216,7 +267,7 @@ if __name__ == "__main__":
                 val = heatmap_data[i,ev]
                 color = 'black' if val > half_vmax else 'white'
                 ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=6)
-        fig.savefig(heatmap_dir/f"heatmap.png", dpi=400)
+        fig.savefig(heatmap_dir / f"heatmap_{SID_METHOD}.png", dpi=400)
         plt.close(fig)
 
         # Heatmap square with no numbers
@@ -237,6 +288,5 @@ if __name__ == "__main__":
         ax.set_xticklabels(event_ids, rotation=45, fontsize=15)
         ax.set_yticks(np.arange(len(out_labels)))
         ax.set_yticklabels(out_labels, fontsize=15)
-        fig.savefig(heatmap_dir/f"heatmap_square.png", dpi=400)
+        fig.savefig(heatmap_dir / f"heatmap_square_{SID_METHOD}.png", dpi=400)
         plt.close(fig)
-
