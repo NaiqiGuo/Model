@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 from pathlib import Path
@@ -46,29 +45,19 @@ if __name__ == "__main__":
     event_files = sorted((FIELD_OUT_DIR / "acceleration" / "ground").glob("*.csv"))
     event_ids = [event.stem for event in event_files]
     for event_id in event_ids:
-        print(f"Plotting Event {event_id}")
+        if VERBOSE:
+            print(f"Plotting Event {event_id}")
 
         try:
             inputs = np.atleast_2d(np.loadtxt(
                 FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.csv",
             ))
 
-            outputs["model"]["displacement"] = np.loadtxt(
-                MODEL_OUT_DIR / "displacement" / "structure" / f"{event_id}.csv",
-            )
-            outputs["model"]["acceleration"] = np.loadtxt(
-                MODEL_OUT_DIR / "acceleration" / "structure" / f"{event_id}.csv",
-            )
-            outputs["field"]["displacement"] = np.loadtxt(
-                FIELD_OUT_DIR / "displacement" / "structure" / f"{event_id}.csv",
-            )
-            outputs["field"]["acceleration"] = np.loadtxt(
-                FIELD_OUT_DIR / "acceleration" / "structure" / f"{event_id}.csv",
-            )
-            for source in outputs:
-                for q in quantities:
-                    if outputs[source][q].ndim == 1:
-                        outputs[source][q] = outputs[source][q][np.newaxis, :]
+            for source in outputs.keys():
+                 for q in quantities:
+                    outputs[source][q] = np.loadtxt(
+                        (MODEL_OUT_DIR if source == "model" else FIELD_OUT_DIR) / q / "structure" / f"{event_id}.csv",
+                    )
 
         except FileNotFoundError:
             if VERBOSE:
