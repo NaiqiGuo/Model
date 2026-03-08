@@ -12,7 +12,7 @@ import pickle
 
 # Analysis configuration
 SID_METHOD = 'srim'
-STRUCTURE = "frame" # "frame", "bridge"
+STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 
@@ -34,14 +34,16 @@ if __name__ == "__main__":
         print(f"{STRUCTURE=}")
         print(f"{ELASTIC=}")
 
-    outputs = {"model": {}, "field": {}}
+    # Retreive data
+    elastic_name = "elastic" if ELASTIC else "inelastic"
+    outputs = {elastic_name: {}, "field": {}}
     quantities = ["displacement", "acceleration"]
 
     event_files = sorted((FIELD_OUT_DIR / "acceleration" / "ground").glob("*.csv"))
     event_ids = [event.stem for event in event_files]
     for event_id in event_ids:
         if VERBOSE:
-            print(f"System ID for Event {event_id}")
+            print(f"\nSystem ID for Event {event_id}")
 
         try:
             inputs = np.atleast_2d(np.loadtxt(
@@ -51,15 +53,13 @@ if __name__ == "__main__":
             for source in outputs.keys():
                  for q in quantities:
                     outputs[source][q] = np.loadtxt(
-                        (MODEL_OUT_DIR if source == "model" else FIELD_OUT_DIR) / q / "structure" / f"{event_id}.csv",
+                        (MODEL_OUT_DIR if source == elastic_name else FIELD_OUT_DIR) / q / "structure" / f"{event_id}.csv",
                     )
 
         except FileNotFoundError:
             if VERBOSE:
                 print(f"No data for event {event_id}; skipping")
             continue
-
-        dt = np.loadtxt(FIELD_OUT_DIR / "dt" / "ground" / f"{event_id}.csv")
 
         # Perform system identification and save systems
         n = 3
@@ -78,16 +78,23 @@ if __name__ == "__main__":
             j           = 4400
         )
 
-        systems = {}
-        for quantity in ["displacement", "acceleration"]:
-            try:
-                systems[quantity] = sysid(inputs["field"]["acceleration"], outputs["model"][quantity], method=SID_METHOD, **options)
-                A,B,C,D, *rest = systems[quantity] 
-                systems[quantity]  = (A,B,C,D)
+        for source in [elastic_name, "field"]:
+             for quantity in quantities:
+                try:
+                    system = sysid(inputs, outputs[source][quantity], method=SID_METHOD, **options)
+                except Exception as e:
+                    if VERBOSE:
+                        print(f"\n>>>> System ID for event {event_id} FAILED for {source},{quantity}")
+                    if VERBOSE>=2:
+                        print(f"\nError: {e}")
+                    continue
+            
+                A,B,C,D, *rest = system 
+                system  = (A,B,C,D)
 
                 system_path = (Path('System ID') /   
                                 STRUCTURE /
-                                ("elastic" if ELASTIC else "inelastic") / 
+                                source / 
                                 quantity /
                                 'System ID Results' /
                                 'system realization' /
@@ -95,10 +102,6 @@ if __name__ == "__main__":
                                 )
                 system_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(system_path, "wb") as f:
-                    pickle.dump(systems[quantity], f)
-                if VERBOSE:
-                    print(f"\n>>>> System ID for event {event_id} SUCCEEDED for {quantity}\n")
-            except:
-                if VERBOSE:
-                    print(f"\n>>>> System ID for event {event_id} FAILED for {quantity}\n")
-                continue
+                    pickle.dump(system, f)
+                if VERBOSE >= 2:
+                    print(f">>>> System ID for event {event_id} SUCCEEDED for {source},{quantity}")
