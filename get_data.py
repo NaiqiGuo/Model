@@ -32,9 +32,9 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-STRUCTURE = "frame" # "frame", "bridge"
+STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True
 LOAD_EVENTS = False
 
 # Verbosity
@@ -308,6 +308,8 @@ if __name__ == "__main__":
 
         ss_path = MODEL_OUT_DIR / "strain_stress" / "structure" / f"{event_id}.csv"
         ss_path.parent.mkdir(parents=True, exist_ok=True)
+        # TODO CC: change to separately saving strain and stresses
+        # consistent with how displacements and accelerations are saved
         save_strain_stress(stresses, strains, inputs["field"]["dt"], filename=ss_path)
 
 
