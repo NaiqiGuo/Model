@@ -34,7 +34,7 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Verbosity
@@ -226,13 +226,13 @@ if __name__ == "__main__":
             zFiber = 0.0
 
             model = create_frame(elastic=ELASTIC,
-                                       multisupport=MULTISUPPORT,
-                                       verbose=VERBOSE)
+                                        multisupport=MULTISUPPORT,
+                                        verbose=VERBOSE)
 
             model = apply_load_frame(model,
-                                     inputx=inputs["field"]["acceleration"][0],
-                                     inputy=inputs["field"]["acceleration"][1],
-                                     dt=inputs["field"]["dt"])
+                                        inputx=inputs["field"]["acceleration"][0],
+                                        inputy=inputs["field"]["acceleration"][1],
+                                        dt=inputs["field"]["dt"])
             
 
         elif STRUCTURE == 'bridge':

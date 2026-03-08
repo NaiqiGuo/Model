@@ -190,13 +190,14 @@ class Painter:
         
     def create_model(self, 
                     elastic:bool,
+                    echo_file=None,
                     multisupport:bool=False,
                     separate_deck_ends:bool = True,
                     verbose = False):
 
         units = self.units
 
-        model = xara.Model(ndm=3, ndf=6)
+        model = xara.Model(ndm=3, ndf=6, echo_file=echo_file)
 
         # Geometry
         # x: East
@@ -452,13 +453,22 @@ def apply_load_bridge(model, inputx=None, inputy=None, dt=None):
 def create_bridge(elastic=True, 
                   multisupport=False,
                   separate_deck_ends=True, 
+                  echo_file=None,
                   verbose=False):
     assert multisupport == False
+
+    if echo_file is not None:
+        echo_file = open(echo_file, 'w+')
+
     painter = Painter(units)
     model = painter.create_model(
         elastic=elastic, 
+        echo_file=echo_file,
         separate_deck_ends=separate_deck_ends, 
         verbose=verbose)
+    
+    if echo_file is not None:
+        echo_file.close()
     return model
 
 
