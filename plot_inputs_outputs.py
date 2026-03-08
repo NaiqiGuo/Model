@@ -49,11 +49,9 @@ if __name__ == "__main__":
         print(f"Plotting Event {event_id}")
 
         try:
-            inputs = np.loadtxt(
+            inputs = np.atleast_2d(np.loadtxt(
                 FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.csv",
-            )
-            if inputs.ndim == 1:
-                inputs = inputs[np.newaxis, :]
+            ))
 
             outputs["model"]["displacement"] = np.loadtxt(
                 MODEL_OUT_DIR / "displacement" / "structure" / f"{event_id}.csv",
@@ -77,14 +75,12 @@ if __name__ == "__main__":
                 print(f"No data for event {event_id}; skipping")
             continue
 
-        with open(FIELD_OUT_DIR / "dt" / "ground" / f"{event_id}.csv", "r") as f:
-            dt = float(f.read())
+        dt = np.loadtxt(FIELD_OUT_DIR / "dt" / "ground" / f"{event_id}.csv")
 
         t_in = np.arange(inputs.shape[1]) * dt
         t_out = np.arange(outputs["model"]["displacement"].shape[1]) * dt
 
         if WINDOWED_PLOT:
-            print(outputs["model"]["displacement"][0])
             bounds = intensity_bounds(outputs["model"]["displacement"][0], lb=0.001, ub=0.999)
             inputs = truncate_by_bounds(inputs, bounds)
             t_in = t_in[bounds[0]:bounds[1]]
@@ -95,17 +91,6 @@ if __name__ == "__main__":
 
 
         # --------- input ---------
-        plt.figure(figsize=(8,4))
-        for ch in range(inputs.shape[0]):
-            plt.plot(t_in, inputs[ch], alpha=0.7, label=input_labels[ch])
-        plt.title(f"Event {event_id} Inputs")
-        plt.xlabel("Time (s)")
-        plt.ylabel("Input Acceleration (in/s²)")
-        plt.legend(loc='lower right')
-        plt.tight_layout()
-        plt.savefig(FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.png", dpi=350)
-        plt.close()
-
         fig = go.Figure()
         for ch in range(inputs.shape[0]):
             fig.add_scatter(x=t_in, y=inputs[ch], mode="lines", name=input_labels[ch])
@@ -122,16 +107,6 @@ if __name__ == "__main__":
         source_dirs = {"model": MODEL_OUT_DIR, "field": FIELD_OUT_DIR}
         for source, source_dir in source_dirs.items():
             for q in quantities:
-                plt.figure(figsize=(8,4))
-                for ch in range(outputs[source][q].shape[0]):
-                    plt.plot(t_out, outputs[source][q][ch], label=output_labels[ch])
-                plt.title(f"Event {event_id} Outputs")
-                plt.xlabel("Time (s)")
-                plt.ylabel(f"Output {Q_MAP[q]['name']} ({Q_MAP[q]['units']})")
-                plt.legend(loc='lower right', ncol=len(output_nodes))
-                plt.tight_layout()
-                plt.savefig(source_dir / q / "structure" / f"{event_id}.png", dpi=350)
-                plt.close()
 
                 fig = go.Figure()
                 for ch in range(outputs[source][q].shape[0]):

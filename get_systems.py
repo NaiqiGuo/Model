@@ -33,7 +33,6 @@ STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
 LOAD_EVENTS = False
-REWRITE = True # rewrite saved quantities # CHECK NG: Added this so that field quantities are only saved once
 
 # Verbosity
 # False means print nothing;
@@ -301,7 +300,7 @@ if __name__ == "__main__":
             create_and_save_csv(
                 path=MODEL_OUT_DIR / label  / "structure" / f"{event_id}.csv",
                 array=quantity,
-                rewrite=REWRITE
+                rewrite=True
                 )
 
         ss_path = MODEL_OUT_DIR / "strain_stress" / "structure" / f"{event_id}.csv"
@@ -338,7 +337,7 @@ if __name__ == "__main__":
                 for source,quantities in qdict.items():
                     print(source, list(quantities.keys()))
 
-        # CHECK NG: use create_and_save_csv to save csvs, with argument rewrite=REWRITE
+        # CHECK NG: use create_and_save_csv to save csvs, with argument rewrite
         for location,location_dict in zip(["ground","structure"],[inputs,outputs]):
             for source,quantities in location_dict.items():
                 SOURCE_DIR = FIELD_OUT_DIR if source=="field" else MODEL_OUT_DIR
@@ -346,7 +345,7 @@ if __name__ == "__main__":
                     create_and_save_csv(
                         path = SOURCE_DIR / q_name / location / f"{event_id}.csv",
                         array = q,
-                        rewrite=REWRITE
+                        rewrite = (source!="field") # CHECK NG: Added this so that field quantities are only saved once
                     )
 
 
