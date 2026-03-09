@@ -12,6 +12,8 @@ from xsection.library._girder import GirderSection
 
 from mdof.utilities.config import extract_channels
 
+from models.analysis import apply_damping
+
 # Verbosity
 # False means print nothing;
 # True or 1 means print progress messages only;
@@ -34,7 +36,7 @@ class Painter:
 
 
     # Concrete modulus (ksi)
-    def __init__(self, units):
+    def __init__(self, units, verbose=VERBOSE):
         self.units = units
 
         self.fy = 60.0*units.ksi   # ksi
@@ -55,7 +57,7 @@ class Painter:
             "steel": xara.Material(E=self.Es, G=self.Gs, Fy=self.fy, b=0.02, type="Steel01", tag=3)
         }
 
-        if VERBOSE >= 2:
+        if verbose >= 2:
             print(f"Ec: {self.Ec/units.ksi:.2f} ksi, Gc: {self.Gc/units.ksi:.2f} ksi")
 
 
@@ -296,8 +298,9 @@ class Painter:
         model.element(beam_type, 106, ( 5,  2), **girder_element)
 
         # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
-        model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
-        
+        # model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
+        apply_damping(model, zeta=[0.02, 0.02], verbose=verbose)
+
         return model
 
         # Mass, damping and earthquake excitation
@@ -406,8 +409,8 @@ class Painter:
 
         # get modes
         lambdas = model.eigen(n_modes, "fullGenLapack")  
-        omega = np.sqrt(np.abs(lambdas))
-        freqs_before = omega/(2*np.pi) 
+        omegas = np.sqrt(np.abs(lambdas))
+        freqs_before = omegas/(2*np.pi) 
 
         # Perform nt analysis steps with a time step of dt
         if verbose:

@@ -15,13 +15,12 @@ import pickle
 from utilities import (
     get_measurements,
     get_node_outputs,
-    create_frame,
-    apply_load_frame,
-    analyze,
     create_and_save_csv, # CHECK NG: new function
 )
 
 from models.painter import create_bridge
+from models.frame import create_frame, apply_load_frame
+from models.analysis import analyze
 
 from utilities_experimental import(
     apply_load_bridge, # TODO CC: first pass clean
@@ -34,7 +33,7 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True
 LOAD_EVENTS = False
 
 # Verbosity
