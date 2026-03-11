@@ -41,6 +41,7 @@ if __name__ == "__main__":
 
     event_files = sorted((FIELD_OUT_DIR / "acceleration" / "ground").glob("*.csv"))
     event_ids = [event.stem for event in event_files]
+    failed_events = []
     for event_id in event_ids:
         if VERBOSE:
             print(f"\nSystem ID for Event {event_id}")
@@ -75,7 +76,8 @@ if __name__ == "__main__":
             threads     = 8,
             chunk       = 200,
             i           = 250,
-            j           = 4400
+            j           = 4400,
+            verbose     = VERBOSE,
         )
 
         for source in [elastic_name, "field"]:
@@ -83,10 +85,10 @@ if __name__ == "__main__":
                 try:
                     system = sysid(inputs, outputs[source][quantity], method=SID_METHOD, **options)
                 except Exception as e:
+                    failed_events.append((event_id, source, quantity, e))
                     if VERBOSE:
                         print(f"\n>>>> System ID for event {event_id} FAILED for {source},{quantity}")
-                    if VERBOSE>=2:
-                        print(f"\nError: {e}")
+                        print(f">>>> Error: {e}")
                     continue
             
                 A,B,C,D, *rest = system 
@@ -103,5 +105,5 @@ if __name__ == "__main__":
                 system_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(system_path, "wb") as f:
                     pickle.dump(system, f)
-                if VERBOSE >= 2:
-                    print(f">>>> System ID for event {event_id} SUCCEEDED for {source},{quantity}")
+    if VERBOSE:
+        print(f"Failed events: {failed_events}")
