@@ -299,8 +299,8 @@ class Painter:
         model.element(beam_type, 104, (10,  1), **girder_element)
 
         #abutment
-        model.element("zeroLength", 107, 0, 11, "mat",(5,5,6), "-dir",1,2,3) 
-        model.element("zeroLength", 108, 1, 12, "mat",(5,5,6), "-dir",1,2,3)
+        model.element("zeroLength", 107, 0, 11, "-mat",(5,5,6), "-dir",1,2,3) 
+        model.element("zeroLength", 108, 1, 12, "-mat",(5,5,6), "-dir",1,2,3)
 
         # Bent
         model.element(beam_type, 105, ( 3,  2), **girder_element)
