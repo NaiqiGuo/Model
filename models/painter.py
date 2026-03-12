@@ -219,8 +219,8 @@ class Painter:
         density = 150.0 * (units.lbf/units.ft**3)/units.gravity  # mass density of concrete in lb/in^3
 
         # Nodes: (tag, (x, y, z))
-        model.node(0, (0.0,                                   0.0,    deck_height)) # abutment 1 (west)
-        model.node(1, (deck_length,                           0.0,    deck_height)) # abutment 2 (east)
+        model.node(0, (0.0,                                   0.0,    deck_height)) # abutment 1 (west) free end of the zero length element
+        model.node(1, (deck_length,                           0.0,    deck_height)) # abutment 2 (east) free end of the zero length element
         model.node(2, (skew_x+span1_length,                   0.0,    deck_height)) # mid-bent
         model.node(3, (span1_length,                 deck_width/3,    deck_height)) # top of column 1 (north)
         model.node(4, (span1_length,                 deck_width/3,            0.0)) # bottom of column 1 (north)
@@ -230,13 +230,15 @@ class Painter:
             model.node(9,  (skew_x,                           0.0,    deck_height)) # deck-abut interface (west)
             model.node(10, (deck_length-skew_x,               0.0,    deck_height)) # deck-abut interface (east) 
 
+        model.node(11, (0.0,                                   0.0,    deck_height)) #abutment 1 (west) fixed end of the zero length element
+        model.node(12, (deck_length,                           0.0,    deck_height)) #abutment 1 (east) fixed end of the zero length element
 
 
         # Boundary conditions, fully fixed at 0, 1, 4, 6
-        model.fix(0, (1, 1, 1, 1, 1, 1))
-        model.fix(1, (1, 1, 1, 1, 1, 1))
-        model.fix(4, (1, 1, 1, 1, 1, 1))
-        model.fix(6, (1, 1, 1, 1, 1, 1))
+        model.fix(11, (1, 1, 1, 1, 1, 1))
+        model.fix(12, (1, 1, 1, 1, 1, 1))
+        model.fix(4,  (1, 1, 1, 1, 1, 1))
+        model.fix(6,  (1, 1, 1, 1, 1, 1))
 
         #
         # Sections
@@ -253,6 +255,9 @@ class Painter:
         #     print(girder.summary())
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
+
+        model.uniaxialMaterial('Elastic', 5, 1000)
+        model.uniaxialMaterial('Elastic', 6, 100)
 
 
 
@@ -292,6 +297,10 @@ class Painter:
 
         model.element(beam_type, 103, ( 2, 10), **girder_element)
         model.element(beam_type, 104, (10,  1), **girder_element)
+
+        #abutment
+        model.element("zeroLength", 107, 0, 11, "mat",(5,5,6), "-dir",1,2,3) 
+        model.element("zeroLength", 108, 1, 12, "mat",(5,5,6), "-dir",1,2,3)
 
         # Bent
         model.element(beam_type, 105, ( 3,  2), **girder_element)
