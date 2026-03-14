@@ -256,7 +256,7 @@ class Painter:
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
-        model.uniaxialMaterial('Elastic', 5, 1000)
+        model.uniaxialMaterial('Elastic', 5, 50)
         model.uniaxialMaterial('Elastic', 6, 100)
 
 
