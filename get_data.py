@@ -112,7 +112,7 @@ if __name__ == "__main__":
             # sign-flipped when retrieved.
         if not MULTISUPPORT:
             input_channels = [1, 3]
-            input_dofs = [-1, 2] # CHECK NG: I had to add some logic for the X direction (it is opposite from the channel direction)
+            input_dofs = [-1, 2] 
         else:
             # `input_nodes` are FE model nodes for excitation; order
             # corresponds to `input_channels`
@@ -121,7 +121,6 @@ if __name__ == "__main__":
             input_dofs = [-1, 2, -1, 2, -1, 2, -1, 2]  # CHECK NG: I had to add some logic for the X direction (it is opposite from the channel direction)
         # CHECK NG: order was opposite; nodes 4 and 9 were flipped. (X goes from west to east)
         output_channels = [4, 7, 9]
-        # CHECK NG: moved output dofs here. Note: Y direction only.
         output_dofs = [2, 2, 2]
 
     for i,event in enumerate(events):
@@ -152,10 +151,7 @@ if __name__ == "__main__":
             outputs["field"]["displacement"] = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch in output_channels_displ])
             # triangulate_wirepot computes 2D triangulation to obtain X & Y displacements.
-            # TODO NG: Verify whether the wirepot_ref makes a difference in displacement results.
-            # If not, remove the wirepot_ref from the triangulate_wirepot function
-            outputs["field"]["displacement"] = triangulate_wirepot(outputs["field"]["displacement"],
-                                                                   wirepot_ref=wirepot_ref_226)
+            outputs["field"]["displacement"] = triangulate_wirepot(outputs["field"]["displacement"])
 
             outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch,dof in zip(output_channels_accel,output_dofs)])
@@ -235,7 +231,7 @@ if __name__ == "__main__":
             
 
         elif STRUCTURE == 'bridge':
-            output_nodes = [9, 3, 10] # CHECK NG: We are only using Y direction, so no repeat
+            output_nodes = [9, 3, 10] 
             output_elements = [3]
             yFiber = 22.5
             zFiber = 0.0
@@ -341,7 +337,7 @@ if __name__ == "__main__":
                 for source,quantities in qdict.items():
                     print(source, list(quantities.keys()))
 
-        # CHECK NG: use create_and_save_csv to save csvs, with argument rewrite
+        # Use create_and_save_csv to save csvs, with argument rewrite
         for location,location_dict in zip(["ground","structure"],[inputs,outputs]):
             for source,quantities in location_dict.items():
                 SOURCE_DIR = FIELD_OUT_DIR if source=="field" else MODEL_OUT_DIR
