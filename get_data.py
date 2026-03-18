@@ -89,7 +89,7 @@ if __name__ == "__main__":
         if not MULTISUPPORT:
             # Rows in data array parsed from txt file
             input_channels_accel = [0, 2] # x, y
-            # input_channels_displ = [0, 2] # x, y
+            input_channels_displ = [34, 35] # x, y
             input_dofs = [1, 2]
         output_channels_accel = [3, 4, 6, 7, 9, 10] # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
         output_channels_displ = [21, 22, 23, 24, 25, 26] # WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S 
@@ -113,11 +113,13 @@ if __name__ == "__main__":
             # sign-flipped when retrieved.
         if not MULTISUPPORT:
             input_channels_accel = [1, 3]
+            input_channels_displ = [1, 3]
             input_dofs = [-1, 2]
         else:
             # `input_nodes` are FE model nodes for excitation; order
             # corresponds to `input_channels`
             input_channels_accel = [1, 3, 15, 17, 18, 20]
+            input_channels_displ = [1, 3, 15, 17, 18, 20]
             input_nodes = [4, 4, 1, 1, 0, 0] # CHECK NG: should be node 4 instead of node 6, and nodes 1 and 0 were flipped
             input_dofs = [-1, 2, -1, 2, -1, 2, -1, 2]  # CHECK NG: I had to add some logic for the X direction (it is opposite from the channel direction)
         # CHECK NG: order was opposite; nodes 4 and 9 were flipped. (X goes from west to east)
@@ -146,6 +148,8 @@ if __name__ == "__main__":
             # Check NG: I added in the logic for flipping the sign of the sensor time series
             # here (not needed for the frame, but included for consistency).
             # Also, I consolidated the units into this computation.
+            inputs["field"]["displacement"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
+                                                         for ch,dof in zip(input_channels_displ,input_dofs)])
             inputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                                          for ch,dof in zip(input_channels_accel,input_dofs)])
             
@@ -158,15 +162,12 @@ if __name__ == "__main__":
                                              for ch,dof in zip(output_channels_accel,output_dofs)])
 
             if VERBOSE >= 2:
-                if not MULTISUPPORT:
-                    print(
-                        f"input sensor x: \n"
-                            f"\tName = {sensor_names[input_channels_accel[0]]}\n"
-                            f"\tUnits = {sensor_units[input_channels_accel[0]]}\n"
-                        f"input sensor y: \n"
-                            f"\tName = {sensor_names[input_channels_accel[1]]}\n"
-                            f"\tUnits = {sensor_units[input_channels_accel[1]]}"
-                        )
+                print("input accel channels:")
+                for ch in input_channels_accel:
+                    print(ch, sensor_names[ch], sensor_units[ch])
+                print("input displ channels:")
+                for ch in input_channels_displ:
+                    print(ch, sensor_names[ch], sensor_units[ch])
                 print("output accel channels:")
                 for ch in output_channels_accel:
                     print(ch, sensor_names[ch], sensor_units[ch])
@@ -187,7 +188,7 @@ if __name__ == "__main__":
                     i, events=events, channels=[*input_channels_accel, *output_channels],
                     scale=measurement_units_accel, response="accel")
                 measurements_displ, _  = get_measurements(
-                    i, events=events, channels=[*input_channels_accel, *output_channels],
+                    i, events=events, channels=[*input_channels_displ, *output_channels],
                     scale=measurement_units_displ, response="displ")
 
                 # CHECK NG: This is I where incorporated the logic for flipping the sign of the sensors
@@ -195,7 +196,7 @@ if __name__ == "__main__":
                                                    for ch,dof in zip(input_channels_accel,input_dofs)])
                 
                 inputs["field"]["displacement"] =  np.vstack([np.sign(dof)*measurements_displ[ch]
-                                                   for ch,dof in zip(input_channels_accel,input_dofs)])
+                                                   for ch,dof in zip(input_channels_displ,input_dofs)])
 
                 outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*measurements_accel[ch]
                                                    for ch,dof in zip(output_channels,output_dofs)])
