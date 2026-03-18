@@ -234,7 +234,7 @@ class Painter:
         model.node(12, (deck_length,                           0.0,    deck_height)) #abutment 1 (east) fixed end of the zero length element
 
 
-        # Boundary conditions, fully fixed at 0, 1, 4, 6
+        # Boundary conditions, fully fixed at 11, 12, 4, 6
         model.fix(11, (1, 1, 1, 1, 1, 1))
         model.fix(12, (1, 1, 1, 1, 1, 1))
         model.fix(4,  (1, 1, 1, 1, 1, 1))
@@ -256,8 +256,8 @@ class Painter:
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
-        model.uniaxialMaterial('Elastic', 5, 50)
-        model.uniaxialMaterial('Elastic', 6, 100)
+        model.uniaxialMaterial('Elastic', 5, 50) # Abutment horizontal stiffness
+        model.uniaxialMaterial('Elastic', 6, 100) # Abutment vertical stiffness
 
 
 
