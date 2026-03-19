@@ -13,7 +13,7 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]  #"elastic",
 OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
@@ -32,7 +32,7 @@ def modeling_path(model: str, source: str, quantity: str, location: str, event_i
 
 
 def modeling_dt_path(model: str, event_id: int | str, location: str = "ground"):
-    return MODELING_DIR / model / "field" / "dt" / location / f"{event_id}.txt"
+    return MODELING_DIR / model / "field" / "dt" / location / f"{event_id}.csv"
 
 
 def sid_training_dir(model: str, source: str, quantity: str, location: str):
@@ -78,8 +78,8 @@ if __name__ == "__main__":
                 if VERBOSE:
                     print(f"skip event {event_id}: missing modeling file(s)")
                 continue
-            inputs = np.loadtxt(input_path, delimiter=",")
-            out_true = np.loadtxt(out_true_path, delimiter=",")
+            inputs = np.atleast_2d(np.loadtxt(input_path))
+            out_true = np.atleast_2d(np.loadtxt(out_true_path))
             with open(dt_path, "r") as f:
                 dt = float(f.read().strip())
             nt = inputs.shape[1]
@@ -175,12 +175,6 @@ if __name__ == "__main__":
             np.savetxt(pred_dir/"outputs_true_processed.csv", out_true_aln_array)
             np.savetxt(pred_dir/"outputs_pred_processed.csv", out_pred_aln_array)
             np.savetxt(pred_dir/"time_processed.csv", time_aln)
-
-            # true to 0.0
-            # out_true_aln_array1 = out_true_aln_array.copy()
-            # for ch in range(out_true_aln_array.shape[0]):
-            #     offset = np.mean(out_pred_aln_array[ch]) - np.mean(out_true_aln_array[ch])
-            #     out_true_aln_array1[ch] = out_true_aln_array[ch] + offset
             
             # Compute errors
             for i,output_label in enumerate(out_labels):
