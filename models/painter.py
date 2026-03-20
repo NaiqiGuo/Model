@@ -43,7 +43,7 @@ class Painter:
         self.Es = 30e3*units.ksi
         self.Gs = self.Es / (2*(1+0.3))
 
-        self.fc_unconf = 4.0*units.ksi   # unconfined concrete
+        self.fc_unconf = 6.0*units.ksi   # unconfined concrete
         self.fc_conf   = 5.0*units.ksi  # confined concrete
 
         self.poisson = 0.24
@@ -231,14 +231,17 @@ class Painter:
             model.node(10, (deck_length-skew_x,               0.0,    deck_height)) # deck-abut interface (east) 
 
         model.node(11, (0.0,                                   0.0,    deck_height)) #abutment 1 (west) fixed end of the zero length element
-        model.node(12, (deck_length,                           0.0,    deck_height)) #abutment 1 (east) fixed end of the zero length element
+        model.node(12, (deck_length,                           0.0,    deck_height)) #abutment 2 (east) fixed end of the zero length element
+
+        model.node(13, (span1_length,                 deck_width/3,            0.0)) #abutment 3 (west) fixed end of the zero length element
+        model.node(14, (2*skew_x+span1_length,       -deck_width/3,            0.0)) #abutment 4 (east) fixed end of the zero length element
 
 
         # Boundary conditions, fully fixed at 11, 12, 4, 6
-        model.fix(11, (1, 1, 1, 1, 1, 1))
-        model.fix(12, (1, 1, 1, 1, 1, 1))
-        model.fix(4,  (1, 1, 1, 1, 1, 1))
-        model.fix(6,  (1, 1, 1, 1, 1, 1))
+        model.fix(11,  (1, 1, 1, 1, 1, 1))
+        model.fix(12,  (1, 1, 1, 1, 1, 1))
+        model.fix(13,  (1, 1, 1, 1, 1, 1))
+        model.fix(14,  (1, 1, 1, 1, 1, 1))
 
         #
         # Sections
@@ -256,7 +259,8 @@ class Painter:
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
-        model.uniaxialMaterial('Elastic', 5, 50) # Abutment horizontal stiffness
+        model.uniaxialMaterial('Elastic', 5, 2500) # column horizontal stiffness
+        model.uniaxialMaterial('Elastic', 7, 2000) # Abutment horizontal stiffness
         model.uniaxialMaterial('Elastic', 6, 100) # Abutment vertical stiffness
 
 
@@ -299,8 +303,11 @@ class Painter:
         model.element(beam_type, 104, (10,  1), **girder_element)
 
         #abutment
-        model.element("zeroLength", 107, 0, 11, "-mat",(5,5,6), "-dir",1,2,3) 
-        model.element("zeroLength", 108, 1, 12, "-mat",(5,5,6), "-dir",1,2,3)
+        model.element("zeroLength", 107, 0, 11, "-mat",(7,7,6), "-dir",1,2,3) 
+        model.element("zeroLength", 108, 1, 12, "-mat",(7,7,6), "-dir",1,2,3)
+
+        model.element("zeroLength", 109, 4, 13, "-mat",(5,5,6), "-dir",1,2,3) 
+        model.element("zeroLength", 110, 6, 14, "-mat",(5,5,6), "-dir",1,2,3)
 
         # Bent
         model.element(beam_type, 105, ( 3,  2), **girder_element)
@@ -308,7 +315,7 @@ class Painter:
 
         # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
         # model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
-        apply_damping(model, zeta=[0.02, 0.02], verbose=verbose)
+        apply_damping(model, zeta=[0.05, 0.05], verbose=verbose)
 
         return model
 
