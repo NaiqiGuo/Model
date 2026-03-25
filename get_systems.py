@@ -105,5 +105,6 @@ if __name__ == "__main__":
                 system_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(system_path, "wb") as f:
                     pickle.dump(system, f)
-    if VERBOSE:
+    
+    if VERBOSE and len(failed_events) > 0:
         print(f"Failed events: {failed_events}")
