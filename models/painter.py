@@ -43,12 +43,13 @@ class Painter:
         self.Es = 30e3*units.ksi
         self.Gs = self.Es / (2*(1+0.3))
 
-        self.fc_unconf = 4.0*units.ksi  # unconfined concrete
-        self.fc_conf   = 5.0*units.ksi  # confined concrete
+        self.fc_unconf = 3.0*units.ksi  # unconfined concrete
+        self.fc_conf   = 3.0*units.ksi  # confined concrete
 
         self.poisson = 0.24
 
-        self.Ec = 57.0 * math.sqrt(self.fc_unconf/units.psi)*units.ksi
+        # self.Ec = 57.0 * math.sqrt(self.fc_unconf/units.psi)*units.ksi
+        self.Ec = 3604.9965325919525*units.ksi # (corresponding to fc_unconf=4 ksi) 
         self.Gc = self.Ec / (2*(1+self.poisson))
 
         self.materials = {
