@@ -20,6 +20,11 @@ OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
 WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
+Q_MAP = {
+    "acceleration": {"name": "Acceleration", "units": "in/s²"},
+    "displacement": {"name": "Displacement", "units": "in"},
+        }
+
 # I/O directories
 MODELING_DIR = Path("Modeling")
 SYSTEM_ID_DIR = Path("System ID")
@@ -224,14 +229,14 @@ if __name__ == "__main__":
                 fig_go[j].update_layout(
                     title=f"Event {event_id} Prediction, {dirs[j]} direction",
                     xaxis_title="Time (s)",
-                    yaxis_title="Displacement (in)",
+                    yaxis_title=f"{Q_MAP[OUTPUT_QUANTITY]["name"]} ({Q_MAP[OUTPUT_QUANTITY]["units"]})",
                     legend=dict(orientation="h", yanchor="bottom", y=0.0, xanchor="left", x=0,
                                 font=dict(size=18)),
                 )
                 fig_go[j].update_xaxes(rangeslider=dict(visible=True))
                 fig_go[j].write_html(pred_dir/f"prediction_{dirs[j]}.html", include_plotlyjs="cdn")
             fig_plt.align_ylabels()
-            fig_plt.suptitle(f"Event {event_id} Displacement Response (in)")
+            fig_plt.suptitle(f"Event {event_id} {Q_MAP[OUTPUT_QUANTITY]["name"]} ({Q_MAP[OUTPUT_QUANTITY]["units"]})")
             fig_plt.savefig(pred_dir/"prediction.png", dpi=350)
             plt.close(fig_plt)
 
