@@ -216,7 +216,7 @@ class Painter:
 
         deck_length = 2*skew_x + span1_length + span2_length
 
-        density = 150.0 * (units.lbf/units.ft**3)/units.gravity  # mass density of concrete in lb/in^3
+        density = 150.0 * (units.lbf/units.ft**3)/units.gravity  # mass density of concrete
 
         # Nodes: (tag, (x, y, z))
         model.node(0, (0.0,                                   0.0,    deck_height)) # abutment 1 (west) free end of the zero length element
@@ -230,14 +230,14 @@ class Painter:
             model.node(9,  (skew_x,                           0.0,    deck_height)) # deck-abut interface (west)
             model.node(10, (deck_length-skew_x,               0.0,    deck_height)) # deck-abut interface (east) 
 
-        model.node(11, (0.0,                                   0.0,    deck_height)) #abutment 1 (west) fixed end of the zero length element
-        model.node(12, (deck_length,                           0.0,    deck_height)) #abutment 2 (east) fixed end of the zero length element
+        model.node(11, (0.0,                                   0.0,    deck_height)) # abutment 1 (west) fixed end of the zero length element
+        model.node(12, (deck_length,                           0.0,    deck_height)) # abutment 2 (east) fixed end of the zero length element
 
-        model.node(13, (span1_length,                 deck_width/3,            0.0)) #abutment 3 (west) fixed end of the zero length element
-        model.node(14, (2*skew_x+span1_length,       -deck_width/3,            0.0)) #abutment 4 (east) fixed end of the zero length element
+        model.node(13, (span1_length,                 deck_width/3,            0.0)) # column 1 (north) fixed end of the zero length element
+        model.node(14, (2*skew_x+span1_length,       -deck_width/3,            0.0)) # column 2 (south) fixed end of the zero length element
 
 
-        # Boundary conditions, fully fixed at 11, 12, 4, 6
+        # Boundary conditions, fully fixed at abutments (11,12) and column bases (13,14)
         model.fix(11,  (1, 1, 1, 1, 1, 1))
         model.fix(12,  (1, 1, 1, 1, 1, 1))
         model.fix(13,  (1, 1, 1, 1, 1, 1))
@@ -259,9 +259,9 @@ class Painter:
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
-        model.uniaxialMaterial('Elastic', 5, 2500) # column horizontal stiffness
-        model.uniaxialMaterial('Elastic', 7, 2000) # Abutment horizontal stiffness
-        model.uniaxialMaterial('Elastic', 6, 100) # Abutment vertical stiffness
+        model.uniaxialMaterial('Elastic', 5, 2500) # column base horizontal stiffness
+        model.uniaxialMaterial('Elastic', 7, 2000) # abutment horizontal stiffness
+        model.uniaxialMaterial('Elastic', 6, 100)  # column base and abutment vertical stiffness
 
 
 
@@ -296,16 +296,15 @@ class Painter:
 
         # Girders
         model.element(beam_type, 101, ( 0,  9), **girder_element)
-        
         model.element(beam_type, 102, ( 9, 2),  **girder_element)
-
         model.element(beam_type, 103, ( 2, 10), **girder_element)
         model.element(beam_type, 104, (10,  1), **girder_element)
 
-        #abutment
+        # Abutments
         model.element("zeroLength", 107, 0, 11, "-mat",(7,7,6), "-dir",1,2,3) 
         model.element("zeroLength", 108, 1, 12, "-mat",(7,7,6), "-dir",1,2,3)
 
+        # Column bases
         model.element("zeroLength", 109, 4, 13, "-mat",(5,5,6), "-dir",1,2,3) 
         model.element("zeroLength", 110, 6, 14, "-mat",(5,5,6), "-dir",1,2,3)
 
