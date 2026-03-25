@@ -43,7 +43,7 @@ class Painter:
         self.Es = 30e3*units.ksi
         self.Gs = self.Es / (2*(1+0.3))
 
-        self.fc_unconf = 6.0*units.ksi   # unconfined concrete
+        self.fc_unconf = 4.0*units.ksi  # unconfined concrete
         self.fc_conf   = 5.0*units.ksi  # confined concrete
 
         self.poisson = 0.24
@@ -195,6 +195,7 @@ class Painter:
                     echo_file=None,
                     multisupport:bool=False,
                     separate_deck_ends:bool = True,
+                    column_base_springs:bool = True,
                     verbose = False):
 
         units = self.units
@@ -233,15 +234,20 @@ class Painter:
         model.node(11, (0.0,                                   0.0,    deck_height)) # abutment 1 (west) fixed end of the zero length element
         model.node(12, (deck_length,                           0.0,    deck_height)) # abutment 2 (east) fixed end of the zero length element
 
-        model.node(13, (span1_length,                 deck_width/3,            0.0)) # column 1 (north) fixed end of the zero length element
-        model.node(14, (2*skew_x+span1_length,       -deck_width/3,            0.0)) # column 2 (south) fixed end of the zero length element
+        if column_base_springs:
+            model.node(13, (span1_length,                 deck_width/3,            0.0)) # column 1 (north) fixed end of the zero length element
+            model.node(14, (2*skew_x+span1_length,       -deck_width/3,            0.0)) # column 2 (south) fixed end of the zero length element
 
 
-        # Boundary conditions, fully fixed at abutments (11,12) and column bases (13,14)
+        # Boundary conditions, fully fixed at abutments (11,12) and column bases (13,14) if springs; (4,6) if no springs
         model.fix(11,  (1, 1, 1, 1, 1, 1))
         model.fix(12,  (1, 1, 1, 1, 1, 1))
-        model.fix(13,  (1, 1, 1, 1, 1, 1))
-        model.fix(14,  (1, 1, 1, 1, 1, 1))
+        if column_base_springs:
+            model.fix(13,  (1, 1, 1, 1, 1, 1))
+            model.fix(14,  (1, 1, 1, 1, 1, 1))
+        else:
+            model.fix(4,  (1, 1, 1, 1, 1, 1))
+            model.fix(6,  (1, 1, 1, 1, 1, 1))
 
         #
         # Sections
@@ -259,10 +265,16 @@ class Painter:
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
-        model.uniaxialMaterial('Elastic', 5, 2500) # column base horizontal stiffness
-        model.uniaxialMaterial('Elastic', 7, 2000) # abutment horizontal stiffness
-        model.uniaxialMaterial('Elastic', 6, 100)  # column base and abutment vertical stiffness
+        if column_base_springs:
+            model.uniaxialMaterial('Elastic', 5,   10e5) # column base horizontal stiffness
+            model.uniaxialMaterial('Elastic', 6,   10e8) # column base vertical stiffness (virtually rigid)
+            model.uniaxialMaterial('Elastic', 7,   10e5) # column base x/y rotational stiffness
+            model.uniaxialMaterial('Elastic', 8,   10e5) # column base z rotational stiffness
 
+        model.uniaxialMaterial('Elastic', 9,   5000) # abutment horizontal stiffness
+        model.uniaxialMaterial('Elastic', 10,  10e8) # abutment vertical stiffness (virtually rigid)
+        model.uniaxialMaterial('Elastic', 11, 10000) # abutment x/y rotational stiffness
+        model.uniaxialMaterial('Elastic', 12,  10e8) # abutment z rotational stiffness (virtually rigid)
 
 
         # Transformations and elements
@@ -300,13 +312,14 @@ class Painter:
         model.element(beam_type, 103, ( 2, 10), **girder_element)
         model.element(beam_type, 104, (10,  1), **girder_element)
 
-        # Abutments
-        model.element("zeroLength", 107, 0, 11, "-mat",(7,7,6), "-dir",1,2,3) 
-        model.element("zeroLength", 108, 1, 12, "-mat",(7,7,6), "-dir",1,2,3)
+        if column_base_springs:
+            # Column bases
+            model.element("zeroLength", 109, 4, 13, "-mat",(5,5,6,7,7,8), "-dir",1,2,3,4,5,6) 
+            model.element("zeroLength", 110, 6, 14, "-mat",(5,5,6,7,7,8), "-dir",1,2,3,4,5,6)
 
-        # Column bases
-        model.element("zeroLength", 109, 4, 13, "-mat",(5,5,6), "-dir",1,2,3) 
-        model.element("zeroLength", 110, 6, 14, "-mat",(5,5,6), "-dir",1,2,3)
+        # Abutments
+        model.element("zeroLength", 107, 0, 11, "-mat",(9,9,10,11,11,12), "-dir",1,2,3,4,5,6) 
+        model.element("zeroLength", 108, 1, 12, "-mat",(9,9,10,11,11,12), "-dir",1,2,3,4,5,6)
 
         # Bent
         model.element(beam_type, 105, ( 3,  2), **girder_element)
