@@ -44,7 +44,7 @@ class Painter:
         self.Gs = self.Es / (2*(1+0.3))
 
         self.fc_unconf = 6.0*units.ksi   # unconfined concrete
-        self.fc_conf   = 5.0*units.ksi  # confined concrete
+        self.fc_conf   = 6.0*units.ksi  # confined concrete
 
         self.poisson = 0.24
 
@@ -259,9 +259,10 @@ class Painter:
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
-        model.uniaxialMaterial('Elastic', 5, 2500) # column horizontal stiffness
-        model.uniaxialMaterial('Elastic', 7, 2000) # Abutment horizontal stiffness
-        model.uniaxialMaterial('Elastic', 6, 100) # Abutment vertical stiffness
+        model.uniaxialMaterial('Elastic', 5, 20000) # column horizontal stiffness
+        model.uniaxialMaterial('Elastic', 7, 15000) # Abutment horizontal stiffness
+        model.uniaxialMaterial('Elastic', 6, 8000) # Abutment vertical stiffness
+        model.uniaxialMaterial('Elastic', 8, 8000) # Abutment vertical stiffness
 
 
 
@@ -306,8 +307,8 @@ class Painter:
         model.element("zeroLength", 107, 0, 11, "-mat",(7,7,6), "-dir",1,2,3) 
         model.element("zeroLength", 108, 1, 12, "-mat",(7,7,6), "-dir",1,2,3)
 
-        model.element("zeroLength", 109, 4, 13, "-mat",(5,5,6), "-dir",1,2,3) 
-        model.element("zeroLength", 110, 6, 14, "-mat",(5,5,6), "-dir",1,2,3)
+        model.element("zeroLength", 109, 4, 13, "-mat",(5,5,8), "-dir",1,2,3) 
+        model.element("zeroLength", 110, 6, 14, "-mat",(5,5,8), "-dir",1,2,3)
 
         # Bent
         model.element(beam_type, 105, ( 3,  2), **girder_element)
