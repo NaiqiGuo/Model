@@ -1,3 +1,4 @@
+import math
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -49,11 +50,8 @@ if __name__ == "__main__":
         # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
         out_labels = ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y', ]
     elif MODEL == "bridge":
-        # out_nodes = [2,3,5]
-        # out_labels = ['Deck, X', 'Deck, Y', 'Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y', ]
-        out_nodes = [3,5] #[3,5]
-        out_labels = ['Col 1, X', 'Col 1, Y', 'Col 2, X', 'Col 2, Y']
-    # out_labels = [f'Node{i}{dof}' for i in out_nodes for dof in ['X','Y']]
+        out_nodes = [9, 3, 10]
+        out_labels = ['West Deck Interface, Y', 'Column 1 Top, Y', 'East Deck Interface, Y']
 
 
     for elas in elas_cases:
@@ -78,8 +76,8 @@ if __name__ == "__main__":
                 if VERBOSE:
                     print(f"skip event {event_id}: missing modeling file(s)")
                 continue
-            inputs = np.atleast_2d(np.loadtxt(input_path))
-            out_true = np.atleast_2d(np.loadtxt(out_true_path))
+            inputs = np.loadtxt(input_path)
+            out_true = np.loadtxt(out_true_path)
             with open(dt_path, "r") as f:
                 dt = float(f.read().strip())
             nt = inputs.shape[1]
@@ -157,7 +155,7 @@ if __name__ == "__main__":
             np.savetxt(train_ground_dir / f"{event_id}.csv", input_array, delimiter=",")
             np.savetxt(train_struct_dir / f"{event_id}.csv", out_true_aln_array, delimiter=",")
             np.savetxt(train_time_dir / f"{event_id}.csv", time_aln, delimiter=",")
-            np.savetxt(train_dt_dir / f"{event_id}.txt", np.array([dt]))
+            np.savetxt(train_dt_dir / f"{event_id}.csv", np.array([dt]))
 
             # Save README-compliant System ID Results.
             sid_pred_dir = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "prediction")
@@ -195,29 +193,35 @@ if __name__ == "__main__":
             np.savetxt(sid_err_dir / f"{event_id}.csv", errors[k], delimiter=",")
 
             # Plot true vs predicted output timeseries
-            fig_plt, axs = plt.subplots(int(len(out_labels)/2), 2,
+            dirs = ['X','Y']
+            n_rows = max(1, max(sum(d in label for label in out_labels) for d in dirs))
+            fig_plt, axs = plt.subplots(n_rows, 2,
                                         figsize=(14,len(out_labels)),
                                         sharex=True,
                                         constrained_layout=True) # matplotlib
+            axs = np.atleast_2d(axs)
             fig_go = [go.Figure(), go.Figure()] # plotly
-            dirs = ['X','Y']
             for j in range(2):
                 colors_go = iter(["blue","darkorange","green"])
+                row_idx = 0
                 for i,out_label in enumerate(out_labels):
                     if dirs[j] in out_label:
-                        r = i//2
                         color = next(colors_go)
-                        axs[r,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
-                        axs[r,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
-                        axs[r,j].set_ylabel(out_label)
-                        axs[r,j].legend()
+                        axs[row_idx,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
+                        axs[row_idx,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
+                        axs[row_idx,j].set_ylabel(out_label)
+                        axs[row_idx,j].legend()
                         fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array[i],
                                               mode="lines", line=dict(color=color),
                                               name=f"True {out_label}")
                         fig_go[j].add_scatter(x=time_aln, y=out_pred_aln_array[i],
                                               mode="lines", line=dict(color=color, dash="dash"),
                                               name=f"Pred {out_label}")
-                axs[r,j].set_xlabel(f"Time (s)")
+                        row_idx += 1
+                for r in range(n_rows):
+                    axs[r,j].set_xlabel("Time (s)")
+                    if r >= row_idx:
+                        axs[r,j].set_visible(False)
                 fig_go[j].update_layout(
                     title=f"Event {event_id} Prediction, {dirs[j]} direction",
                     xaxis_title="Time (s)",
