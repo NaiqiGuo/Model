@@ -1,4 +1,3 @@
-import math
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -173,12 +172,6 @@ if __name__ == "__main__":
             np.savetxt(pred_dir/"outputs_true_processed.csv", out_true_aln_array)
             np.savetxt(pred_dir/"outputs_pred_processed.csv", out_pred_aln_array)
             np.savetxt(pred_dir/"time_processed.csv", time_aln)
-
-            # true to 0.0
-            # out_true_aln_array1 = out_true_aln_array.copy()
-            # for ch in range(out_true_aln_array.shape[0]):
-            #     offset = np.mean(out_pred_aln_array[ch]) - np.mean(out_true_aln_array[ch])
-            #     out_true_aln_array1[ch] = out_true_aln_array[ch] + offset
             
             # Compute errors
             for i,output_label in enumerate(out_labels):
