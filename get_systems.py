@@ -14,7 +14,7 @@ import pickle
 SID_METHOD = 'srim'
 STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 
 # Verbosity
 # False means print nothing;
