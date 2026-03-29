@@ -13,10 +13,10 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 SID_METHOD = "srim"
 elas_cases = ["elastic", "inelastic"]  #"elastic",
-OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
+OUTPUT_QUANTITY = "acceleration"  # "displacement" or "acceleration"
 WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
@@ -197,24 +197,36 @@ if __name__ == "__main__":
             np.savetxt(sid_err_dir / f"{event_id}.csv", errors[k], delimiter=",")
 
             # Plot true vs predicted output timeseries
-            dirs = ['X','Y']
+            if MODEL == "frame":
+                dirs = ['X', 'Y']
+            elif MODEL == "bridge":
+                dirs = ['Y']
             n_rows = max(1, max(sum(d in label for label in out_labels) for d in dirs))
-            fig_plt, axs = plt.subplots(n_rows, 2,
-                                        figsize=(14,len(out_labels)),
-                                        sharex=True,
-                                        constrained_layout=True) # matplotlib
-            axs = np.atleast_2d(axs)
-            fig_go = [go.Figure(), go.Figure()] # plotly
-            for j in range(2):
+            n_cols = len(dirs)
+            fig_plt, axs = plt.subplots(
+                n_rows, n_cols,
+                figsize=(16, 4.5 * n_rows),
+                sharex=True
+            )
+            axs = np.array(axs, ndmin=2)
+            if n_cols == 1:
+                axs = axs.reshape(n_rows, 1)
+            fig_go = [go.Figure() for _ in range(n_cols)]
+
+            for j, direction in enumerate(dirs):
                 colors_go = iter(["blue","darkorange","green"])
                 row_idx = 0
                 for i,out_label in enumerate(out_labels):
-                    if dirs[j] in out_label:
+                    if direction in out_label:
                         color = next(colors_go)
                         axs[row_idx,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
                         axs[row_idx,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
-                        axs[row_idx,j].set_ylabel(out_label)
-                        axs[row_idx,j].legend()
+                        axs[row_idx,j].set_title(out_label, fontsize=16)
+                        axs[row_idx,j].set_ylabel(
+                            f"{Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']})",
+                            fontsize=16
+                        )
+                        axs[row_idx,j].legend(fontsize=16, loc="upper right")
                         fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array[i],
                                               mode="lines", line=dict(color=color),
                                               name=f"True {out_label}")
