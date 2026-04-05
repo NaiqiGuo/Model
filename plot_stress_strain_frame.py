@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-STRUCTURE_TYPE = "bridge" 
-RESPONSE_TYPE = "elastic"
-ELEMENT_ID = 3
+STRUCTURE_TYPE = "frame"
+RESPONSE_TYPE = "inelastic"
+ELEMENT_ID = 1
 
 
 def load_stress_strain_for_event(filepath, element_id):
@@ -65,19 +65,15 @@ def plot_stress_strain_each_event(
     Plot one stress-strain curve per event for the selected structure.
     The figure is saved inside each event directory.
     """
-    data_dir = Path(structure_type) / response_type
-    event_dirs = iter_event_dirs(data_dir)
+    strain_stress_dir = Path("Modeling") / structure_type / response_type / "strain_stress"
+    data_dir = strain_stress_dir / "structure"
+    csv_paths = sorted(data_dir.glob("*.csv"), key=lambda p: int(p.stem))
 
-    if not event_dirs:
-        raise FileNotFoundError(f"No event folders found in {data_dir}")
+    if not csv_paths:
+        raise FileNotFoundError(f"No event csv files found in {data_dir}")
 
-    for event_dir in event_dirs:
-        filepath = event_dir / "strain_stress.csv"
-        if not filepath.exists():
-            print(f"[Skip] Missing {filepath}")
-            continue
-
-        event_label = event_dir.name
+    for filepath in csv_paths:
+        event_label = filepath.stem
         strain, stress = load_stress_strain_for_event(filepath, element_id)
         if strain is None:
             print(f"[Skip] No valid data in {filepath}")
@@ -94,7 +90,7 @@ def plot_stress_strain_each_event(
         plt.grid(True)
         plt.tight_layout()
 
-        outpath = event_dir / f"stress_strain_ele{element_id}.png"
+        outpath = data_dir / f"{structure_type}_{response_type}_E{event_label}_ele{element_id}.png"
         plt.savefig(outpath, dpi=300)
         plt.close()
 
