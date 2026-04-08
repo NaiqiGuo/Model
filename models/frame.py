@@ -1,5 +1,6 @@
 import xara
 import xara.units.iks as units
+from xsection.library import from_aisc
 import numpy as np
 import math
 from models.analysis import apply_damping
@@ -92,27 +93,32 @@ def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBar
 
 
 def create_frame(elastic:bool,
-                multisupport:bool,
-                verbose = False):
+                 multisupport:bool,
+                 coupons = False,
+                 material = 'concrete',
+                 verbose = False):
 
     # create Model in three-dimensions with 6 DOF/node
     model = xara.Model(ndm=3, ndf=6)
 
-    # Geometry and Material Properties
+    # General model definition scheme:
+        # Geometry
         # Nodes(location)
         # Boundary conditions(nodes)
-        # Elements(nodes, material properties,                             geometric transformation)
-                          # non-fiber section elastic (linear)              # linear
-                          # fiber section (linear elastic OR inelastic)     # PDelta
-                                                                            # corotational
+        # Materials
+        # Sections
+        # Elements(nodes, material properties,                         geometric transformation)
+                        # non-fiber section elastic (linear)              # linear
+                        # fiber section (linear elastic OR inelastic)     # PDelta
+                                                                          # corotational
 
     # Geometry
-    # ---------------
+    # --------------------------------------------
 
     # Set parameters for model geometry
-    h  = 82.0;      # Story height 82 144
-    by = 96.0;      # Bay width in Y-direction 96 240
-    bx = 72.0;      # Bay width in X-direction 72 240
+    h  = 82.0*units.inch;      # Story height 82 inches
+    bx = 72.0*units.inch;      # Bay width in X-direction 72 inches
+    by = 96.0*units.inch;      # Bay width in Y-direction 96 inches
 
     # Create nodes
     #            tag    X        Y       Z 
@@ -136,151 +142,211 @@ def create_frame(elastic:bool,
     model.node(17, ( bx/2.0, -by/2.0, 3.0*h))
     model.node(18, (-bx/2.0, -by/2.0, 3.0*h))
 
+    if coupons:
+        model.node(21, (-bx/2.0,  by/2.0,   0.0))
+        model.node(22, ( bx/2.0,  by/2.0,   0.0))
+        model.node(23, ( bx/2.0, -by/2.0,   0.0))
+        model.node(24, (-bx/2.0, -by/2.0,   0.0))
+
+        model.node(25, (-bx/2.0,  by/2.0,     h))
+        model.node(26, ( bx/2.0,  by/2.0,     h))
+        model.node(27, ( bx/2.0, -by/2.0,     h))
+        model.node(28, (-bx/2.0, -by/2.0,     h))
+
+        model.node(30, (-bx/2.0,  by/2.0, 2.0*h))
+        model.node(31, ( bx/2.0,  by/2.0, 2.0*h))
+        model.node(32, ( bx/2.0, -by/2.0, 2.0*h))
+        model.node(33, (-bx/2.0, -by/2.0, 2.0*h))
+
+        model.node(35, (-bx/2.0,  by/2.0, 3.0*h))
+        model.node(36, ( bx/2.0,  by/2.0, 3.0*h))
+        model.node(37, ( bx/2.0, -by/2.0, 3.0*h))
+        model.node(38, (-bx/2.0, -by/2.0, 3.0*h))
 
     # Set base constraints
-    #      tag DX DY DZ RX RY RZ
-    model.fix(1, (1, 1, 1, 1, 1, 1))
-    model.fix(2, (1, 1, 1, 1, 1, 1))
-    model.fix(3, (1, 1, 1, 1, 1, 1))
-    model.fix(4, (1, 1, 1, 1, 1, 1))
-
-
-    # Define materials for nonlinear columns
-    # --------------------------------------
-    # CONCRETE
-    fc = 4.0 # unconfined
-    fpc = 5.0 # confined
-    Ec = 57000.0*math.sqrt(fc*1000.0)/1000.0
-    if not elastic:
-        # Core concrete (confined)
-        #                                 tag  f'c   epsc0  f'cu  epscu
-        model.uniaxialMaterial("Concrete01", 1, -fpc, -2*fpc/Ec, -3.5, -0.02)
-        # Cover concrete (unconfined)
-        #                                 tag  f'c   epsc0  f'cu  epscu
-        model.uniaxialMaterial("Concrete01", 2, -fc, -2*fc/Ec, 0.0, -0.006)
+    if coupons:
+        #      tag DX DY DZ RX RY RZ
+        model.fix(21, (1, 1, 1, 1, 1, 1))
+        model.fix(22, (1, 1, 1, 1, 1, 1))
+        model.fix(23, (1, 1, 1, 1, 1, 1))
+        model.fix(24, (1, 1, 1, 1, 1, 1))
     else:
-        # Core concrete
-        model.uniaxialMaterial("Elastic", 1, Ec)
-        # Cover concrete
-        model.uniaxialMaterial("Elastic", 2, Ec)
+        #      tag DX DY DZ RX RY RZ
+        model.fix(1, (1, 1, 1, 1, 1, 1))
+        model.fix(2, (1, 1, 1, 1, 1, 1))
+        model.fix(3, (1, 1, 1, 1, 1, 1))
+        model.fix(4, (1, 1, 1, 1, 1, 1))
 
+
+    # Materials
+    # --------------------------------------------
+    core_concrete_mat = 1
+    cover_concrete_mat = 2
+    steel_mat = 3
+    # Only the concrete frame has concrete
+    if material == 'concrete':
+        # CONCRETE
+        fc = 4.0 # unconfined
+        fpc = 5.0 # confined
+        fpcu = 3.5 # ultimate
+        Ec = 57000.0*math.sqrt(fc*1000.0)/1000.0
+        if not elastic:
+            # Core concrete (confined)
+            #                                        tag             f'c   epsc0      f'cu  epscu
+            model.uniaxialMaterial("Concrete01", core_concrete_mat, -fpc, -2*fpc/Ec, -fpcu, -0.02)
+            # Cover concrete (unconfined)
+            #                                        tag             f'c   epsc0      f'cu  epscu
+            model.uniaxialMaterial("Concrete01", cover_concrete_mat, -fc, -2*fc/Ec, 0.0, -0.006)
+        else:
+            # Core concrete
+            model.uniaxialMaterial("Elastic", core_concrete_mat, Ec)
+            # Cover concrete
+            model.uniaxialMaterial("Elastic", cover_concrete_mat, Ec)
+
+    # Both the concrete and steel frame have steel
     # STEEL
     fy = 60.0;       # Yield stress
     Es = 30000.0;    # Young's modulus
-    # Reinforcing steel 
     if not elastic:
-        #                                tag fy  E0  b
-        model.uniaxialMaterial("Steel01", 3, fy, Es, 0.02)
+        #                                    tag     fy  E0  b
+        model.uniaxialMaterial("Steel01", steel_mat, fy, Es, 0.02)
     else:
-        model.uniaxialMaterial("Elastic", 3, Es)
+        model.uniaxialMaterial("Elastic", steel_mat, Es)
 
 
-    # Define column elements
-    # ----------------------
-    # Column parameters
-    h_col  = 20.0
-    b_col = 20.0
-    GJ = 1.0E10
-    colSec = 1
-    beamSec = 2
+    # Column sections and elements
+    # --------------------------------------------
+    col_sec = 1
 
-    ReinforcedRectangle(model, colSec,
-                        h=h_col, 
-                        b=b_col,
-                        cover=2.5, 
-                        coreID=1,
-                        coverID=2,
-                        steelID=3,
-                        numBars=3,
-                        barArea=0.79,
-                        nfCoreY=8,      
-                        nfCoreZ=8,      
-                        nfCoverY=10,      
-                        nfCoverZ=10,
-                        GJ=GJ)
+    if material == 'steel':
+        # See https://peer-open-source.github.io/xsection/examples/fibers
+        # See https://xara.so/user/manual/section/ShearFiber.html
+        shape = from_aisc("HSS5X5X3/8", units=units)
+        model.section("FiberSection", col_sec, GJ=1.0E8)
+        for fiber in shape.create_fibers():
+            model.fiber(**fiber, material=steel_mat, section=col_sec)
+    elif material == 'concrete':
+        GJ = 1.0E10
+        h_col  = 20.0
+        b_col = 20.0
+        ReinforcedRectangle(model, col_sec,
+                            h=h_col, 
+                            b=b_col,
+                            cover=2.5, 
+                            coreID=1,
+                            coverID=2,
+                            steelID=3,
+                            numBars=3,
+                            barArea=0.79,
+                            nfCoreY=8,      
+                            nfCoreZ=8,      
+                            nfCoverY=10,      
+                            nfCoverZ=10,
+                            GJ=GJ)
+    
     # Number of column integration points (sections)
     itg_col = 1
     npts_col = 4
-    model.beamIntegration("Lobatto", itg_col, colSec, npts_col)
+    model.beamIntegration("Lobatto", itg_col, col_sec, npts_col)
         
     # Geometric transformation for columns
     colTransf = 1
     model.geomTransf("Linear", colTransf, (1.0, 0.0, 0.0))
 
     #                                tag ndI ndJ transfTag integrationTag
-    model.element("forceBeamColumn",  1, ( 1,  5), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn",  2, ( 2,  6), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn",  3, ( 3,  7), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn",  4, ( 4,  8), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  1, ( 1,  5), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn",  2, ( 2,  6), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn",  3, ( 3,  7), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn",  4, ( 4,  8), transform=colTransf, section=col_sec, shear=0)
 
-    model.element("forceBeamColumn",  5, ( 5, 10), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn",  6, ( 6, 11), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn",  7, ( 7, 12), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn",  8, ( 8, 13), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  5, ( 5, 10), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn",  6, ( 6, 11), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn",  7, ( 7, 12), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn",  8, ( 8, 13), transform=colTransf, section=col_sec, shear=0)
 
-    model.element("forceBeamColumn",  9, (10, 15), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn", 10, (11, 16), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn", 11, (12, 17), transform=colTransf, section=colSec, shear=0)
-    model.element("forceBeamColumn", 12, (13, 18), transform=colTransf, section=colSec, shear=0)
+    model.element("forceBeamColumn",  9, (10, 15), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn", 10, (11, 16), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn", 11, (12, 17), transform=colTransf, section=col_sec, shear=0)
+    model.element("forceBeamColumn", 12, (13, 18), transform=colTransf, section=col_sec, shear=0)
 
-    # Define beam elements
-    # --------------------
 
-    # Define material properties for elastic beams
-    # Using beam depth of 24 and width of 18
-    Abeam = 18.0*24.0
-    # Second moments of area
-    Ibeamzz = 1.0/12.0*18.0*pow(24.0,3)
-    Ibeamyy = 1.0/12.0*24.0*pow(18.0,3)
-    Jbeam = Ibeamzz + Ibeamyy
+    # Beam sections and elements
+    # --------------------------------------------
+    beam_sec = 2
 
-    nu = 0.2
-    Gb = Ec/(2 * (1 + nu))
+    if material == 'steel':
+        # The beams are the same shape and material as the columns
+        shape = from_aisc("HSS5X5X3/8", units=units)
+        model.section("FiberSection", beam_sec, GJ=1.0E8)
+        for fiber in shape.create_fibers():
+            model.fiber(**fiber, material=steel_mat, section=beam_sec)
+    elif material == 'concrete':
+        # Using beam depth of 24 and width of 18
+        Abeam = 18.0*24.0
+        # Second moments of area
+        Ibeamzz = 1.0/12.0*18.0*pow(24.0,3)
+        Ibeamyy = 1.0/12.0*24.0*pow(18.0,3)
+        Jbeam = Ibeamzz + Ibeamyy
 
-    # Define elastic section for beams
-    #                       tag     E    A      Iz       Iy     G    J
-    model.section("Elastic", beamSec, Ec, Abeam, Ibeamzz, Ibeamyy, Gb, Jbeam)
+        nu = 0.2
+        Gb = Ec/(2 * (1 + nu))
+
+        # Define elastic section for beams
+        #                       tag     E    A      Iz       Iy     G    J
+        model.section("Elastic", beam_sec, Ec, Abeam, Ibeamzz, Ibeamyy, Gb, Jbeam)
+
+    # Number of beam integration points (sections)
+    itg_beam = 1
+    npts_beam = 4
+    model.beamIntegration("Lobatto", itg_beam, beam_sec, npts_beam)
 
     # Geometric transformation for beams
     beamTransf = 2
     model.geomTransf("Linear", beamTransf, 0.0, 0.0, 1.0)
 
-    # Create the beam elements
+    # Beam mass
+    if material == 'steel':
+        density = 490.0*units.pcf # lb/ft^3 -- conversion from weight to mass is handled by units.pcf
+        weight_per_length = density*shape.area
+    elif material == 'concrete':
+        density = 150.0*units.pcf # lb/ft^3 -- conversion from weight to mass is handled by units.pcf
+        weight_per_length = density*b_col*h_col
+
     #                   tag (ndI ndJ) transfTag integrationTag
-    model.element("elasticBeamColumn", 13, ( 5,  6), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 14, ( 6,  7), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 15, ( 7,  8), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 16, ( 8,  5), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 13, ( 5,  6), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 14, ( 6,  7), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 15, ( 7,  8), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 16, ( 8,  5), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
 
-    model.element("elasticBeamColumn", 17, (10, 11), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 18, (11, 12), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 19, (12, 13), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 20, (13, 10), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 17, (10, 11), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 18, (11, 12), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 19, (12, 13), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 20, (13, 10), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
 
-    model.element("elasticBeamColumn", 21, (15, 16), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 22, (16, 17), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 23, (17, 18), transform=beamTransf, section=beamSec, shear=0)
-    model.element("elasticBeamColumn", 24, (18, 15), transform=beamTransf, section=beamSec, shear=0)
+    model.element("elasticBeamColumn", 21, (15, 16), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 22, (16, 17), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 23, (17, 18), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
+    model.element("elasticBeamColumn", 24, (18, 15), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
 
-    # Lumped mass at nodes on top of columns
-    # 10% of axial column capacity assuming unconfined concrete
-    p = 0.1*fc*b_col*h_col
-    m = p/units.gravity
-    #         tag   MX MY MZ   RX   RY   RZ
-    model.mass( 5, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 6, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 7, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 8, (m, m, m, 0.0, 0.0, 0.0))
 
-    model.mass( 10, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 11, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 12, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 13, (m, m, m, 0.0, 0.0, 0.0))
+    # first_floor_mass = (weight_per_length*bx/2, weight_per_length*by/2, weight_per_length*h*2, 0.0, 0.0, 0.0)
+    # #         tag   MX MY MZ   RX   RY   RZ
+    # model.mass( 5, first_floor_mass)
+    # model.mass( 6, first_floor_mass)
+    # model.mass( 7, first_floor_mass)
+    # model.mass( 8, first_floor_mass)
 
-    model.mass( 15, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 16, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 17, (m, m, m, 0.0, 0.0, 0.0))
-    model.mass( 18, (m, m, m, 0.0, 0.0, 0.0))
+    # second_floor_mass = (weight_per_length*bx/2, weight_per_length*by/2, weight_per_length*h, 0.0, 0.0, 0.0)
+    # model.mass( 10, second_floor_mass)
+    # model.mass( 11, second_floor_mass)
+    # model.mass( 12, second_floor_mass)
+    # model.mass( 13, second_floor_mass)
+
+    # third_floor_mass = (weight_per_length*bx/2, weight_per_length*by/2, weight_per_length*h/4, 0.0, 0.0, 0.0)
+    # model.mass( 15, third_floor_mass)
+    # model.mass( 16, third_floor_mass)
+    # model.mass( 17, third_floor_mass)
+    # model.mass( 18, third_floor_mass)
 
     # set rayleigh damping factors
     # model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
