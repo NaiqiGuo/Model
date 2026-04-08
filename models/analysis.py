@@ -18,6 +18,8 @@ def apply_damping(model, zeta, verbose=False):
     Apply mass and stiffness proportional Rayleigh damping coefficients
     """
     lambdas = model.eigen(2, "fullGenLapack")  
+    if verbose >= 2:
+        model.modalProperties(print=True)
     omegas = np.sqrt(np.abs(lambdas))
     A = np.array([[1/(2*omegas[0]), omegas[0]/2], [1/(2*omegas[1]), omegas[1]/2]])
     b = np.array(zeta)
