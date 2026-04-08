@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-import os, glob
+import os
 from pathlib import Path
 from tqdm import tqdm
 
@@ -13,11 +13,12 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
-elas_cases = ["elastic", "inelastic"]  #"elastic",
-OUTPUT_QUANTITY = "acceleration"  # "displacement" or "acceleration"
-WINDOWED = False # if true, truncates all signals before aligning, computing error, and plotting
+SOURCE_CASES = [s.strip() for s in os.environ.get("SID_SOURCE_CASES", "field,elastic,inelastic").split(",") if s.strip()]
+OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
+WINDOWED = os.environ.get("SID_WINDOWED", "0") == "1" # if true, truncates all signals before aligning, computing error, and plotting
+ALIGN_SIGNALS = os.environ.get("SID_ALIGN", "0") == "1"
 VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
 Q_MAP = {
@@ -47,26 +48,65 @@ def sid_training_dir(model: str, source: str, quantity: str, location: str):
 def sid_results_dir(model: str, source: str, quantity: str, result_name: str):
     return SYSTEM_ID_DIR / model / source / quantity / "System ID Results" / result_name
 
-if __name__ == "__main__":
 
-    if MODEL == "frame":
-        out_nodes = [5,10,15]
-        # output_labels = ['1X', '1Y', '2X', '2Y', '3X', '3Y']
-        out_labels = ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y', ]
-    elif MODEL == "bridge":
-        out_nodes = [9, 3, 10]
-        out_labels = ['West Deck Interface, Y', 'Column 1 Top, Y', 'East Deck Interface, Y']
+def available_event_ids(model: str, source: str, quantity: str):
+    struct_dir = MODELING_DIR / model / source / quantity / "structure"
+    event_files = sorted(struct_dir.glob("[0-9]*.csv"), key=lambda path: int(path.stem))
+    return [event.stem for event in event_files]
 
 
-    for elas in elas_cases:
+def output_labels_for(model: str, source: str, quantity: str):
+    if source == "field":
+        if model == "bridge":
+            return ["Channel 4 (Y)", "Channel 7 (Y)", "Channel 9 (Y)"]
+        if model == "frame":
+            if quantity == "acceleration":
+                return [
+                    "Channel 3 (X)",
+                    "Channel 4 (Y)",
+                    "Channel 6 (X)",
+                    "Channel 7 (Y)",
+                    "Channel 9 (X)",
+                    "Channel 10 (Y)",
+                ]
+            return [
+                "Channel 21",
+                "Channel 22",
+                "Channel 23",
+                "Channel 24",
+                "Channel 25",
+                "Channel 26",
+            ]
+
+    if model == "frame":
+        return ['Floor 1, X', 'Floor 1, Y', 'Floor 2, X', 'Floor 2, Y', 'Floor 3, X', 'Floor 3, Y']
+    return ['West Deck Interface, Y', 'Column 1 Top, Y', 'East Deck Interface, Y']
+
+
+def save_figure_with_pgf(fig, output_path: Path, dpi: int | None = None):
+    savefig_kwargs = {}
+    if dpi is not None:
+        savefig_kwargs["dpi"] = dpi
+    fig.savefig(output_path, **savefig_kwargs)
+
+    pgf_path = output_path.with_suffix(".pgf")
+    try:
+        fig.savefig(pgf_path)
+    except Exception as exc:
         if VERBOSE:
-            print(f"\nComputing {elas} case.")
+            print(f"warning: failed to save PGF file {pgf_path}: {exc}")
 
-        if MODEL == "frame":
-            event_ids = list(range(226, 248))  # 226..247 (226, 248)
-        else:
-            n_events = len(glob.glob(str(MODELING_DIR / MODEL / elas / OUTPUT_QUANTITY / "structure" / "[0-9]*.csv")))
-            event_ids = list(range(1, n_events+1))
+if __name__ == "__main__":
+    for source in SOURCE_CASES:
+        if VERBOSE:
+            print(f"\nComputing {source} case.")
+
+        event_ids = available_event_ids(MODEL, source, OUTPUT_QUANTITY)
+        out_labels = output_labels_for(MODEL, source, OUTPUT_QUANTITY)
+        if len(event_ids) == 0:
+            if VERBOSE:
+                print(f"skip {source}: no modeling files found for {MODEL}/{source}/{OUTPUT_QUANTITY}")
+            continue
 
         n_events = len(event_ids)
         errors = np.full((n_events, len(out_labels)), np.nan)
@@ -74,7 +114,7 @@ if __name__ == "__main__":
         for k, event_id in enumerate(tqdm(event_ids)):
             # Load true input (ground acceleration) and true output from Modeling/.
             input_path = modeling_path(MODEL, "field", "acceleration", "ground", event_id)
-            out_true_path = modeling_path(MODEL, elas, OUTPUT_QUANTITY, "structure", event_id)
+            out_true_path = modeling_path(MODEL, source, OUTPUT_QUANTITY, "structure", event_id)
             dt_path = modeling_dt_path(MODEL, event_id, "ground")
             if not input_path.exists() or not out_true_path.exists() or not dt_path.exists():
                 if VERBOSE:
@@ -89,7 +129,7 @@ if __name__ == "__main__":
             
 
             # Load identified system from README System ID path.
-            sys_path = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "system realization") / f"{event_id}.pkl"
+            sys_path = sid_results_dir(MODEL, source, OUTPUT_QUANTITY, "system realization") / f"{event_id}.pkl"
             if not sys_path.exists():
                 if VERBOSE:
                     print(f"skip event {event_id}: missing system realization {sys_path}")
@@ -116,20 +156,23 @@ if __name__ == "__main__":
                 out_pred_trunc = out_pred
                 time_trunc     = time
 
-            # Align signals
-            max_lag_allowed_sec = 1.0
-
-            if VERBOSE==2:
-                print(f">>> Aligning signals for Event {event_id:02d}.")
-
             out_true_aln_stacked = []
             out_pred_aln_stacked = []
             for i, output_label in enumerate(out_labels):
                 s1 = out_true_trunc[i]
                 s2 = out_pred_trunc[i]
-                lag, out_true_aln, out_pred_aln, _ = align_signals(s1, s2, time_trunc, 
-                                                            verbose=False, 
-                                                            max_lag_allowed=max_lag_allowed_sec)
+                if ALIGN_SIGNALS:
+                    if VERBOSE==2:
+                        print(f">>> Aligning signals for Event {event_id:02d}.")
+                    lag, out_true_aln, out_pred_aln, _ = align_signals(
+                        s1, s2, time_trunc, verbose=False
+                    )
+                    out_true_aln = np.asarray(out_true_aln).reshape(-1)
+                    out_pred_aln = np.asarray(out_pred_aln).reshape(-1)
+                else:
+                    lag = 0
+                    out_true_aln = np.asarray(s1).reshape(-1)
+                    out_pred_aln = np.asarray(s2).reshape(-1)
                 out_true_aln_stacked.append(out_true_aln)
                 out_pred_aln_stacked.append(out_pred_aln)
 
@@ -145,10 +188,10 @@ if __name__ == "__main__":
                 nt = np.min([nt, len(out_true_aln)])
 
             # Save README-compliant System ID Training Data.
-            train_ground_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "ground")
-            train_struct_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "structure")
-            train_time_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "time")
-            train_dt_dir = sid_training_dir(MODEL, elas, OUTPUT_QUANTITY, "dt")
+            train_ground_dir = sid_training_dir(MODEL, source, OUTPUT_QUANTITY, "ground")
+            train_struct_dir = sid_training_dir(MODEL, source, OUTPUT_QUANTITY, "structure")
+            train_time_dir = sid_training_dir(MODEL, source, OUTPUT_QUANTITY, "time")
+            train_dt_dir = sid_training_dir(MODEL, source, OUTPUT_QUANTITY, "dt")
             for d in [train_ground_dir, train_struct_dir, train_time_dir, train_dt_dir]:
                 d.mkdir(parents=True, exist_ok=True)
 
@@ -162,11 +205,11 @@ if __name__ == "__main__":
             np.savetxt(train_dt_dir / f"{event_id}.csv", np.array([dt]))
 
             # Save README-compliant System ID Results.
-            sid_pred_dir = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "prediction")
+            sid_pred_dir = sid_results_dir(MODEL, source, OUTPUT_QUANTITY, "prediction")
             sid_pred_dir.mkdir(parents=True, exist_ok=True)
             np.savetxt(sid_pred_dir / f"{event_id}.csv", out_pred_aln_array, delimiter=",")
 
-            sid_time_dir = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "time")
+            sid_time_dir = sid_results_dir(MODEL, source, OUTPUT_QUANTITY, "time")
             sid_time_dir.mkdir(parents=True, exist_ok=True)
             np.savetxt(sid_time_dir / f"{event_id}.csv", time_aln, delimiter=",")
 
@@ -183,16 +226,14 @@ if __name__ == "__main__":
                 out_true = out_true_aln_array[i]
                 out_pred = out_pred_aln_array[i]
                 errors[k,i] = (_get_error(
-                    ytrue = out_true,
-                    ypred = out_pred,
-                    numerator_norm = 2,
-                    denominator_norm = 2,
-                    numerator_averaged = True,
-                    denominator_averaged = True
+                    true=out_true,
+                    test=out_pred,
+                    metric="l2_norm",
+                    normalized=True,
                 ))
             np.savetxt(pred_dir/"errors.csv", np.array(errors))
 
-            sid_err_dir = sid_results_dir(MODEL, elas, OUTPUT_QUANTITY, "prediction error")
+            sid_err_dir = sid_results_dir(MODEL, source, OUTPUT_QUANTITY, "prediction error")
             sid_err_dir.mkdir(parents=True, exist_ok=True)
             np.savetxt(sid_err_dir / f"{event_id}.csv", errors[k], delimiter=",")
 
@@ -239,7 +280,7 @@ if __name__ == "__main__":
                     if r >= row_idx:
                         axs[r,j].set_visible(False)
                 fig_go[j].update_layout(
-                    title=f"Event {event_id} Prediction, {dirs[j]} direction",
+                    title=f"Event {event_id} Prediction ({source}), {dirs[j]} direction",
                     xaxis_title="Time (s)",
                     yaxis_title=f"{Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']})",
                     legend=dict(orientation="h", yanchor="bottom", y=0.0, xanchor="left", x=0,
@@ -248,12 +289,14 @@ if __name__ == "__main__":
                 fig_go[j].update_xaxes(rangeslider=dict(visible=True))
                 fig_go[j].write_html(pred_dir/f"prediction_{dirs[j]}.html", include_plotlyjs="cdn")
             fig_plt.align_ylabels()
-            fig_plt.suptitle(f"Event {event_id} {Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']})")
-            fig_plt.savefig(pred_dir/"prediction.png", dpi=350)
+            fig_plt.suptitle(
+                f"Event {event_id} {Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']}) [{source}]"
+            )
+            save_figure_with_pgf(fig_plt, pred_dir / "prediction.png", dpi=350)
             plt.close(fig_plt)
 
         # Heatmap non-square with numbers
-        heatmap_dir = SYSTEM_ID_DIR / MODEL / elas / OUTPUT_QUANTITY / "System ID Results"
+        heatmap_dir = SYSTEM_ID_DIR / MODEL / source / OUTPUT_QUANTITY / "System ID Results"
         os.makedirs(heatmap_dir, exist_ok=True)
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
         heatmap_data = np.nan_to_num(errors.T, nan=0.0)
@@ -281,7 +324,7 @@ if __name__ == "__main__":
                 val = heatmap_data[i,ev]
                 color = 'black' if val > half_vmax else 'white'
                 ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=6)
-        fig.savefig(heatmap_dir / f"heatmap_{SID_METHOD}.png", dpi=400)
+        save_figure_with_pgf(fig, heatmap_dir / f"heatmap_{SID_METHOD}.png", dpi=400)
         plt.close(fig)
 
         # Heatmap square with no numbers
@@ -302,5 +345,5 @@ if __name__ == "__main__":
         ax.set_xticklabels(event_ids, rotation=45, fontsize=15)
         ax.set_yticks(np.arange(len(out_labels)))
         ax.set_yticklabels(out_labels, fontsize=15)
-        fig.savefig(heatmap_dir / f"heatmap_square_{SID_METHOD}.png", dpi=400)
+        save_figure_with_pgf(fig, heatmap_dir / f"heatmap_square_{SID_METHOD}.png", dpi=400)
         plt.close(fig)
