@@ -33,7 +33,7 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 LOAD_EVENTS = False
 
 # Verbosity
@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
         elif STRUCTURE == 'bridge':
             output_nodes = [9, 3, 10] 
-            output_elements = [3]
+            output_elements = [107]
             yFiber = 22.5
             zFiber = 0.0
 
