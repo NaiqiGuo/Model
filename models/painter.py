@@ -273,11 +273,17 @@ class Painter:
 
         Hiso = 0.5
         Hkin = 10e3
+
         model.uniaxialMaterial('Elastic', 9,   5000) # abutment longitudinal stiffness
-        model.uniaxialMaterial('Hardening', 10,  10e8, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment vertical stiffness (virtually rigid)
         model.uniaxialMaterial('Elastic', 11, 10000) # abutment x/y rotational stiffness
         model.uniaxialMaterial('Elastic', 12,  10e8) # abutment z rotational stiffness (virtually rigid)
-        model.uniaxialMaterial('Hardening', 13,   5000, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment transverse stiffness
+
+        if elastic:
+            model.uniaxialMaterial('Elastic', 10,  10e8) # abutment vertical stiffness (virtually rigid)
+            model.uniaxialMaterial('Elastic', 13,   5000) # abutment transverse stiffness
+        else:
+            model.uniaxialMaterial('Hardening', 10,  10e8, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment vertical stiffness (virtually rigid)
+            model.uniaxialMaterial('Hardening', 13,   5000, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment transverse stiffness
 
         # Transformations and elements
         colTransf  = 1
