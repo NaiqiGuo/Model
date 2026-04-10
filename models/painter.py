@@ -322,12 +322,12 @@ class Painter:
 
         if column_base_springs:
             # Column bases
-            model.element("zeroLength", 109, 4, 13, "-mat",(5,5,6,7,7,8), "-dir",1,2,3,4,5,6) 
-            model.element("zeroLength", 110, 6, 14, "-mat",(5,5,6,7,7,8), "-dir",1,2,3,4,5,6)
+            model.element("zeroLength", 109, 4, 13, mat=(5,5,6,7,7,8), dir=(1,2,3,4,5,6)) 
+            model.element("zeroLength", 110, 6, 14, mat=(5,5,6,7,7,8), dir=(1,2,3,4,5,6))
 
         # Abutments
-        model.element("zeroLength", 107, 0, 11, "-mat",(9,13,10,11,11,12), "-dir",1,2,3,4,5,6) 
-        model.element("zeroLength", 108, 1, 12, "-mat",(9,13,10,11,11,12), "-dir",1,2,3,4,5,6)
+        model.element("zeroLength", 107, 0, 11, mat=(9,13,10,11,11,12), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength", 108, 1, 12, mat=(9,13,10,11,11,12), dir=(1,2,3,4,5,6))
 
         # Bent
         model.element(beam_type, 105, ( 3,  2), **girder_element)

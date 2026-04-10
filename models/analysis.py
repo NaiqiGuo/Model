@@ -29,10 +29,19 @@ def apply_damping(model, zeta, verbose=False):
     # rayleigh(alphaM, betaK, betaKinit, betaKcomm)
     model.rayleigh(alpha, 0.0, beta, 0.0)
 
-def get_material_response(model, element, sec_tag, y, z):
+def get_fiber_response(model, element, sec_tag, y, z):
     try:
         strain =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "strain")
         stress =  model.eleResponse(element, "section", sec_tag, "fiber", y, z, "stress")
+        return strain, stress
+    except Exception as e:
+        print(e)
+        return None
+    
+def get_material_response(model, element):
+    try:
+        strain =  model.eleResponse(element, "deformation")
+        stress =  model.eleResponse(element, "basicForce")
         return strain, stress
     except Exception as e:
         print(e)
@@ -90,10 +99,10 @@ def analyze(model, nt, dt,
         node: [model.nodeAccel(node)] for node in record_nodes
     }
     strains = {
-        element: [get_material_response(model, element, 1, yFiber, zFiber)[0]] for element in output_elements
+        element: [get_fiber_response(model, element, 1, yFiber, zFiber)[0]] for element in output_elements
     }
     stresses = {
-        element: [get_material_response(model, element, 1, yFiber, zFiber)[1]] for element in output_elements
+        element: [get_fiber_response(model, element, 1, yFiber, zFiber)[1]] for element in output_elements
     }
 
     # get modes
@@ -118,8 +127,8 @@ def analyze(model, nt, dt,
             accelerations[node].append(model.nodeAccel(node))
         
         for element in output_elements:
-            strains[element].append(get_material_response(model, element, 1, yFiber, zFiber)[0])
-            stresses[element].append(get_material_response(model, element, 1, yFiber, zFiber)[1])
+            strains[element].append(get_fiber_response(model, element, 1, yFiber, zFiber)[0])
+            stresses[element].append(get_fiber_response(model, element, 1, yFiber, zFiber)[1])
 
     lambdas_after = model.eigen(n_modes, "fullGenLapack") 
     omega_after = np.sqrt(np.abs(lambdas_after))   
