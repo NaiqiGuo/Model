@@ -239,7 +239,7 @@ class Painter:
             model.node(14, (2*skew_x+span1_length,       -deck_width/3,            0.0)) # column 2 (south) fixed end of the zero length element
 
 
-        # Boundary conditions, fully fixed at abutments (11,12) and column bases (13,14) if springs; (4,6) if no springs
+        # Boundary conditions, fully fixed at abutments (11,12) and column bases (13,14) if springs; (4,6) if no springs TODO Naiqi
         model.fix(11,  (1, 1, 1, 1, 1, 1))
         model.fix(12,  (1, 1, 1, 1, 1, 1))
         if column_base_springs:
@@ -282,9 +282,10 @@ class Painter:
             model.uniaxialMaterial('Elastic', 10,  10e8) # abutment vertical stiffness (virtually rigid)
             model.uniaxialMaterial('Elastic', 13,   5000) # abutment transverse stiffness
         else:
-            model.uniaxialMaterial('Hardening', 10,  10e8, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment vertical stiffness (virtually rigid)
-            model.uniaxialMaterial('Hardening', 13,   5000, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment transverse stiffness
-
+            #model.uniaxialMaterial('Hardening', 10,  10e8, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment vertical stiffness (virtually rigid)
+            #model.uniaxialMaterial('Hardening', 13,   5000, Fy=10, Hiso = Hiso, Hkin = Hkin) # abutment transverse stiffness
+            model.uniaxialMaterial('Steel02', 10, 1.0e6, 1.0e9, 0.01, 20.0, 0.925, 0.15)   # abutment vertical
+            model.uniaxialMaterial('Steel02', 13, 1.0e3, 5000.0, 0.01, 20.0, 0.925, 0.15)  # abutment transverse
         # Transformations and elements
         colTransf  = 1
         beamTransf = 2

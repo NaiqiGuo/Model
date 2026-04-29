@@ -26,6 +26,7 @@ from utilities_experimental import(
     apply_load_bridge, # TODO CC: first pass clean
     apply_load_bridge_multi_support, # TODO CC+NG: after clean apply_load_bridge, absorb
     save_strain_stress, # TODO CC: verify and move to utilities
+    save_force_deformation,
     triangulate_wirepot
 )
 
@@ -35,6 +36,10 @@ STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = False
 LOAD_EVENTS = False
+FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "1"))
+FRAME_OUTPUT_RESPONSE = os.environ.get("FRAME_OUTPUT_RESPONSE", "force_deformation") #force_deformation, stress_strain
+BRIDGE_OUTPUT_ELEMENT = int(os.environ.get("BRIDGE_OUTPUT_ELEMENT", "107"))
+BRIDGE_OUTPUT_RESPONSE = os.environ.get("BRIDGE_OUTPUT_RESPONSE", "force_deformation") #force_deformation, stress_strain
 
 # Verbosity
 # False means print nothing;
@@ -221,9 +226,13 @@ if __name__ == "__main__":
         # Finite element model
         if STRUCTURE == 'frame':
             output_nodes = [5, 5, 10, 10, 15, 15]
-            output_elements = [1, 5, 9]
+            output_elements = [FRAME_OUTPUT_ELEMENT]
             yFiber = 7.5
             zFiber = 0.0
+            response_mode = "material" if FRAME_OUTPUT_RESPONSE == "force_deformation" else "fiber"
+            fiber_response_dof = None
+            material_deformation_dof = None
+            material_force_dof = None
 
             model = create_frame(elastic=ELASTIC,
                                         multisupport=MULTISUPPORT,
@@ -237,9 +246,13 @@ if __name__ == "__main__":
 
         elif STRUCTURE == 'bridge':
             output_nodes = [9, 3, 10] 
-            output_elements = [107]
-            yFiber = 22.5
+            output_elements = [BRIDGE_OUTPUT_ELEMENT]
+            yFiber = 22.5 
             zFiber = 0.0
+            response_mode = "material" if BRIDGE_OUTPUT_RESPONSE == "force_deformation" else "fiber"
+            fiber_response_dof = None
+            material_deformation_dof = 2 if BRIDGE_OUTPUT_RESPONSE == "force_deformation" else None
+            material_force_dof = 8 if BRIDGE_OUTPUT_RESPONSE == "force_deformation" else None
 
             model = create_bridge(elastic=ELASTIC,
                                         multisupport=MULTISUPPORT,
@@ -276,13 +289,17 @@ if __name__ == "__main__":
                 )
 
         try:
-            displ, accel, stresses, strains, freqs_before, freqs_after = analyze(model,
+            displ, accel, response_x, response_y, freqs_before, freqs_after = analyze(model,
                                                                     nt=nt,
                                                                     dt=inputs["field"]["dt"],
                                                                     output_nodes=output_nodes,
                                                                     output_elements=output_elements,
                                                                     yFiber=yFiber,
                                                                     zFiber=zFiber,
+                                                                    response_mode=response_mode,
+                                                                    fiber_response_dof=fiber_response_dof,
+                                                                    material_deformation_dof=material_deformation_dof,
+                                                                    material_force_dof=material_force_dof,
                                                                     verbose=VERBOSE
                                                                 )
 
@@ -293,8 +310,11 @@ if __name__ == "__main__":
             continue
 
 
-        # Save frequencies, displacements, strains, and stresses
+        # Save frequencies, displacements, and element-response pairs
         source = "elastic" if ELASTIC else "inelastic"  # field/elastic/inelastic
+        output_response = (
+            FRAME_OUTPUT_RESPONSE if STRUCTURE == "frame" else BRIDGE_OUTPUT_RESPONSE
+        )
 
 
         for quantity,label in zip(
@@ -306,11 +326,16 @@ if __name__ == "__main__":
                 rewrite=True
                 )
 
-        ss_path = MODEL_OUT_DIR / "strain_stress" / "structure" / f"{event_id}.csv"
-        ss_path.parent.mkdir(parents=True, exist_ok=True)
-        # TODO CC: change to separately saving strain and stresses
-        # consistent with how displacements and accelerations are saved
-        save_strain_stress(stresses, strains, inputs["field"]["dt"], filename=ss_path)
+        if output_response == "force_deformation":
+            fd_path = MODEL_OUT_DIR / "force_deformation" / "structure" / f"{event_id}.csv"
+            fd_path.parent.mkdir(parents=True, exist_ok=True)
+            save_force_deformation(response_y, response_x, inputs["field"]["dt"], filename=fd_path)
+        else:
+            ss_path = MODEL_OUT_DIR / "strain_stress" / "structure" / f"{event_id}.csv"
+            ss_path.parent.mkdir(parents=True, exist_ok=True)
+            # TODO CC: change to separately saving the x/y response components
+            # consistent with how displacements and accelerations are saved
+            save_strain_stress(response_y, response_x, inputs["field"]["dt"], filename=ss_path)
 
 
         # FE model outputs, used as true outputs in system identification 
@@ -352,4 +377,3 @@ if __name__ == "__main__":
                         array = q,
                         rewrite = (source!="field") # CHECK NG: Added this so that field quantities are only saved once
                     )
-
