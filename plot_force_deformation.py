@@ -6,60 +6,52 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-STRUCTURE_TYPE = "bridge" # bridge, frame
-RESPONSE_TYPE = "inelastic" # elastic, inelastic 
-ELEMENT_ID = 3
-STRESS_UNIT = "ksi"
+STRUCTURE_TYPE = "bridge"  # bridge, frame
+RESPONSE_TYPE = "inelastic"  # elastic, inelastic
+ELEMENT_ID = 107
 
 
 DEFAULTS_BY_STRUCTURE = {
-    "bridge": {"response_type": "elastic", "element_id": 3},
+    "bridge": {"response_type": "inelastic", "element_id": 107},
     "frame": {"response_type": "inelastic", "element_id": 1},
 }
 
 
-def load_stress_strain_for_event(filepath, element_id):
+def load_force_deformation_for_event(filepath, element_id):
     """
-    Load stress-strain data for one event and element.
+    Load force-deformation data for one event and element.
 
     Returns:
-        strain (ndarray), stress (ndarray)
+        deformation (ndarray), force (ndarray)
     """
     with open(filepath, "r") as f:
         reader = csv.reader(f)
         header = next(reader)
 
-        stress_col = f"ele{element_id}_stress"
-        strain_col = f"ele{element_id}_strain"
+        force_col = f"ele{element_id}_force"
+        deformation_col = f"ele{element_id}_deformation"
 
         try:
-            idx_stress = header.index(stress_col)
-            idx_strain = header.index(strain_col)
+            idx_force = header.index(force_col)
+            idx_deformation = header.index(deformation_col)
         except ValueError:
             print(f"[WARN] {filepath} does not contain required columns for element {element_id}.")
             return None, None
 
-        strain_list, stress_list = [], []
+        deformation_list, force_list = [], []
         for row in reader:
             if not row:
                 continue
             try:
-                strain_list.append(float(row[idx_strain]))
-                stress_list.append(float(row[idx_stress]))
+                deformation_list.append(float(row[idx_deformation]))
+                force_list.append(float(row[idx_force]))
             except ValueError:
                 continue
 
-    if not strain_list:
+    if not deformation_list:
         return None, None
 
-    return np.array(strain_list), np.array(stress_list)
-
-
-def iter_legacy_event_dirs(data_dir):
-    return sorted(
-        [d for d in data_dir.iterdir() if d.is_dir() and d.name.isdigit()],
-        key=lambda d: int(d.name),
-    )
+    return np.array(deformation_list), np.array(force_list)
 
 
 def iter_modeling_event_csvs(data_dir):
@@ -71,8 +63,7 @@ def iter_modeling_event_csvs(data_dir):
 
 def detect_layout(structure_type, response_type, requested_layout="auto"):
     layout_paths = {
-        "legacy": Path(structure_type) / response_type,
-        "modeling": Path("Modeling") / structure_type / response_type / "strain_stress" / "structure",
+        "modeling": Path("Modeling") / structure_type / response_type / "force_deformation" / "structure",
     }
 
     if requested_layout != "auto":
@@ -87,13 +78,8 @@ def detect_layout(structure_type, response_type, requested_layout="auto"):
     if modeling_dir.exists() and iter_modeling_event_csvs(modeling_dir):
         return "modeling", modeling_dir
 
-    legacy_dir = layout_paths["legacy"]
-    if legacy_dir.exists() and iter_legacy_event_dirs(legacy_dir):
-        return "legacy", legacy_dir
-
     raise FileNotFoundError(
-        "Could not find stress-strain data in either supported layout:\n"
-        f"  - {legacy_dir}\n"
+        "Could not find force-deformation data in the supported layout:\n"
         f"  - {modeling_dir}"
     )
 
@@ -104,19 +90,16 @@ def iter_event_sources(data_dir, layout):
             yield filepath.stem, filepath
         return
 
-    for event_dir in iter_legacy_event_dirs(data_dir):
-        yield event_dir.name, event_dir / "strain_stress.csv"
 
-
-def build_output_path(data_dir, layout, structure_type, response_type, element_id, event_label):
-    output_dir = Path("Modeling") / structure_type / response_type / "strain_stress" / "structure"
+def build_output_path(structure_type, response_type, element_id, event_label):
+    output_dir = Path("Modeling") / structure_type / response_type / "force_deformation" / "structure"
     output_dir.mkdir(parents=True, exist_ok=True)
-    return output_dir / f"{structure_type}_{response_type}_E{event_label}_ele{element_id}.png"
+    return output_dir / f"{structure_type}_{response_type}_E{event_label}_ele{element_id}_fd.png"
 
 
-def plot_stress_strain_each_event(structure_type, response_type, element_id, layout="auto"):
+def plot_force_deformation_each_event(structure_type, response_type, element_id, layout="auto"):
     """
-    Plot one stress-strain curve per event for the selected structure.
+    Plot one force-deformation curve per event for the selected structure.
     """
     resolved_layout, data_dir = detect_layout(
         structure_type=structure_type,
@@ -132,28 +115,23 @@ def plot_stress_strain_each_event(structure_type, response_type, element_id, lay
             print(f"[Skip] Missing {filepath}")
             continue
 
-        strain, stress = load_stress_strain_for_event(filepath, element_id)
-        if strain is None:
+        deformation, force = load_force_deformation_for_event(filepath, element_id)
+        if deformation is None:
             print(f"[Skip] No valid data in {filepath}")
             continue
 
-        plt.figure(figsize=(7, 5))
-        plt.plot(strain, stress, linewidth=1.5)
-        plt.xlabel("Strain", fontsize=16)
-        plt.ylabel(f"Stress ({STRESS_UNIT})", fontsize=16)
+        plt.figure(figsize=(6, 4))
+        plt.plot(deformation, force, linewidth=1.5)
+        plt.xlabel("Deformation")
+        plt.ylabel("Force")
         plt.title(
             f"{structure_type.capitalize()} - Event {event_label} - "
-            f"Element {element_id} Stress-Strain",
-            fontsize=17
+            f"Element {element_id} Force-Deformation"
         )
-        plt.xticks(fontsize=14)
-        plt.yticks(fontsize=14)
         plt.grid(True)
         plt.tight_layout()
 
         outpath = build_output_path(
-            data_dir=data_dir,
-            layout=resolved_layout,
             structure_type=structure_type,
             response_type=response_type,
             element_id=element_id,
@@ -183,7 +161,7 @@ def parse_args():
     parser.add_argument(
         "--response-type",
         default=RESPONSE_TYPE,
-        help="Response type folder, for example elastic, inelastic, or field.",
+        help="Response type folder, for example elastic or inelastic.",
     )
     parser.add_argument(
         "--element-id",
@@ -193,7 +171,7 @@ def parse_args():
     )
     parser.add_argument(
         "--layout",
-        choices=["auto", "legacy", "modeling"],
+        choices=["auto", "modeling"],
         default="auto",
         help="Which input directory layout to use. Default: auto-detect.",
     )
@@ -203,7 +181,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    plot_stress_strain_each_event(
+    plot_force_deformation_each_event(
         structure_type=args.structure_type,
         response_type=args.response_type,
         element_id=args.element_id,
