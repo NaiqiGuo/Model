@@ -15,7 +15,7 @@ import pickle
 from utilities import (
     get_measurements,
     get_node_outputs,
-    create_and_save_csv, # CHECK NG: new function
+    create_and_save_csv,
 )
 
 from models.painter import create_bridge
@@ -137,9 +137,8 @@ if __name__ == "__main__":
             # corresponds to `input_channels`
             input_channels_accel = [1, 3, 15, 17, 18, 20]
             input_channels_displ = [1, 3, 15, 17, 18, 20]
-            input_nodes = [4, 4, 1, 1, 0, 0] # CHECK NG: should be node 4 instead of node 6, and nodes 1 and 0 were flipped
-            input_dofs = [-1, 2, -1, 2, -1, 2, -1, 2]  # CHECK NG: I had to add some logic for the X direction (it is opposite from the channel direction)
-        # CHECK NG: order was opposite; nodes 4 and 9 were flipped. (X goes from west to east)
+            input_nodes = [4, 4, 1, 1, 0, 0]
+            input_dofs = [-1, 2, -1, 2, -1, 2, -1, 2]
         output_channels = [4, 7, 9]
         output_dofs = [2, 2, 2]
 
@@ -162,9 +161,6 @@ if __name__ == "__main__":
         if STRUCTURE == "frame":     
             array, sensor_names, sensor_units, time_raw, inputs["field"]["dt"] = get_249_data(event)
 
-            # Check NG: I added in the logic for flipping the sign of the sensor time series
-            # here (not needed for the frame, but included for consistency).
-            # Also, I consolidated the units into this computation.
             inputs["field"]["displacement"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                                          for ch,dof in zip(input_channels_displ,input_dofs)])
             inputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
@@ -172,7 +168,6 @@ if __name__ == "__main__":
             
             outputs["field"]["displacement"] = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch in output_channels_displ])
-            # triangulate_wirepot computes 2D triangulation to obtain X & Y displacements.
             outputs["field"]["displacement"] = triangulate_wirepot(outputs["field"]["displacement"])
 
             outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
@@ -199,8 +194,6 @@ if __name__ == "__main__":
             try:
                 # Read in-field measurements. Scale by units and flip sign where needed.
 
-                # CHECK NG: limit calls to get_measurements,
-                # because the parsing done inside it in extract_channels is slow.
                 measurements_accel, inputs["field"]["dt"] = get_measurements(
                     i, events=events, channels=[*input_channels_accel, *output_channels],
                     scale=measurement_units_accel, response="accel")
@@ -208,7 +201,6 @@ if __name__ == "__main__":
                     i, events=events, channels=[*input_channels_displ, *output_channels],
                     scale=measurement_units_displ, response="displ")
 
-                # CHECK NG: This is I where incorporated the logic for flipping the sign of the sensors
                 inputs["field"]["acceleration"] =  np.vstack([np.sign(dof)*measurements_accel[ch]
                                                    for ch,dof in zip(input_channels_accel,input_dofs)])
                 
@@ -387,5 +379,5 @@ if __name__ == "__main__":
                     create_and_save_csv(
                         path = SOURCE_DIR / q_name / location / f"{event_id}.csv",
                         array = q,
-                        rewrite = True  # Always refresh saved data so field/model files stay in sync with current preprocessing.
+                        rewrite = (source!="field")
                     )

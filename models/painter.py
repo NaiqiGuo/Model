@@ -53,9 +53,23 @@ class Painter:
         self.Gc = self.Ec / (2*(1+self.poisson))
 
         self.materials = {
-            "core":  xara.Material(E=self.Ec, G=self.Gc, fc=self.fc_conf, type="Concrete01", tag=1),
-            "cover": xara.Material(E=self.Ec, G=self.Gc, fc=self.fc_unconf, type="Concrete01", tag=2),
-            "steel": xara.Material(E=self.Es, G=self.Gs, Fy=self.fy, b=0.02, type="Steel01", tag=3)
+            "core":  xara.UniaxialMaterial(#E=self.Ec, 
+                                           G=self.Gc, 
+                                           fc=-self.fc_conf, 
+                                           Fcu=-3.5,
+                                           epscu=-0.02,
+                                           epsc0=-2*self.fc_conf/self.Ec,
+                                           type="Concrete01", 
+                                           tag=1),
+            "cover": xara.UniaxialMaterial(
+                                           #E=self.Ec, 
+                                           G=self.Gc, 
+                                           fc=-self.fc_unconf, 
+                                           Fcu=0.0,
+                                           epscu=-0.006,
+                                           epsc0=-2*self.fc_unconf/self.Ec,
+                                           type="Concrete01", tag=2),
+            "steel": xara.UniaxialMaterial(E=self.Es, G=self.Gs, Fy=self.fy, b=0.02, type="Steel01", tag=3)
         }
 
         if verbose >= 2:
@@ -77,7 +91,10 @@ class Painter:
             # model.section("Elastic", tag, E=Ec, A=e.A, Iy=e.Iy, Iz=e.Iz, G=Gc, J=e.J)
             return
 
-
+        else:
+            section = xara.Section("AxialFiber", shape)
+            model.section(section)
+            return
         core  = 1 
         cover = 2
         steel = 3
@@ -262,6 +279,11 @@ class Painter:
         girder = self.create_girder()
         # if verbose:
         #     print(girder.summary())
+
+
+        for material in self.materials.values():
+            model.material(material)
+
         self.add_section(model, column_tag, column, elastic=elastic, fiber=True)
         self.add_section(model, girder_tag, girder, elastic=True, fiber=False)  # Girders always elastic
 
