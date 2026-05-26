@@ -12,7 +12,7 @@ import pickle
 
 # Analysis configuration
 SID_METHOD = 'srim'
-STRUCTURE = "bridge" # "frame", "bridge"
+STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = False
 

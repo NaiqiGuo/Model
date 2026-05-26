@@ -4,22 +4,22 @@ import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 from tqdm import tqdm
+from matplotlib.lines import Line2D
 
 from mdof.simulate import simulate
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds, align_signals
 from mdof.validation import stabilize_discrete
-from mdof.prediction import _get_error 
 import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 SID_METHOD = "srim"
 SOURCE_CASES = [s.strip() for s in os.environ.get("SID_SOURCE_CASES", "field,elastic,inelastic").split(",") if s.strip()]
 OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
-WINDOWED = os.environ.get("SID_WINDOWED", "0") == "1" # if true, truncates all signals before aligning, computing error, and plotting
+WINDOWED = os.environ.get("SID_WINDOWED", "1") == "1" # if true, truncates all signals before aligning, computing error, and plotting
 ALIGN_SIGNALS = os.environ.get("SID_ALIGN", "0") == "1"
-VERBOSE = True # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
+VERBOSE = 1 # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
 Q_MAP = {
     "acceleration": {"name": "Acceleration", "units": "in/s²"},
@@ -70,12 +70,12 @@ def output_labels_for(model: str, source: str, quantity: str):
                     "Channel 10 (Y)",
                 ]
             return [
-                "Channel 21",
-                "Channel 22",
-                "Channel 23",
-                "Channel 24",
-                "Channel 25",
-                "Channel 26",
+                "Floor 1, X",
+                "Floor 1, Y",
+                "Floor 2, X",
+                "Floor 2, Y",
+                "Floor 3, X",
+                "Floor 3, Y",
             ]
 
     if model == "frame":
@@ -89,12 +89,24 @@ def save_figure_with_pgf(fig, output_path: Path, dpi: int | None = None):
         savefig_kwargs["dpi"] = dpi
     fig.savefig(output_path, **savefig_kwargs)
 
-    pgf_path = output_path.with_suffix(".pgf")
-    try:
-        fig.savefig(pgf_path)
-    except Exception as exc:
-        if VERBOSE:
-            print(f"warning: failed to save PGF file {pgf_path}: {exc}")
+    #pgf_path = output_path.with_suffix(".pgf")
+    # try:
+    #     fig.savefig(pgf_path)
+    # except Exception as exc:
+    #     if VERBOSE:
+    #         print(f"warning: failed to save PGF file {pgf_path}: {exc}")
+
+
+def normalized_l2_error(true, test):
+    true = np.asarray(true).reshape(-1)
+    test = np.asarray(test).reshape(-1)
+    assert true.shape == test.shape, f"Shapes are different for true series ({true.shape}) and test series ({test.shape})."
+
+    denom = np.linalg.norm(true)
+    error = np.linalg.norm(test - true)
+    if denom == 0:
+        return error
+    return error / denom
 
 if __name__ == "__main__":
     for source in SOURCE_CASES:
@@ -102,6 +114,9 @@ if __name__ == "__main__":
             print(f"\nComputing {source} case.")
 
         event_ids = available_event_ids(MODEL, source, OUTPUT_QUANTITY)
+        if source == "field":
+            # Temporarily skip field event 20 when generating predictions/plots.
+            event_ids = [event_id for event_id in event_ids if event_id != "20"]
         out_labels = output_labels_for(MODEL, source, OUTPUT_QUANTITY)
         if len(event_ids) == 0:
             if VERBOSE:
@@ -225,12 +240,7 @@ if __name__ == "__main__":
             for i,output_label in enumerate(out_labels):
                 out_true = out_true_aln_array[i]
                 out_pred = out_pred_aln_array[i]
-                errors[k,i] = (_get_error(
-                    true=out_true,
-                    test=out_pred,
-                    metric="l2_norm",
-                    normalized=True,
-                ))
+                errors[k,i] = normalized_l2_error(out_true, out_pred)
             np.savetxt(pred_dir/"errors.csv", np.array(errors))
 
             sid_err_dir = sid_results_dir(MODEL, source, OUTPUT_QUANTITY, "prediction error")
@@ -246,9 +256,10 @@ if __name__ == "__main__":
             n_cols = len(dirs)
             fig_plt, axs = plt.subplots(
                 n_rows, n_cols,
-                figsize=(16, 4.5 * n_rows),
+                figsize=(17, 3.4 * n_rows),
                 sharex=True
             )
+            fig_plt.subplots_adjust(hspace=0.35, top=0.80, bottom=0.16, left=0.12, right=0.88)
             axs = np.array(axs, ndmin=2)
             if n_cols == 1:
                 axs = axs.reshape(n_rows, 1)
@@ -257,17 +268,32 @@ if __name__ == "__main__":
             for j, direction in enumerate(dirs):
                 colors_go = iter(["blue","darkorange","green"])
                 row_idx = 0
+                direction_indices = [i for i, out_label in enumerate(out_labels) if direction in out_label]
+                if direction_indices:
+                    direction_series = []
+                    for idx in direction_indices:
+                        direction_series.extend([out_true_aln_array[idx], out_pred_aln_array[idx]])
+                    direction_min = min(np.min(series) for series in direction_series)
+                    direction_max = max(np.max(series) for series in direction_series)
+                    if np.isclose(direction_min, direction_max):
+                        span = max(1.0, abs(direction_min) * 0.05)
+                    else:
+                        span = (direction_max - direction_min) * 0.05
+                    y_limits = (direction_min - span, direction_max + span)
+                else:
+                    y_limits = None
                 for i,out_label in enumerate(out_labels):
                     if direction in out_label:
                         color = next(colors_go)
-                        axs[row_idx,j].plot(time_aln, out_true_aln_array[i], color="black", linestyle='-',  label=f"True") 
-                        axs[row_idx,j].plot(time_aln, out_pred_aln_array[i], color="red", linestyle='--', label=f"Pred") 
-                        axs[row_idx,j].set_title(out_label, fontsize=16)
-                        axs[row_idx,j].set_ylabel(
-                            f"{Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']})",
-                            fontsize=16
+                        true_line, = axs[row_idx,j].plot(
+                            time_aln, out_true_aln_array[i], color="black", linestyle='-', label="True"
                         )
-                        axs[row_idx,j].legend(fontsize=16, loc="upper right")
+                        pred_line, = axs[row_idx,j].plot(
+                            time_aln, out_pred_aln_array[i], color="red", linestyle='--', label="Pred"
+                        )
+                        axs[row_idx,j].set_title(out_label, fontsize=24, fontweight="bold", pad=10)
+                        if y_limits is not None:
+                            axs[row_idx,j].set_ylim(*y_limits)
                         fig_go[j].add_scatter(x=time_aln, y=out_true_aln_array[i],
                                               mode="lines", line=dict(color=color),
                                               name=f"True {out_label}")
@@ -276,7 +302,11 @@ if __name__ == "__main__":
                                               name=f"Pred {out_label}")
                         row_idx += 1
                 for r in range(n_rows):
-                    axs[r,j].set_xlabel("Time (s)")
+                    axs[r,j].tick_params(axis="both", labelsize=20)
+                    for tick_label in axs[r,j].get_xticklabels() + axs[r,j].get_yticklabels():
+                        tick_label.set_fontweight("bold")
+                    if r < row_idx and r != n_rows - 1:
+                        axs[r,j].tick_params(axis="x", labelbottom=False)
                     if r >= row_idx:
                         axs[r,j].set_visible(False)
                 fig_go[j].update_layout(
@@ -289,9 +319,43 @@ if __name__ == "__main__":
                 fig_go[j].update_xaxes(rangeslider=dict(visible=True))
                 fig_go[j].write_html(pred_dir/f"prediction_{dirs[j]}.html", include_plotlyjs="cdn")
             fig_plt.align_ylabels()
-            fig_plt.suptitle(
-                f"Event {event_id} {Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']}) [{source}]"
+            fig_plt.supylabel(
+                f"{Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']})",
+                fontsize=26,
+                fontweight=900,
+                x=0.04
             )
+            fig_plt.supxlabel("Time (s)", fontsize=26, fontweight=900, y=0.06)
+            fig_plt.suptitle(
+                f"Event {event_id} {Q_MAP[OUTPUT_QUANTITY]['name']} ({Q_MAP[OUTPUT_QUANTITY]['units']}) [{source}]",
+                fontsize=30,
+                fontweight="bold",
+                y=0.965
+            )
+            legend_items = [
+                {"x": 0.93, "y0": 0.60, "y1": 0.67, "label": "True", "color": "black", "linestyle": "-"},
+                {"x": 0.93, "y0": 0.42, "y1": 0.49, "label": "Pred", "color": "red", "linestyle": "--"},
+            ]
+            for item in legend_items:
+                fig_plt.add_artist(Line2D(
+                    [item["x"], item["x"]],
+                    [item["y0"], item["y1"]],
+                    transform=fig_plt.transFigure,
+                    color=item["color"],
+                    linestyle=item["linestyle"],
+                    linewidth=2.0,
+                ))
+                fig_plt.text(
+                    item["x"] + 0.018,
+                    (item["y0"] + item["y1"]) / 2,
+                    item["label"],
+                    rotation=90,
+                    va="center",
+                    ha="center",
+                    fontsize=22,
+                    fontweight="bold",
+                    transform=fig_plt.transFigure,
+                )
             save_figure_with_pgf(fig_plt, pred_dir / "prediction.png", dpi=350)
             plt.close(fig_plt)
 
@@ -312,18 +376,19 @@ if __name__ == "__main__":
             cmap='viridis'
         )
         cbar = fig.colorbar(im, ax=ax, extend='max')
-        cbar.set_label("$\\epsilon$: Normalized $L_2$ Error", fontsize=14)
-        ax.set_xlabel("Event", fontsize=14)
+        cbar.set_label(r"Error, $\epsilon$", fontsize=18)
+        cbar.ax.tick_params(labelsize=16)
+        ax.set_xlabel("Event", fontsize=18)
         ax.set_xticks(np.arange(n_events))
-        ax.set_xticklabels(event_ids, rotation=45, fontsize=12)
+        ax.set_xticklabels(event_ids, rotation=45, fontsize=16)
         ax.set_yticks(np.arange(len(out_labels)))
-        ax.set_yticklabels(out_labels, fontsize=12)
+        ax.set_yticklabels(out_labels, fontsize=16)
         half_vmax = np.nanmax(heatmap_data)/2.0
         for ev in range(n_events):
             for i in range(len(out_labels)):
                 val = heatmap_data[i,ev]
                 color = 'black' if val > half_vmax else 'white'
-                ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=6)
+                ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=9)
         save_figure_with_pgf(fig, heatmap_dir / f"heatmap_{SID_METHOD}.png", dpi=400)
         plt.close(fig)
 

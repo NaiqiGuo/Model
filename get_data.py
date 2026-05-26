@@ -32,12 +32,12 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-STRUCTURE = "bridge" # "frame", "bridge"
+STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = False
 LOAD_EVENTS = False
 FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "1"))
-FRAME_OUTPUT_RESPONSE = os.environ.get("FRAME_OUTPUT_RESPONSE", "force_deformation") #force_deformation, stress_strain
+FRAME_OUTPUT_RESPONSE = os.environ.get("FRAME_OUTPUT_RESPONSE", "stress_strain") #force_deformation, stress_strain
 BRIDGE_OUTPUT_ELEMENT = int(os.environ.get("BRIDGE_OUTPUT_ELEMENT", "107"))
 BRIDGE_OUTPUT_RESPONSE = os.environ.get("BRIDGE_OUTPUT_RESPONSE", "force_deformation") #force_deformation, stress_strain
 
@@ -53,6 +53,16 @@ MODEL_OUT_DIR = BASE_DIR / STRUCTURE / ("elastic" if ELASTIC else "inelastic")
 os.makedirs(MODEL_OUT_DIR, exist_ok=True)
 FIELD_OUT_DIR = BASE_DIR / STRUCTURE / "field"
 os.makedirs(FIELD_OUT_DIR, exist_ok=True)
+SCRIPT_DIR = Path(__file__).resolve().parent
+UPLOAD_ROOT_CANDIDATES = [SCRIPT_DIR / "uploads", SCRIPT_DIR.parent / "uploads"]
+
+
+def find_upload_path(*parts: str) -> Path:
+    for root in UPLOAD_ROOT_CANDIDATES:
+        candidate = root.joinpath(*parts)
+        if candidate.exists():
+            return candidate
+    return UPLOAD_ROOT_CANDIDATES[0].joinpath(*parts)
 
 
 if __name__ == "__main__":
@@ -64,19 +74,21 @@ if __name__ == "__main__":
     # Load events
     if STRUCTURE == "frame":
         # events are a list of filepaths to txt
-        events = sorted(glob.glob("uploads/CE249_2024_Lab4data/ce249Run*.txt"))
+        frame_event_pattern = str(find_upload_path("CE249_2024_Lab4data", "ce249Run*.txt"))
+        events = sorted(glob.glob(frame_event_pattern))
     elif STRUCTURE == "bridge":
         # events are a list of quakeio objects
+        bridge_upload_dir = find_upload_path("CE89324")
         if LOAD_EVENTS:
             if VERBOSE:
                 events = sorted([
                     print(file) or quakeio.read(file, exclusions=["*filter*"])
-                    for file in list(Path(f"uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+                    for file in list(bridge_upload_dir.glob("????????*.[zZ][iI][pP]"))
                 ], key=lambda event: abs(event["peak_accel"]))
             else:
                 events = sorted([
                     quakeio.read(file, exclusions=["*filter*"])
-                    for file in list(Path(f"uploads/CE89324/").glob("????????*.[zZ][iI][pP]"))
+                    for file in list(bridge_upload_dir.glob("????????*.[zZ][iI][pP]"))
                 ], key=lambda event: abs(event["peak_accel"]))
             with open("events.pkl","wb") as f:
                 pickle.dump(events,f)
@@ -101,7 +113,7 @@ if __name__ == "__main__":
         output_dofs = [1, 2, 1, 2, 1, 2]
 
         wirepot_ref_226 = None
-        ref_event = "uploads/CE249_2024_Lab4data/ce249Run226.txt"
+        ref_event = find_upload_path("CE249_2024_Lab4data", "ce249Run226.txt")
         array_ref, sensor_names_ref, sensor_units_ref, time_raw_ref, dt_ref = get_249_data(ref_event)
         wirepot_ref_226 = np.vstack([array_ref[ch] * scale_249_units(units=sensor_units_ref[ch])
             for ch in output_channels_displ])
@@ -375,5 +387,5 @@ if __name__ == "__main__":
                     create_and_save_csv(
                         path = SOURCE_DIR / q_name / location / f"{event_id}.csv",
                         array = q,
-                        rewrite = (source!="field") # CHECK NG: Added this so that field quantities are only saved once
+                        rewrite = True  # Always refresh saved data so field/model files stay in sync with current preprocessing.
                     )
