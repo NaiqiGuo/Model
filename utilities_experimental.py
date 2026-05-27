@@ -1158,6 +1158,30 @@ def save_strain_stress(stresses, strains, dt, filename):
             writer.writerow(row)
 
 
+def save_force_deformation(forces, deformations, dt, filename):
+
+    nt = len(list(forces.values())[0])
+    time = np.arange(nt) * dt
+
+    elems = sorted(forces.keys())
+
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+
+        header = ["time"]
+        header += [f"ele{e}_force" for e in elems]
+        header += [f"ele{e}_deformation" for e in elems]
+        writer.writerow(header)
+
+        for k in range(nt):
+            row = [time[k]]
+            for e in elems:
+                row.append(forces[e][k])
+            for e in elems:
+                row.append(deformations[e][k])
+            writer.writerow(row)
+
+
 #get damage
 def list_event_dirs(case_dir: Path):
     ev_dirs = [p for p in case_dir.iterdir() if p.is_dir() and p.name.isdigit()]
