@@ -43,8 +43,8 @@ def get_material_response(model, element):
     try:
         deformation = model.eleResponse(element, "deformation") #
         force = model.eleResponse(element, "force")
-        #print(f"[Debug] element {element} raw deformation = {deformation}")
-        #print(f"[Debug] element {element} raw force = {force}")
+        print(f"[Debug] element {element} raw deformation = {deformation}")
+        print(f"[Debug] element {element} raw force = {force}")
    
         return deformation, force
     except Exception as e:

@@ -125,6 +125,11 @@ if __name__ == "__main__":
 
         n_events = len(event_ids)
         errors = np.full((n_events, len(out_labels)), np.nan)
+        if MODEL == "frame":
+            display_indices = [i for i, label in enumerate(out_labels) if "X" in label]
+        else:
+            display_indices = list(range(len(out_labels)))
+        display_labels = [out_labels[i] for i in display_indices]
 
         for k, event_id in enumerate(tqdm(event_ids)):
             # Load true input (ground acceleration) and true output from Modeling/.
@@ -249,10 +254,10 @@ if __name__ == "__main__":
 
             # Plot true vs predicted output timeseries
             if MODEL == "frame":
-                dirs = ['X', 'Y']
+                dirs = ['X']
             elif MODEL == "bridge":
                 dirs = ['Y']
-            n_rows = max(1, max(sum(d in label for label in out_labels) for d in dirs))
+            n_rows = max(1, max(sum(d in label for label in display_labels) for d in dirs))
             n_cols = len(dirs)
             fig_plt, axs = plt.subplots(
                 n_rows, n_cols,
@@ -268,7 +273,7 @@ if __name__ == "__main__":
             for j, direction in enumerate(dirs):
                 colors_go = iter(["blue","darkorange","green"])
                 row_idx = 0
-                direction_indices = [i for i, out_label in enumerate(out_labels) if direction in out_label]
+                direction_indices = [i for i in display_indices if direction in out_labels[i]]
                 if direction_indices:
                     direction_series = []
                     for idx in direction_indices:
@@ -282,7 +287,8 @@ if __name__ == "__main__":
                     y_limits = (direction_min - span, direction_max + span)
                 else:
                     y_limits = None
-                for i,out_label in enumerate(out_labels):
+                for i in direction_indices:
+                    out_label = out_labels[i]
                     if direction in out_label:
                         color = next(colors_go)
                         true_line, = axs[row_idx,j].plot(
@@ -363,7 +369,7 @@ if __name__ == "__main__":
         heatmap_dir = SYSTEM_ID_DIR / MODEL / source / OUTPUT_QUANTITY / "System ID Results"
         os.makedirs(heatmap_dir, exist_ok=True)
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
-        heatmap_data = np.nan_to_num(errors.T, nan=0.0)
+        heatmap_data = np.nan_to_num(errors[:, display_indices].T, nan=0.0)
         if MODEL == "frame":
             vmax = 1.0
         elif MODEL == "bridge":
@@ -381,11 +387,11 @@ if __name__ == "__main__":
         ax.set_xlabel("Event", fontsize=18)
         ax.set_xticks(np.arange(n_events))
         ax.set_xticklabels(event_ids, rotation=45, fontsize=16)
-        ax.set_yticks(np.arange(len(out_labels)))
-        ax.set_yticklabels(out_labels, fontsize=16)
+        ax.set_yticks(np.arange(len(display_labels)))
+        ax.set_yticklabels(display_labels, fontsize=16)
         half_vmax = np.nanmax(heatmap_data)/2.0
         for ev in range(n_events):
-            for i in range(len(out_labels)):
+            for i in range(len(display_labels)):
                 val = heatmap_data[i,ev]
                 color = 'black' if val > half_vmax else 'white'
                 ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=9)
@@ -408,7 +414,7 @@ if __name__ == "__main__":
         ax.set_xticks(np.arange(n_events))
         #ax.set_xticklabels(np.arange(1, n_events+1), rotation=45, fontsize=15)
         ax.set_xticklabels(event_ids, rotation=45, fontsize=15)
-        ax.set_yticks(np.arange(len(out_labels)))
-        ax.set_yticklabels(out_labels, fontsize=15)
+        ax.set_yticks(np.arange(len(display_labels)))
+        ax.set_yticklabels(display_labels, fontsize=15)
         save_figure_with_pgf(fig, heatmap_dir / f"heatmap_square_{SID_METHOD}.png", dpi=400)
         plt.close(fig)
