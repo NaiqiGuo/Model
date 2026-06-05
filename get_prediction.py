@@ -123,6 +123,38 @@ if __name__ == "__main__":
                 print(f"skip {source}: no modeling files found for {MODEL}/{source}/{OUTPUT_QUANTITY}")
             continue
 
+        window_bounds_by_event = {}
+        window_lengths = []
+        if WINDOWED:
+            for event_id in event_ids:
+                out_true_path = modeling_path(MODEL, source, OUTPUT_QUANTITY, "structure", event_id)
+                if not out_true_path.exists():
+                    continue
+                out_true_scan = np.loadtxt(out_true_path)
+                sig_scan = np.asarray(out_true_scan[0]).reshape(-1).copy()
+                bounds_scan = intensity_bounds(sig_scan, lb=0.01, ub=0.99)
+                window_bounds_by_event[event_id] = bounds_scan
+                window_lengths.append(bounds_scan[1] - bounds_scan[0])
+            median_window_length = int(np.median(window_lengths)) if window_lengths else None
+            if VERBOSE and median_window_length is not None:
+                median_window_seconds = None
+                for event_id in event_ids:
+                    dt_path = modeling_dt_path(MODEL, event_id, "ground")
+                    if not dt_path.exists():
+                        continue
+                    with open(dt_path, "r") as f:
+                        median_window_seconds = median_window_length * float(f.read().strip())
+                    break
+                if median_window_seconds is None:
+                    print(f"{source} truncation median window length: {median_window_length} samples")
+                else:
+                    print(
+                        f"{source} truncation median window length: "
+                        f"{median_window_length} samples ({median_window_seconds:.3f} s)"
+                    )
+        else:
+            median_window_length = None
+
         n_events = len(event_ids)
         errors = np.full((n_events, len(out_labels)), np.nan)
         if MODEL == "frame":
@@ -164,8 +196,21 @@ if __name__ == "__main__":
 
             # Window signals
             if WINDOWED:
-                sig = out_true[0].copy()
-                bounds = intensity_bounds(sig, lb=0.01, ub=0.99)
+                bounds = window_bounds_by_event.get(event_id)
+                if bounds is None:
+                    sig = np.asarray(out_true[0]).reshape(-1).copy()
+                    bounds = intensity_bounds(sig, lb=0.01, ub=0.99)
+                ilb, iub = bounds
+                window_length = iub - ilb
+                target_length = window_length if median_window_length is None else max(window_length, median_window_length)
+                center = (ilb + iub) // 2
+                half = target_length // 2
+                ilb = max(0, center - half)
+                iub = ilb + target_length
+                if iub > out_true.shape[1]:
+                    iub = out_true.shape[1]
+                    ilb = max(0, iub - target_length)
+                bounds = (ilb, iub)
                 inputs_trunc = truncate_by_bounds(inputs, bounds)
                 out_true_trunc = truncate_by_bounds(out_true, bounds)
                 out_pred_trunc = truncate_by_bounds(out_pred, bounds)
