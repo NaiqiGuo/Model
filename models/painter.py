@@ -25,10 +25,6 @@ VERBOSE = 1
 class Painter:
     # Labeled channel numbers from quakeio object
     input_channels = [1,3,15,17,18,20] # ordered arbitrarily
-    # Nodes for excitation, order corresponds to input_channels
-    input_nodes = [] # TODO NG: fill in input nodes.
-    # DOFs for excitation, order corresponds to input_channels
-    input_dofs = []  # TODO NG: fill in input dofs
 
     output_nodes = [3,5]
     output_elements = [3]
