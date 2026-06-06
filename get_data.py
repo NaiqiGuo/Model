@@ -240,7 +240,9 @@ if __name__ == "__main__":
 
             model = create_frame(elastic=ELASTIC,
                                         multisupport=MULTISUPPORT,
-                                        verbose=VERBOSE)
+                                        verbose=VERBOSE,
+                                        material='steel',
+                                        coupons=True)
 
             model = apply_load_frame(model,
                                         inputx=inputs["field"]["acceleration"][0],
