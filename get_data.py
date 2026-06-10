@@ -34,7 +34,7 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True
 LOAD_EVENTS = False
 FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "1"))
 FRAME_OUTPUT_RESPONSE = os.environ.get("FRAME_OUTPUT_RESPONSE", "stress_strain") #force_deformation, stress_strain

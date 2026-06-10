@@ -221,9 +221,10 @@ def create_frame(elastic:bool,
         model.uniaxialMaterial("Elastic", steel_mat, Es)
     # Coupon material
     if elastic:
-        model.uniaxialMaterial('Elastic', 5, 5000) # coupon translational stiffness
+        model.uniaxialMaterial('Elastic', 5, 50) # coupon translational stiffness
     else:
-        model.uniaxialMaterial('Steel02', 5, 1.0e3, 5000.0, 0.01, 20.0, 0.925, 0.15)  # coupon translational
+        model.uniaxialMaterial('Steel02', 5, 500, 50.0, 0.01, 20.0, 0.925, 0.15)  # coupon translational
+    model.uniaxialMaterial('Elastic', 6, 1.0e3) # coupon rotational stiffness
     
 
     # Column sections and elements
@@ -268,10 +269,10 @@ def create_frame(elastic:bool,
     if coupons:
         #                                tag ndI ndJ transfTag integrationTag
         # Add 1 zerolength element at the base of each column (1,21) (2,22) (3,23) (4,24)
-        model.element("zeroLength",     101, ( 1, 21), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",     102, ( 2, 22), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",     103, ( 3, 23), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",     104, ( 4, 24), mat=(5,5,5), dir=(1,2,3)) 
+        model.element("zeroLength",     101, ( 1, 21), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",     102, ( 2, 22), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",     103, ( 3, 23), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",     104, ( 4, 24), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
 
         model.element("forceBeamColumn",  1, ( 1,  5), transform=colTransf, section=col_sec, shear=0)
         model.element("forceBeamColumn",  2, ( 2,  6), transform=colTransf, section=col_sec, shear=0)
@@ -351,35 +352,35 @@ def create_frame(elastic:bool,
         # Add 1 zerolength element at the two ends of each x-direction beam
         #                   tag (ndI ndJ) transfTag integrationTag
         # zerolength elements between (5,25) and (6,26)
-        model.element("zeroLength",       105, ( 5, 25), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",       106, ( 6, 26), mat=(5,5,5), dir=(1,2,3)) 
+        model.element("zeroLength",       105, ( 5, 25), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",       106, ( 6, 26), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
         model.element("elasticBeamColumn", 13, (25, 26), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 14, ( 6,  7), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         # zerolength elements between (7,27) and (8,28)
-        model.element("zeroLength",       107, ( 7, 27), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",       108, ( 8, 28), mat=(5,5,5), dir=(1,2,3)) 
+        model.element("zeroLength",       107, ( 7, 27), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",       108, ( 8, 28), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
         model.element("elasticBeamColumn", 15, (27, 28), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 16, ( 8,  5), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
 
         # zerolength elements between (10,30) and (11,31)
-        model.element("zeroLength",       109, (10, 30), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",       110, (11, 31), mat=(5,5,5), dir=(1,2,3)) 
+        model.element("zeroLength",       109, (10, 30), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",       110, (11, 31), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
         model.element("elasticBeamColumn", 17, (30, 31), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 18, (11, 12), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         # zerolength elements between (12,32) and (13,33)
-        model.element("zeroLength",       111, (12, 32), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",       112, (13, 33), mat=(5,5,5), dir=(1,2,3)) 
+        model.element("zeroLength",       111, (12, 32), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",       112, (13, 33), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
         model.element("elasticBeamColumn", 19, (32, 33), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 20, (13, 10), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
 
         # zerolength elements between (15,35) and (16,36)
-        model.element("zeroLength",       113, (15, 35), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",       114, (16, 36), mat=(5,5,5), dir=(1,2,3)) 
+        model.element("zeroLength",       113, (15, 35), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",       114, (16, 36), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
         model.element("elasticBeamColumn", 21, (35, 36), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 22, (16, 17), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         # zerolength elements between (17,37) and (18,38)
-        model.element("zeroLength",       115, (17, 37), mat=(5,5,5), dir=(1,2,3)) 
-        model.element("zeroLength",       116, (18, 38), mat=(5,5,5), dir=(1,2,3)) 
+        model.element("zeroLength",       115, (17, 37), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
+        model.element("zeroLength",       116, (18, 38), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6)) 
         model.element("elasticBeamColumn", 23, (37, 38), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 24, (18, 15), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
     else:
@@ -445,6 +446,5 @@ def apply_load_frame(model, inputx=None, inputy=None, dt=None):
     model.pattern("UniformExcitation", 3, 2, accel=3)
 
     return model
-
 
 
