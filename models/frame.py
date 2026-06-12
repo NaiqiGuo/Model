@@ -96,6 +96,7 @@ def create_frame(elastic:bool,
                  multisupport:bool,
                  coupons = False,
                  material = 'steel',
+                 zerolength = 'section', # 'element'
                  verbose = False):
 
     """
@@ -221,10 +222,19 @@ def create_frame(elastic:bool,
         model.uniaxialMaterial("Elastic", steel_mat, Es)
     # Coupon material
     if elastic:
-        model.uniaxialMaterial('Elastic', 5, 50) # coupon translational stiffness
+        if zerolength == 'element':
+            model.uniaxialMaterial('Elastic', 5, 50) # coupon translational stiffness for zero length element
+            model.uniaxialMaterial('Elastic', 6, 1.0e3) # coupon rotational stiffness
+        elif zerolength == 'section':
+            model.uniaxialMaterial('Elastic', 5, Es) # coupon translational stiffness for zero length section element
+    
     else:
-        model.uniaxialMaterial('Steel02', 5, 500, 50.0, 0.01, 20.0, 0.925, 0.15)  # coupon translational
-    model.uniaxialMaterial('Elastic', 6, 1.0e3) # coupon rotational stiffness
+        if zerolength == 'element':
+            model.uniaxialMaterial('Steel02', 5, 500, 50.0, 0.01, 20.0, 0.925, 0.15)  # coupon translational for zero length element
+            model.uniaxialMaterial('Elastic', 6, 1.0e3) # coupon rotational stiffness (in future, maybe use Steel02)
+        elif zerolength == 'section':
+            model.uniaxialMaterial('Steel02', 5, fy, Es, 0.01, 20.0, 0.925, 0.15)  # coupon translational stiffness for zero length section element
+    
     
 
     # Column sections and elements
