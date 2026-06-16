@@ -34,12 +34,12 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False # True means elastic analysis; False means inelastic analysis. Note that for frame, only inelastic analysis is available.
 FRAME_COUPONS = True
 FRAME_ZEROLENGTH = "section" # "element", "section"
 LOAD_EVENTS = False
-FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "1"))
-FRAME_OUTPUT_RESPONSE = os.environ.get("FRAME_OUTPUT_RESPONSE", "stress_strain") #force_deformation, stress_strain
+FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "102"))
+FRAME_OUTPUT_RESPONSE = os.environ.get("FRAME_OUTPUT_RESPONSE", "force_deformation") #force_deformation, stress_strain
 BRIDGE_OUTPUT_ELEMENT = int(os.environ.get("BRIDGE_OUTPUT_ELEMENT", "107"))
 BRIDGE_OUTPUT_RESPONSE = os.environ.get("BRIDGE_OUTPUT_RESPONSE", "force_deformation") #force_deformation, stress_strain
 
