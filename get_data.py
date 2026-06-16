@@ -35,6 +35,8 @@ SID_METHOD = 'srim'
 STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
 ELASTIC = True
+FRAME_COUPONS = True
+FRAME_ZEROLENGTH = "section" # "element", "section"
 LOAD_EVENTS = False
 FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "1"))
 FRAME_OUTPUT_RESPONSE = os.environ.get("FRAME_OUTPUT_RESPONSE", "stress_strain") #force_deformation, stress_strain
@@ -238,11 +240,17 @@ if __name__ == "__main__":
             material_deformation_dof = None
             material_force_dof = None
 
+            if FRAME_ZEROLENGTH not in {"element", "section"}:
+                raise ValueError(
+                    f"Unsupported FRAME_ZEROLENGTH={FRAME_ZEROLENGTH!r}; "
+                    "expected 'element' or 'section'."
+                )
             model = create_frame(elastic=ELASTIC,
                                         multisupport=MULTISUPPORT,
                                         verbose=VERBOSE,
                                         material='steel',
-                                        coupons=True)
+                                        coupons=FRAME_COUPONS,
+                                        zerolength=FRAME_ZEROLENGTH)
 
             model = apply_load_frame(model,
                                         inputx=inputs["field"]["acceleration"][0],
