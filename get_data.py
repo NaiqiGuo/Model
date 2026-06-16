@@ -237,8 +237,8 @@ if __name__ == "__main__":
             zFiber = 0.0
             response_mode = "material" if FRAME_OUTPUT_RESPONSE == "force_deformation" else "fiber"
             fiber_response_dof = None
-            material_deformation_dof = None
-            material_force_dof = None
+            material_deformation_dof = 2 if FRAME_OUTPUT_RESPONSE == "force_deformation" else None
+            material_force_dof = 2 if FRAME_OUTPUT_RESPONSE == "force_deformation" else None
 
             if FRAME_ZEROLENGTH not in {"element", "section"}:
                 raise ValueError(
