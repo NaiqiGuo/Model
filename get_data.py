@@ -144,7 +144,7 @@ if __name__ == "__main__":
         output_channels = [4, 7, 9]
         output_dofs = [2, 2, 2]
 
-    for i,event in enumerate(events):
+    for i,event in enumerate(events[1:5]):
         if STRUCTURE == "frame":
             # filepaths are like .../ce249Run244.txt
             event_id = Path(event).stem.replace("ce249Run", "")  # "244"
@@ -314,6 +314,7 @@ if __name__ == "__main__":
                                                                     fiber_response_dof=fiber_response_dof,
                                                                     material_deformation_dof=material_deformation_dof,
                                                                     material_force_dof=material_force_dof,
+                                                                    n_modes=5,
                                                                     verbose=VERBOSE
                                                                 )
 
