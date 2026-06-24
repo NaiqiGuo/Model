@@ -21,6 +21,7 @@ ELASTIC = False
 # True or 1 means print progress messages only;
 # 2 means print progress and validation messages
 VERBOSE = 1
+SYSTEM_ID_VERBOSE = 2
 
 # Main output directory
 BASE_DIR = Path("Modeling")
@@ -77,7 +78,7 @@ if __name__ == "__main__":
             chunk       = 200,
             i           = 250,
             j           = 4400,
-            verbose     = VERBOSE,
+            verbose     = SYSTEM_ID_VERBOSE,
         )
 
         for source in [elastic_name, "field"]:
