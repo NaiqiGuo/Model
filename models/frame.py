@@ -98,7 +98,7 @@ def create_coupon_fiber_section(bar_material):
     """Create a fiber section for zeroLengthSection coupon elements."""
     plate_width = 10.0 * units.inch
     plate_height = 10.0 * units.inch
-    bar_radius = 0.5 * units.inch
+    bar_radius = 3/8 * units.inch
     edge_dist_x = 3.5 * units.inch
     edge_dist_y = 1.5 * units.inch
     bar = Circle(
@@ -163,26 +163,48 @@ def create_frame(elastic:bool,
     by = 72.0*units.inch;      # Bay width in Y-direction 72 inches
 
     # Create nodes
-    #            tag    X        Y       Z 
-    model.node( 1, (-bx/2.0,  by/2.0,   0.0))
-    model.node( 2, ( bx/2.0,  by/2.0,   0.0))
-    model.node( 3, ( bx/2.0, -by/2.0,   0.0))
-    model.node( 4, (-bx/2.0, -by/2.0,   0.0))
+    if "coupons" and "section":
+        #            tag    X        Y       Z 
+        model.node( 1, (-bx/2.0,  by/2.0,   5.0))
+        model.node( 2, ( bx/2.0,  by/2.0,   5.0))
+        model.node( 3, ( bx/2.0, -by/2.0,   5.0))
+        model.node( 4, (-bx/2.0, -by/2.0,   5.0))
 
-    model.node( 5, (-bx/2.0,  by/2.0,     h))
-    model.node( 6, ( bx/2.0,  by/2.0,     h))
-    model.node( 7, ( bx/2.0, -by/2.0,     h))
-    model.node( 8, (-bx/2.0, -by/2.0,     h))
+        model.node( 5, (-bx/2.0+5,  by/2.0,     h))
+        model.node( 6, ( bx/2.0-5,  by/2.0,     h))
+        model.node( 7, ( bx/2.0-5, -by/2.0,     h))
+        model.node( 8, (-bx/2.0+5, -by/2.0,     h))
 
-    model.node(10, (-bx/2.0,  by/2.0, 2.0*h))
-    model.node(11, ( bx/2.0,  by/2.0, 2.0*h))
-    model.node(12, ( bx/2.0, -by/2.0, 2.0*h))
-    model.node(13, (-bx/2.0, -by/2.0, 2.0*h))
+        model.node(10, (-bx/2.0+5,  by/2.0, 2.0*h))
+        model.node(11, ( bx/2.0-5,  by/2.0, 2.0*h))
+        model.node(12, ( bx/2.0-5, -by/2.0, 2.0*h))
+        model.node(13, (-bx/2.0+5, -by/2.0, 2.0*h))
 
-    model.node(15, (-bx/2.0,  by/2.0, 3.0*h))
-    model.node(16, ( bx/2.0,  by/2.0, 3.0*h))
-    model.node(17, ( bx/2.0, -by/2.0, 3.0*h))
-    model.node(18, (-bx/2.0, -by/2.0, 3.0*h))
+        model.node(15, (-bx/2.0+5,  by/2.0, 3.0*h))
+        model.node(16, ( bx/2.0-5,  by/2.0, 3.0*h))
+        model.node(17, ( bx/2.0-5, -by/2.0, 3.0*h))
+        model.node(18, (-bx/2.0+5, -by/2.0, 3.0*h))
+    else:
+        #            tag    X        Y       Z 
+        model.node( 1, (-bx/2.0,  by/2.0,   0.0))
+        model.node( 2, ( bx/2.0,  by/2.0,   0.0))
+        model.node( 3, ( bx/2.0, -by/2.0,   0.0))
+        model.node( 4, (-bx/2.0, -by/2.0,   0.0))
+
+        model.node( 5, (-bx/2.0,  by/2.0,     h))
+        model.node( 6, ( bx/2.0,  by/2.0,     h))
+        model.node( 7, ( bx/2.0, -by/2.0,     h))
+        model.node( 8, (-bx/2.0, -by/2.0,     h))
+
+        model.node(10, (-bx/2.0,  by/2.0, 2.0*h))
+        model.node(11, ( bx/2.0,  by/2.0, 2.0*h))
+        model.node(12, ( bx/2.0, -by/2.0, 2.0*h))
+        model.node(13, (-bx/2.0, -by/2.0, 2.0*h))
+
+        model.node(15, (-bx/2.0,  by/2.0, 3.0*h))
+        model.node(16, ( bx/2.0,  by/2.0, 3.0*h))
+        model.node(17, ( bx/2.0, -by/2.0, 3.0*h))
+        model.node(18, (-bx/2.0, -by/2.0, 3.0*h))
 
     if coupons:
         model.node(21, (-bx/2.0,  by/2.0,   0.0))
@@ -354,15 +376,19 @@ def create_frame(elastic:bool,
             model.element("zeroLength",     103, ( 3, 23), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
             model.element("zeroLength",     104, ( 4, 24), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
         elif zerolength == 'section':
-            model.element("zeroLengthSection", 101, (1, 21), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
-            model.element("zeroLengthSection", 102, (2, 22), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
-            model.element("zeroLengthSection", 103, (3, 23), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
-            model.element("zeroLengthSection", 104, (4, 24), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
-            # Fiber sections do not provide transverse shear response.
-            model.element("zeroLength", 201, (1, 21), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 202, (2, 22), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 203, (3, 23), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 204, (4, 24), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
+            # model.element("zeroLengthSection", 101, (1, 21), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
+            # model.element("zeroLengthSection", 102, (2, 22), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
+            # model.element("zeroLengthSection", 103, (3, 23), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
+            # model.element("zeroLengthSection", 104, (4, 24), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
+            model.element("forceBeamColumn", 101, (1, 21), transform=colTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 102, (2, 22), transform=colTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 103, (3, 23), transform=colTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 104, (4, 24), transform=colTransf, section=coupon_section, shear=0)
+            # # Fiber sections do not provide transverse shear response.
+            # model.element("zeroLength", 201, (1, 21), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 202, (2, 22), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 203, (3, 23), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 204, (4, 24), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
 
         # First floor
         model.element("forceBeamColumn",  1, ( 1,  5), transform=colTransf, section=col_sec, shear=0)
@@ -450,10 +476,12 @@ def create_frame(elastic:bool,
             model.element("zeroLength",       105, ( 5, 25), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
             model.element("zeroLength",       106, ( 6, 26), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
         elif zerolength == 'section':
-            model.element("zeroLengthSection", 105, (5, 25), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLengthSection", 106, (6, 26), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLength", 205, (5, 25), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 206, (6, 26), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLengthSection", 105, (5, 25), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            # model.element("zeroLengthSection", 106, (6, 26), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            model.element("forceBeamColumn", 105, (5, 25), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 106, (6, 26), transform=beamTransf, section=coupon_section, shear=0)
+            # model.element("zeroLength", 205, (5, 25), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 206, (6, 26), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 13, (25, 26), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 14, ( 6,  7), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         # zerolength elements between (7,27) and (8,28)
@@ -461,10 +489,12 @@ def create_frame(elastic:bool,
             model.element("zeroLength",       107, ( 7, 27), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
             model.element("zeroLength",       108, ( 8, 28), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
         elif zerolength == 'section':
-            model.element("zeroLengthSection", 107, (7, 27), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLengthSection", 108, (8, 28), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLength", 207, (7, 27), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 208, (8, 28), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLengthSection", 107, (7, 27), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            # model.element("zeroLengthSection", 108, (8, 28), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            model.element("forceBeamColumn", 107, (7, 27), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 108, (8, 28), transform=beamTransf, section=coupon_section, shear=0)
+            # model.element("zeroLength", 207, (7, 27), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 208, (8, 28), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 15, (27, 28), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 16, ( 8,  5), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
 
@@ -474,10 +504,12 @@ def create_frame(elastic:bool,
             model.element("zeroLength",       109, (10, 30), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
             model.element("zeroLength",       110, (11, 31), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
         elif zerolength == 'section':
-            model.element("zeroLengthSection", 109, (10, 30), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLengthSection", 110, (11, 31), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLength", 209, (10, 30), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 210, (11, 31), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLengthSection", 109, (10, 30), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            # model.element("zeroLengthSection", 110, (11, 31), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            model.element("forceBeamColumn", 109, (10, 30), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 110, (11, 31), transform=beamTransf, section=coupon_section, shear=0)
+            # model.element("zeroLength", 209, (10, 30), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 210, (11, 31), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 17, (30, 31), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 18, (11, 12), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         # zerolength elements between (12,32) and (13,33)
@@ -485,10 +517,12 @@ def create_frame(elastic:bool,
             model.element("zeroLength",       111, (12, 32), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
             model.element("zeroLength",       112, (13, 33), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
         elif zerolength == 'section':
-            model.element("zeroLengthSection", 111, (12, 32), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLengthSection", 112, (13, 33), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLength", 211, (12, 32), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 212, (13, 33), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLengthSection", 111, (12, 32), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            # model.element("zeroLengthSection", 112, (13, 33), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            model.element("forceBeamColumn", 111, (12, 32), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 112, (13, 33), transform=beamTransf, section=coupon_section, shear=0)
+            # model.element("zeroLength", 211, (12, 32), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 212, (13, 33), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 19, (32, 33), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 20, (13, 10), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
 
@@ -498,10 +532,12 @@ def create_frame(elastic:bool,
             model.element("zeroLength",       113, (15, 35), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
             model.element("zeroLength",       114, (16, 36), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
         elif zerolength == 'section':
-            model.element("zeroLengthSection", 113, (15, 35), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLengthSection", 114, (16, 36), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLength", 213, (15, 35), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 214, (16, 36), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLengthSection", 113, (15, 35), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            # model.element("zeroLengthSection", 114, (16, 36), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            model.element("forceBeamColumn", 113, (15, 35), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 114, (16, 36), transform=beamTransf, section=coupon_section, shear=0)
+            # model.element("zeroLength", 213, (15, 35), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 214, (16, 36), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 21, (35, 36), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 22, (16, 17), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         # zerolength elements between (17,37) and (18,38)
@@ -509,10 +545,12 @@ def create_frame(elastic:bool,
             model.element("zeroLength",       115, (17, 37), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
             model.element("zeroLength",       116, (18, 38), mat=(5,5,5,6,6,6), dir=(1,2,3,4,5,6))
         elif zerolength == 'section':
-            model.element("zeroLengthSection", 115, (17, 37), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLengthSection", 116, (18, 38), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("zeroLength", 215, (17, 37), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
-            model.element("zeroLength", 216, (18, 38), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLengthSection", 115, (17, 37), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            # model.element("zeroLengthSection", 116, (18, 38), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
+            model.element("forceBeamColumn", 115, (17, 37), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("forceBeamColumn", 116, (18, 38), transform=beamTransf, section=coupon_section, shear=0)
+            # model.element("zeroLength", 215, (17, 37), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
+            # model.element("zeroLength", 216, (18, 38), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 23, (37, 38), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
         model.element("elasticBeamColumn", 24, (18, 15), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
     else:
