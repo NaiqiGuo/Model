@@ -13,10 +13,10 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "frame" # "frame", "bridge"
+MODEL = "bridge" # "frame", "bridge"
 SID_METHOD = "srim"
 SOURCE_CASES = [s.strip() for s in os.environ.get("SID_SOURCE_CASES", "field,elastic,inelastic").split(",") if s.strip()]
-OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
+OUTPUT_QUANTITY = "acceleration"  # "displacement" or "acceleration"
 WINDOWED = os.environ.get("SID_WINDOWED", "1") == "1" # if true, truncates all signals before aligning, computing error, and plotting
 ALIGN_SIGNALS = os.environ.get("SID_ALIGN", "0") == "1"
 VERBOSE = 1 # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
@@ -114,9 +114,6 @@ if __name__ == "__main__":
             print(f"\nComputing {source} case.")
 
         event_ids = available_event_ids(MODEL, source, OUTPUT_QUANTITY)
-        if source == "field":
-            # Temporarily skip field event 20 when generating predictions/plots.
-            event_ids = [event_id for event_id in event_ids if event_id != "20"]
         out_labels = output_labels_for(MODEL, source, OUTPUT_QUANTITY)
         if len(event_ids) == 0:
             if VERBOSE:

@@ -32,9 +32,9 @@ from utilities_experimental import(
 
 # Analysis configuration
 SID_METHOD = 'srim'
-STRUCTURE = "frame" # "frame", "bridge"
+STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True
 FRAME_COUPONS = True
 FRAME_ZEROLENGTH = "section" # "element", "section"
 LOAD_EVENTS = False
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         output_channels = [4, 7, 9]
         output_dofs = [2, 2, 2]
 
-    for i,event in enumerate(events[1:5]):
+    for i,event in enumerate(events):
         if STRUCTURE == "frame":
             # filepaths are like .../ce249Run244.txt
             event_id = Path(event).stem.replace("ce249Run", "")  # "244"
@@ -393,5 +393,5 @@ if __name__ == "__main__":
                     create_and_save_csv(
                         path = SOURCE_DIR / q_name / location / f"{event_id}.csv",
                         array = q,
-                        rewrite = (source!="field")
+                        rewrite = True
                     )
