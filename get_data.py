@@ -34,10 +34,12 @@ from utilities_experimental import(
 SID_METHOD = 'srim'
 STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 FRAME_COUPONS = True
 FRAME_ZEROLENGTH = "section" # "element", "section"
-LOAD_EVENTS = False
+LOAD_EVENTS = True
+# Save measured field data without creating or analyzing the FE model.
+FIELD_ONLY = False
 FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "102"))
 FRAME_OUTPUT_RESPONSE = "force_deformation" \
                             if FRAME_COUPONS and FRAME_ZEROLENGTH=="element" \
@@ -134,9 +136,15 @@ if __name__ == "__main__":
             # If coordinates are flipped, the sensor time series are
             # sign-flipped when retrieved.
         if not MULTISUPPORT:
-            input_channels_accel = [1, 3]
-            input_channels_displ = [1, 3]
-            input_dofs = [-1, 2]
+            # Field system identification uses the three transverse ground
+            # sensors. The FE models keep the original two uniform-excitation
+            # inputs (longitudinal channel 1 and transverse channel 3).
+            input_channels_accel = [3, 17, 20]
+            input_channels_displ = [3, 17, 20]
+            input_dofs = [2, 2, 2]
+            model_input_channels_accel = [1, 3]
+            model_input_channels_displ = [1, 3]
+            model_input_dofs = [-1, 2]
         else:
             # `input_nodes` are FE model nodes for excitation; order
             # corresponds to `input_channels`
@@ -144,10 +152,13 @@ if __name__ == "__main__":
             input_channels_displ = [1, 3, 15, 17, 18, 20]
             input_nodes = [4, 4, 1, 1, 0, 0]
             input_dofs = [-1, 2, -1, 2, -1, 2, -1, 2]
+            model_input_channels_accel = input_channels_accel
+            model_input_channels_displ = input_channels_displ
+            model_input_dofs = input_dofs
         output_channels = [4, 7, 9]
         output_dofs = [2, 2, 2]
 
-    for i,event in enumerate(events):
+    for i,event in enumerate(events[0:22]):
         if STRUCTURE == "frame":
             # filepaths are like .../ce249Run244.txt
             event_id = Path(event).stem.replace("ce249Run", "")  # "244"
@@ -178,6 +189,13 @@ if __name__ == "__main__":
             outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                              for ch,dof in zip(output_channels_accel,output_dofs)])
 
+            # Frame field and FE cases use the same ground inputs.
+            inputs["model"] = {
+                "dt": inputs["field"]["dt"],
+                "displacement": inputs["field"]["displacement"].copy(),
+                "acceleration": inputs["field"]["acceleration"].copy(),
+            }
+
             if VERBOSE >= 2:
                 print("input accel channels:")
                 for ch in input_channels_accel:
@@ -199,11 +217,17 @@ if __name__ == "__main__":
             try:
                 # Read in-field measurements. Scale by units and flip sign where needed.
 
+                accel_channels = list(dict.fromkeys([
+                    *input_channels_accel, *model_input_channels_accel, *output_channels
+                ]))
+                displ_channels = list(dict.fromkeys([
+                    *input_channels_displ, *model_input_channels_displ, *output_channels
+                ]))
                 measurements_accel, inputs["field"]["dt"] = get_measurements(
-                    i, events=events, channels=[*input_channels_accel, *output_channels],
+                    i, events=events, channels=accel_channels,
                     scale=measurement_units_accel, response="accel")
                 measurements_displ, _  = get_measurements(
-                    i, events=events, channels=[*input_channels_displ, *output_channels],
+                    i, events=events, channels=displ_channels,
                     scale=measurement_units_displ, response="displ")
 
                 inputs["field"]["acceleration"] =  np.vstack([np.sign(dof)*measurements_accel[ch]
@@ -211,6 +235,18 @@ if __name__ == "__main__":
                 
                 inputs["field"]["displacement"] =  np.vstack([np.sign(dof)*measurements_displ[ch]
                                                    for ch,dof in zip(input_channels_displ,input_dofs)])
+
+                inputs["model"] = {
+                    "dt": inputs["field"]["dt"],
+                    "acceleration": np.vstack([
+                        np.sign(dof) * measurements_accel[ch]
+                        for ch, dof in zip(model_input_channels_accel, model_input_dofs)
+                    ]),
+                    "displacement": np.vstack([
+                        np.sign(dof) * measurements_displ[ch]
+                        for ch, dof in zip(model_input_channels_displ, model_input_dofs)
+                    ]),
+                }
 
                 outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*measurements_accel[ch]
                                                    for ch,dof in zip(output_channels,output_dofs)])
@@ -230,13 +266,32 @@ if __name__ == "__main__":
             print("Requested input channels:", input_channels_accel)
             print(f"Event {event_id} time series length: {nt}, Time step dt = {inputs['field']['dt']}")
 
+        if FIELD_ONLY:
+            inputs["field"]["time"] = np.arange(nt) * inputs["field"]["dt"]
+
+            # Save measured ground inputs and measured structural responses.
+            for location, quantities in (
+                ("ground", inputs["field"]),
+                ("structure", outputs["field"]),
+            ):
+                for q_name, q in quantities.items():
+                    create_and_save_csv(
+                        path=FIELD_OUT_DIR / q_name / location / f"{event_id}.csv",
+                        array=q,
+                        rewrite=True,
+                    )
+
+            if VERBOSE:
+                print(f"Saved field data for event {event_id}; skipping FE analysis.")
+            continue
+
 
 
         # Finite element model
         if STRUCTURE == 'frame':
             output_nodes = [5, 5, 10, 10, 15, 15]
             output_elements = [FRAME_OUTPUT_ELEMENT]
-            yFiber = 7.5
+            yFiber = 2
             zFiber = 0.0
             response_mode = "material" if FRAME_OUTPUT_RESPONSE == "force_deformation" else "fiber"
             fiber_response_dof = None
@@ -256,9 +311,9 @@ if __name__ == "__main__":
                                         zerolength=FRAME_ZEROLENGTH)
 
             model = apply_load_frame(model,
-                                        inputx=inputs["field"]["acceleration"][0],
-                                        inputy=inputs["field"]["acceleration"][1],
-                                        dt=inputs["field"]["dt"])
+                                        inputx=inputs["model"]["acceleration"][0],
+                                        inputy=inputs["model"]["acceleration"][1],
+                                        dt=inputs["model"]["dt"])
             
 
         elif STRUCTURE == 'bridge':
@@ -279,9 +334,9 @@ if __name__ == "__main__":
             
             if not MULTISUPPORT:
                 model = apply_load_bridge(model,
-                                        inputx=inputs["field"]["acceleration"][0],
-                                        inputy=inputs["field"]["acceleration"][1],
-                                        dt=inputs["field"]["dt"],
+                                        inputx=inputs["model"]["acceleration"][0],
+                                        inputy=inputs["model"]["acceleration"][1],
+                                        dt=inputs["model"]["dt"],
                                         # multisupport=MULTISUPPORT,
                                         # input_nodes=input_nodes,
                                         # input_channels=input_channels
@@ -363,9 +418,10 @@ if __name__ == "__main__":
         # Acceleration outputs (inches/second/second)
         outputs["model"]["acceleration"] = get_node_outputs(accel, nodes=output_nodes, dofs=output_dofs)[:, 1:]
 
-        assert inputs["field"]["acceleration"].shape[1] == outputs["model"]["displacement"].shape[1], (
+        assert inputs["model"]["acceleration"].shape[1] == outputs["model"]["displacement"].shape[1], (
             "system identification training inputs and outputs have different length of time samples.")
         inputs["field"]["time"] = np.arange(nt) * inputs["field"]["dt"]
+        inputs["model"]["time"] = np.arange(nt) * inputs["model"]["dt"]
 
         
         # Save inputs (ground): dt, time, and field displ/accel
@@ -393,5 +449,6 @@ if __name__ == "__main__":
                     create_and_save_csv(
                         path = SOURCE_DIR / q_name / location / f"{event_id}.csv",
                         array = q,
-                        rewrite = True
+                        #rewrite = (source!="field")
+                        rewrite=True
                     )

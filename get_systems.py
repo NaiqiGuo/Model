@@ -8,13 +8,14 @@ import numpy as np
 import pickle
 from mdof import sysid
 from mdof.utilities.config import Config
+from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 import pickle
 
 # Analysis configuration
 SID_METHOD = 'srim'
 STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True
+ELASTIC = False
 
 # Verbosity
 # False means print nothing;
@@ -22,6 +23,7 @@ ELASTIC = True
 # 2 means print progress and validation messages
 VERBOSE = 1
 SYSTEM_ID_VERBOSE = 2
+WINDOWED = True
 
 # Main output directory
 BASE_DIR = Path("Modeling")
@@ -48,10 +50,6 @@ if __name__ == "__main__":
             print(f"\nSystem ID for Event {event_id}")
 
         try:
-            inputs = np.atleast_2d(np.loadtxt(
-                FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.csv",
-            ))
-
             for source in outputs.keys():
                  for q in quantities:
                     outputs[source][q] = np.loadtxt(
@@ -64,7 +62,7 @@ if __name__ == "__main__":
             continue
 
         # Perform system identification and save systems
-        n = 3
+        n = 4
         options = Config(
             m           = 500,
             horizon     = 190,
@@ -84,7 +82,18 @@ if __name__ == "__main__":
         for source in [elastic_name, "field"]:
              for quantity in quantities:
                 try:
-                    system = sysid(inputs, outputs[source][quantity], method=SID_METHOD, **options)
+                    input_dir = FIELD_OUT_DIR if source == "field" else MODEL_OUT_DIR
+                    sid_inputs = np.atleast_2d(np.loadtxt(
+                        input_dir / "acceleration" / "ground" / f"{event_id}.csv",
+                    ))
+                    sid_outputs = outputs[source][quantity]
+                    if WINDOWED:
+                        sig = np.asarray(sid_outputs[0]).reshape(-1).copy()
+                        bounds = intensity_bounds(sig, lb=0.01, ub=0.99)
+                        sid_inputs = truncate_by_bounds(sid_inputs, bounds)
+                        sid_outputs = truncate_by_bounds(sid_outputs, bounds)
+
+                    system = sysid(sid_inputs, sid_outputs, method=SID_METHOD, **options)
                 except Exception as e:
                     failed_events.append((event_id, source, quantity, e))
                     if VERBOSE:
