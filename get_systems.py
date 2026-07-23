@@ -53,6 +53,9 @@ if __name__ == "__main__":
             print(f"\nSystem ID for Event {event_id}")
 
         try:
+            inputs = np.atleast_2d(np.loadtxt(
+                FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.csv",
+            ))
             for source in outputs.keys():
                  for q in quantities:
                     outputs[source][q] = np.loadtxt(
