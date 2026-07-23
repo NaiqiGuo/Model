@@ -10,6 +10,7 @@ from mdof import sysid
 from mdof.utilities.config import Config
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 import pickle
+from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
 # Analysis configuration
 SID_METHOD = 'srim'
@@ -29,6 +30,8 @@ WINDOWED = True
 BASE_DIR = Path("Modeling")
 MODEL_OUT_DIR = BASE_DIR / STRUCTURE / ("elastic" if ELASTIC else "inelastic")
 FIELD_OUT_DIR = BASE_DIR / STRUCTURE / "field"
+
+WINDOWED_INTENSITY = True
 
 
 if __name__ == "__main__":
@@ -63,6 +66,7 @@ if __name__ == "__main__":
 
         # Perform system identification and save systems
         n = 4
+        n = 4
         options = Config(
             m           = 500,
             horizon     = 190,
@@ -81,6 +85,10 @@ if __name__ == "__main__":
 
         for source in [elastic_name, "field"]:
              for quantity in quantities:
+                if WINDOWED_INTENSITY:
+                    bounds = intensity_bounds(outputs[source][quantity][0], lb=0.01, ub=0.99)
+                    inputs_truncated = truncate_by_bounds(inputs, bounds)
+                    outputs[source][quantity] = truncate_by_bounds(outputs[source][quantity], bounds)
                 try:
                     input_dir = FIELD_OUT_DIR if source == "field" else MODEL_OUT_DIR
                     sid_inputs = np.atleast_2d(np.loadtxt(
