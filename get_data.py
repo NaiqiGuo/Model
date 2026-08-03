@@ -37,7 +37,7 @@ MULTISUPPORT = False
 ELASTIC = False
 FRAME_COUPONS = True
 FRAME_ZEROLENGTH = "section" # "element", "section"
-LOAD_EVENTS = True
+LOAD_EVENTS = False
 # Save measured field data without creating or analyzing the FE model.
 FIELD_ONLY = False
 FRAME_OUTPUT_ELEMENT = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "102"))
