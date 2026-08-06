@@ -4,25 +4,29 @@ A suite of structures, their vibration responses to strong ground motion events,
 
 ## Getting Started
 
-1. `get_systems.py` : finite element model and its system identification.
-    - Choose an analysis configuration
-        - "frame" or "bridge"
-        - `MULTISUPPORT = True` or `False`
-        - `ELASTIC = True` or `False`
+1. `get_data.py` : finite element model analysis and data extraction.
+    - Choose an analysis configuration via command-line flags
+        - `--structure frame` or `--structure bridge`
+        - `--multisupport` (bridge only)
+        - `--elastic` (otherwise inelastic)
+        - `--field_only` to save measured field data without running the FE model
     - Loads a suite of events
     - For each event:
+        - saves measured field inputs (ground) and outputs (structure)
         - performs FEM analysis and saves:
             - pre- and post- earthquake natural frequencies from FEM eigenvalue analysis
             - displacement response histories at select output nodes
-            - strain/stress response histories at select output elements
-        - performs system identification and saves:
-            - timestep (dt)
-            - time array
-            - inputs array
-            - outputs array
-            - system matrices (A,B,C,D)
-2. `plot_inputs_outputs.py`: plot the inputs and outputs used for system ID. Primarily used for debugging.
-3.  `plot_series.py`: plot timeseries.
+            - strain/stress (or force/deformation) response histories at select output elements
+            - model inputs and outputs used for system identification
+2. `get_systems.py` : system identification on the data produced by `get_data.py`.
+    - For each event, saves:
+        - timestep (dt)
+        - time array
+        - inputs array
+        - outputs array
+        - system matrices (A,B,C,D)
+3. `plot_inputs_outputs.py`: plot the inputs and outputs used for system ID. Primarily used for debugging.
+4.  `plot_series.py`: plot timeseries.
     1. Prompts the user for:
         1. structure
         2. event
@@ -32,6 +36,14 @@ A suite of structures, their vibration responses to strong ground motion events,
         2. location
     3. Save the plot if desired.
 
+
+## Running
+
+Run all four configurations (frame/bridge × inelastic/elastic):
+
+```bash
+for s in frame bridge; do for e in "" "--elastic"; do python get_data.py --structure "$s" $e; done; done
+```
 
 ## Overall Directory Structure
 [tree.nathanfriend](https://tree.nathanfriend.com/?s=(%27optjs!(%27fancyY~fullPath!false~trail_gSlashY~rootDotY)~w(%27w%27Model_g8framL4227.csvFKE-4B-dtFVFQtxtFKB-BOG9FE-4B-BO_G-B8bridgL4BFBW-BOG9FE-4B-BOBWWH8framN3A4EJ4K0F*QpklF*frequency%20IDJ4KK*heatmap.pngC3A4EJ4BF0-5OGX3A4K0-5C3A4EJ4BF0-5OO_GX3A4K0-5C3BFUB8bridgN3A4K0-5C3A4BF0-5OGX3A*K0F*K*BCJ*BOO_GJ*B8%27)~versj!%271%27)*%20%20-O*0UsZrealizatj%2F3JH%20Tra__g%20Data%2F*F*4*QcsvF*5**QpklF*K*B8W*9-displacementAVJB...C-acceleratjEstructureF-*GelasticHSZIDJ%2FFK*BFLeOfield-timeFV-Ne%2FOfieldXO8*Q*226.UH%20ResultsJ*VgroundW%5CnX%2F9Y!trueZystem%20_injionwsource!%01wj_ZYXWVUQONLKJHGFECBA985430-*)
