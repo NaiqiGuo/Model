@@ -13,7 +13,6 @@ import numpy as np
 import quakeio
 import xara.units.iks as units
 import pickle
-from get_data_original import FRAME_ZEROLENGTH
 from utilities import (
     get_measurements,
     get_node_outputs,
