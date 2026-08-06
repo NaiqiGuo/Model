@@ -806,26 +806,6 @@ def create_bridge_model1(elastic: bool = True, girder: str = "elasticBeamColumn"
 
     return model
 
-def apply_load_bridge(model, inputx=None, inputy=None, dt=None):
-    """
-    Add dynamic loads to bridge model
-    """
-    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
-        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
-    
-    # Define earthquake excitation
-    # ----------------------------
-    # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
-    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
-
-    # Define the excitation using the given ground motion records
-    #                         tag dir         accel series args
-    model.pattern("UniformExcitation", 2, 1, accel=2)
-    model.pattern("UniformExcitation", 3, 2, accel=3)
-
-    return model
-
 
 
 def save_event_io(i, inputs, outputs, dt, out_dir="event_data"):
@@ -1381,60 +1361,6 @@ def compute_Dr_residual_tail(y_true: np.ndarray, y_pred: np.ndarray, dt: float, 
     for i, val in enumerate(res, start=1):
         out[f"Dr_residual_ch{i}"] = float(val)
     return out
-
-
-def apply_load_bridge_multi_support(
-    model,
-    inputs: np.ndarray,
-    dt: float,
-    node_channel_map: dict,
-    input_channels: list,
-    *,
-    factor: float = 1.0,
-    pattern_tag: int = 20,
-    ts_tag_start: int = 2000,
-    gm_tag_start: int = 3000,
-):
-    
-    if inputs is None or dt is None:
-        raise ValueError("Missing inputs or dt.")
-    if inputs.ndim != 2:
-        raise ValueError(f"inputs must be 2D (n_channels, nt). Got {inputs.shape}")
-
-    # Build mapping: channel number -> row index in inputs
-    ch_to_row = {ch: k for k, ch in enumerate(input_channels)}
-
-    model.pattern("MultipleSupportExcitation", pattern_tag)
-
-    ts_tag = ts_tag_start
-    gm_tag = gm_tag_start
-
-    for node, (chx, chy) in node_channel_map.items():
-        if chx not in ch_to_row or chy not in ch_to_row:
-            raise ValueError(
-                f"Node {node} requests channels ({chx},{chy}), "
-                f"but input_channels={input_channels}."
-            )
-
-        ix = ch_to_row[chx]
-        iy = ch_to_row[chy]
-
-        # 1) timeSeries for this support in X and Y
-        ts_x = ts_tag; ts_tag += 1
-        ts_y = ts_tag; ts_tag += 1
-        model.timeSeries("Path", ts_x, values=inputs[ix].tolist(), dt=dt, factor=factor)
-        model.timeSeries("Path", ts_y, values=inputs[iy].tolist(), dt=dt, factor=factor)
-
-        # 2) GroundMotion objects
-        gm_x = gm_tag; gm_tag += 1
-        gm_y = gm_tag; gm_tag += 1
-        model.groundMotion(gm_x, "Plain", accel=ts_x)
-        model.groundMotion(gm_y, "Plain", accel=ts_y)
-
-        # 3) imposed motions (DOF 1=X, DOF 2=Y)
-        model.imposedMotion(node, 1, gm_x)
-        model.imposedMotion(node, 2, gm_y)
-    return model
 
 
 # TODO CC check: same as matlab code

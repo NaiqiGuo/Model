@@ -207,7 +207,6 @@ class Painter:
     def create_model(self, 
                     elastic:bool,
                     echo_file=None,
-                    multisupport:bool=False,
                     separate_deck_ends:bool = True,
                     column_base_springs:bool = True,
                     verbose = False):
@@ -414,11 +413,7 @@ class Painter:
         inputs, dt = self.load_event(event, scale=scale)
         nin,nt = inputs.shape
 
-        model = apply_load_bridge(model,
-                                inputx=inputs[0],
-                                inputy=inputs[1],
-                                dt=dt
-                                )
+        model = apply_load_bridge(model, inputs, dt)
 
         # ----------------------------
         # 1. Configure the analysis
@@ -487,33 +482,77 @@ class Painter:
         return displacements, stresses, strains, freqs_before
 
 
-def apply_load_bridge(model, inputx=None, inputy=None, dt=None):
+def apply_load_bridge(
+    model,
+    inputs,
+    dt,
+    multisupport=False,
+    input_nodes=None,
+    input_dofs=None,
+    *,
+    factor: float = 1.0,
+    pattern_tag: int = 20,
+    ts_tag_start: int = 2000,
+    gm_tag_start: int = 3000,
+):
     """
-    Add dynamic loads to bridge model
-    """
-    if np.all(inputx is None) or np.all(inputy is None) or dt is None:
-        raise ValueError("Missing inputx, inputy, or dt. Exiting.")
-    
-    # Define earthquake excitation
-    # ----------------------------
-    # Set up the acceleration records for fault normal (x, dof 1) and fault parallel (y, dof 2)
-    model.timeSeries("Path", 2, values=inputx.tolist(), dt=dt, factor=1.0)
-    model.timeSeries("Path", 3, values=inputy.tolist(), dt=dt, factor=1.0)
+    Add dynamic ground-motion loads to a bridge model, for either uniform or
+    multiple-support excitation.
 
-    # Define the excitation using the given ground motion records
-    #                         tag dir         accel series args
-    model.pattern("UniformExcitation", 2, 1, accel=2)
-    model.pattern("UniformExcitation", 3, 2, accel=3)
+    Parameters
+    ----------
+    inputs : (n_channels, nt) array
+        Ground acceleration series, one row per model input channel.
+    input_nodes, input_dofs : parallel lists
+        For each row of `inputs`: the support node it drives and its FE DOF.
+        The DOF sign encodes orientation (already baked into `inputs`).
+    multisupport : bool
+        If False, apply a single UniformExcitation in global X and Y from the
+        first two rows. If True, impose each row as a support motion at its
+        node/DOF via a MultipleSupportExcitation pattern.
+    """
+    if inputs is None or dt is None:
+        raise ValueError("Missing inputs or dt. Exiting.")
+    inputs = np.atleast_2d(np.asarray(inputs, dtype=float))
+    input_dofs = list(input_dofs) if input_dofs is not None else []
+
+    if not multisupport:
+        # Global uniform excitation. Rows are already sign-adjusted.
+        # DOF magnitudes come from input_dofs (default to X=1, Y=2).
+        assert inputs.shape[0] == 2, "Uniform excitation requires exactly two input channels."
+        dof_x = abs(input_dofs[0]) if len(input_dofs) > 0 else 1
+        dof_y = abs(input_dofs[1]) if len(input_dofs) > 1 else 2
+        model.timeSeries("Path", 2, values=inputs[0].tolist(), dt=dt, factor=factor)
+        model.timeSeries("Path", 3, values=inputs[1].tolist(), dt=dt, factor=factor)
+        model.pattern("UniformExcitation", 2, dof_x, accel=2)
+        model.pattern("UniformExcitation", 3, dof_y, accel=3)
+        return model
+
+    # Multiple-support excitation: impose each channel as a support motion.
+    if input_nodes is None or not input_dofs:
+        raise ValueError("Multisupport requires input_nodes and input_dofs.")
+    if not (len(input_nodes) == len(input_dofs) == inputs.shape[0]):
+        raise ValueError(
+            f"input_nodes ({len(input_nodes)}), input_dofs ({len(input_dofs)}), "
+            f"and inputs rows ({inputs.shape[0]}) must have equal length."
+        )
+
+    model.pattern("MultipleSupportExcitation", pattern_tag)
+    ts_tag, gm_tag = ts_tag_start, gm_tag_start
+    for row, (node, dof) in enumerate(zip(input_nodes, input_dofs)):
+        model.timeSeries("Path", ts_tag, values=inputs[row].tolist(), dt=dt, factor=factor)
+        model.groundMotion(gm_tag, "Plain", accel=ts_tag)
+        model.imposedMotion(node, abs(dof), gm_tag)
+        ts_tag += 1
+        gm_tag += 1
 
     return model
 
 
 def create_bridge(elastic=True, 
-                  multisupport=False,
                   separate_deck_ends=True, 
                   echo_file=None,
                   verbose=False):
-    assert multisupport == False
 
     if echo_file is not None:
         echo_file = open(echo_file, 'w+')

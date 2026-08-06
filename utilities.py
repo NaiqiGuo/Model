@@ -59,8 +59,14 @@ def get_node_outputs(outputs, nodes, dofs):
 
     return np.vstack(rows)
 
-def get_measurements(i, events, channels, scale=1, response="accel"):
+def get_measurements_from_eventlist(i, events, channels, scale=1, response="accel"):
     event = events[i]
+    channel_data, dt = extract_channels(event, channels, response=response)
+    channel_data = scale * channel_data
+    measurements = {ch: channel_data[idx] for idx, ch in enumerate(channels)}
+    return measurements, dt
+
+def get_measurements(event, channels, scale=1, response="accel"):
     channel_data, dt = extract_channels(event, channels, response=response)
     channel_data = scale * channel_data
     measurements = {ch: channel_data[idx] for idx, ch in enumerate(channels)}
