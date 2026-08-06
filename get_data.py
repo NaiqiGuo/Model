@@ -453,19 +453,16 @@ class EventAnalysis:
             material_force_dof = 8 if cfg.output_response == "force_deformation" else None
 
             model = create_bridge(elastic=cfg.elastic,
-                                        multisupport=cfg.multisupport,
-                                        separate_deck_ends=True,
-                                        verbose=cfg.verbose
-                                        )
+                                  separate_deck_ends=True,
+                                  verbose=cfg.verbose)
 
 
             model = apply_load_bridge(model,
-                                    inputs=self.inputs["model"]["acceleration"],
-                                    dt=self.inputs["model"]["dt"],
-                                    multisupport=cfg.multisupport,
-                                    input_nodes=cfg.channels_dofs["input"]["model"]["nodes"],
-                                    input_dofs=cfg.channels_dofs["input"]["model"]["dofs"]
-                                    )
+                                      inputs=self.inputs["model"]["acceleration"],
+                                      dt=self.inputs["model"]["dt"],
+                                      multisupport=cfg.multisupport,
+                                      input_nodes=cfg.channels_dofs["input"]["model"]["nodes"],
+                                      input_dofs=cfg.channels_dofs["input"]["model"]["dofs"])
 
 
         try:
