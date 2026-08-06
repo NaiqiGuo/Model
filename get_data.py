@@ -175,7 +175,7 @@ class RunConfig:
         frame_output_element = int(os.environ.get("FRAME_OUTPUT_ELEMENT", "102"))
         frame_output_response = "force_deformation" \
                                     if args.frame_coupons and args.frame_zerolength == "element" \
-                                    and frame_output_element in [str(i) for i in np.arange(101,117)]+[str(i) for i in np.arange(201,217)] \
+                                    and frame_output_element in [*range(101,117), *range(201,217)] \
                                     else "stress_strain"
         bridge_output_element = int(os.environ.get("BRIDGE_OUTPUT_ELEMENT", "107"))
         bridge_output_response = "force_deformation" if bridge_output_element in ["107","108","109","110"] else "stress_strain"
