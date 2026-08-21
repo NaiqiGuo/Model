@@ -13,3 +13,6 @@ __pycache__
 
 !tests/golden/**
 !tests/fixtures/**
+!uploads/elcentro.txt
+!uploads/tabasFN.txt
+!uploads/tabasFP.txt
