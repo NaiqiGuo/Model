@@ -110,7 +110,7 @@ if __name__ == "__main__":
                     if VERBOSE:
                         print(f"\n>>>> System ID for event {event_id} FAILED for {source},{quantity}")
                         print(f">>>> Error: {e}")
-                    continue
+                    continue 
             
                 A,B,C,D, *rest = system 
                 system  = (A,B,C,D)
