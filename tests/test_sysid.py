@@ -1,12 +1,10 @@
-"""Simple three-story MCK example for testing system identification."""
-
 import pickle
 from pathlib import Path
-
 import numpy as np
 
 
 ELCENTRO = Path(__file__).resolve().parent.parent / "uploads" / "elcentro.txt"
+TRUE_RESPONSE = Path(__file__).resolve().parent / "results" / "sysid" / "elcentro" / "u_true.csv"
 PREDICTION = Path(__file__).resolve().parent / "results" / "sysid" / "elcentro" / "u_pred.csv"
 ABCD_PATH = Path(__file__).resolve().parent / "results" / "sysid" / "elcentro" / "abcd.pkl"
 BRIDGE_GOLDEN = Path(__file__).resolve().parent / "golden" / "bridge" / "inelastic"
@@ -17,7 +15,6 @@ DT = 0.02
 
 
 def _get_mck():
-    """Define and return the M, C, and K matrices from the example."""
     M = np.diag([400.0, 400.0, 200.0]) / 386.0
 
     K = 610.0 * np.array([
@@ -75,19 +72,42 @@ def _mck_response(M, C, K, f, dt):
 
 
 def _relative_error(u_pred, u_true):
-    """Return the relative error between predicted and true displacement."""
+    """Return the relative error between u_pred and u_true."""
     return np.linalg.norm(u_pred - u_true) / np.linalg.norm(u_true)
 
 
-def test_elcentro_sysid():
-    from mdof import predict, sysid
+# Step 1
+def test_elcentro_mck_response():
     from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
     M, C, K = _get_mck()
     f = np.loadtxt(ELCENTRO)
     u = _mck_response(M, C, K, f, DT)
 
-    # Use one set of bounds to keep the input and output time-aligned.
+    bounds = intensity_bounds(u[0], lb=0.01, ub=0.99)
+    f_truncated = truncate_by_bounds(f[None, :], bounds)
+    u_truncated = truncate_by_bounds(u, bounds)
+
+    assert M.shape == (3, 3)
+    assert C.shape == (3, 3)
+    assert K.shape == (3, 3)
+    assert u.shape == (3, f.size)
+    assert f_truncated.shape[1] == u_truncated.shape[1]
+    assert np.all(np.isfinite(u_truncated))
+
+    TRUE_RESPONSE.parent.mkdir(parents=True, exist_ok=True)
+    np.savetxt(TRUE_RESPONSE, u_truncated)
+
+
+# Step 2
+def test_elcentro_sysid():
+    from mdof import sysid
+    from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
+
+    M, C, K = _get_mck()
+    f = np.loadtxt(ELCENTRO)
+    u = _mck_response(M, C, K, f, DT)
+
     bounds = intensity_bounds(u[0], lb=0.01, ub=0.99)
     f_truncated = truncate_by_bounds(f[None, :], bounds)
     u_truncated = truncate_by_bounds(u, bounds)
@@ -106,35 +126,13 @@ def test_elcentro_sysid():
         verbose=False,
     )
 
-    # Prediction using only the truncated input.
-    u_pred = predict(ABCD, f_truncated)
-
-    PREDICTION.parent.mkdir(parents=True, exist_ok=True)
-    np.savetxt(PREDICTION, u_pred)
+    ABCD_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(ABCD_PATH, "wb") as file:
         pickle.dump(ABCD, file)
 
 
-def test_elcentro_prediction():
-    from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
-
-    M, C, K = _get_mck()
-    f = np.loadtxt(ELCENTRO)
-    u = _mck_response(M, C, K, f, DT)
-
-    bounds = intensity_bounds(u[0], lb=0.01, ub=0.99)
-    u_truncated = truncate_by_bounds(u, bounds)
-    u_pred = np.loadtxt(PREDICTION)
-
-    assert u_pred.shape == u_truncated.shape
-    assert np.all(np.isfinite(u_pred))
-
-    relative_error = _relative_error(u_pred, u_truncated)
-
-    assert relative_error < 0.20
-
-
-def test_simulate():
+# Step 3
+def test_elcentro_simulate():
     from mdof.simulate import simulate
     from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
@@ -144,20 +142,47 @@ def test_simulate():
 
     bounds = intensity_bounds(u[0], lb=0.01, ub=0.99)
     f_truncated = truncate_by_bounds(f[None, :], bounds)
+    u_truncated = truncate_by_bounds(u, bounds)
 
     with open(ABCD_PATH, "rb") as file:
         ABCD = pickle.load(file)
 
-    u_simulated = simulate(ABCD, f_truncated)
-    u_pred = np.loadtxt(PREDICTION)
+    u_pred = simulate(ABCD, f_truncated)
+    PREDICTION.parent.mkdir(parents=True, exist_ok=True)
+    np.savetxt(PREDICTION, u_pred)
 
-    assert u_simulated.shape == u_pred.shape
-    assert np.all(np.isfinite(u_simulated))
-    np.testing.assert_allclose(u_simulated, u_pred, rtol=1e-10, atol=1e-12)
+    assert u_pred.shape == u_truncated.shape
+    assert np.all(np.isfinite(u_pred))
+
+    relative_error = _relative_error(u_pred, u_truncated)
+    print(f"relative_error = {relative_error:.6f}")
+
+    assert relative_error < 0.20
 
 
+# Step 1
+def test_bridge_inelastic_event1_golden():
+    """Validate the Bridge NL Event 1 golden input and output."""
+    f = np.loadtxt(
+        BRIDGE_GOLDEN / "acceleration" / "ground" / "1.csv",
+        ndmin=2,
+    )
+    u = np.loadtxt(
+        BRIDGE_GOLDEN / "displacement" / "structure" / "1.csv",
+        ndmin=2,
+    )
+
+    assert f.shape == (2, 1500)
+    assert u.shape == (3, 1500)
+    assert f.shape[1] == u.shape[1]
+    assert np.all(np.isfinite(f))
+    assert np.all(np.isfinite(u))
+
+
+# Step 2
 def test_bridge_inelastic_event1_sysid():
-    from mdof import predict, sysid
+    """Identify and save the Bridge NL Event 1 system."""
+    from mdof import sysid
     from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
     f = np.loadtxt(
@@ -185,33 +210,14 @@ def test_bridge_inelastic_event1_sysid():
         threads=1,
         verbose=False,
     )
-    u_pred = predict(ABCD, f_truncated)
-
     BRIDGE_RESULTS.mkdir(parents=True, exist_ok=True)
-    np.savetxt(BRIDGE_PREDICTION, u_pred)
     with open(BRIDGE_ABCD, "wb") as file:
         pickle.dump(ABCD, file)
 
 
-def test_bridge_inelastic_event1_prediction():
-    from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
-
-    u = np.loadtxt(
-        BRIDGE_GOLDEN / "displacement" / "structure" / "1.csv",
-        ndmin=2,
-    )
-    bounds = intensity_bounds(u[0], lb=0.01, ub=0.99)
-    u_truncated = truncate_by_bounds(u, bounds)
-    u_pred = np.loadtxt(BRIDGE_PREDICTION, ndmin=2)
-
-    assert u_pred.shape == u_truncated.shape
-    assert np.all(np.isfinite(u_pred))
-
-    relative_error = _relative_error(u_pred, u_truncated)
-    assert relative_error < 0.30
-
-
+# Step 3
 def test_bridge_inelastic_event1_simulate():
+    """Simulate Bridge NL Event 1 and compare with golden output."""
     from mdof.simulate import simulate
     from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
@@ -225,13 +231,18 @@ def test_bridge_inelastic_event1_simulate():
     )
     bounds = intensity_bounds(u[0], lb=0.01, ub=0.99)
     f_truncated = truncate_by_bounds(f, bounds)
+    u_truncated = truncate_by_bounds(u, bounds)
 
     with open(BRIDGE_ABCD, "rb") as file:
         ABCD = pickle.load(file)
 
-    u_simulated = simulate(ABCD, f_truncated)
-    u_pred = np.loadtxt(BRIDGE_PREDICTION, ndmin=2)
+    u_pred = simulate(ABCD, f_truncated)
+    BRIDGE_RESULTS.mkdir(parents=True, exist_ok=True)
+    np.savetxt(BRIDGE_PREDICTION, u_pred)
 
-    assert u_simulated.shape == u_pred.shape
-    assert np.all(np.isfinite(u_simulated))
-    np.testing.assert_allclose(u_simulated, u_pred, rtol=1e-10, atol=1e-12)
+    assert u_pred.shape == u_truncated.shape
+    assert np.all(np.isfinite(u_pred))
+
+    relative_error = _relative_error(u_pred, u_truncated)
+    print(f"relative_error = {relative_error:.6f}")
+    assert relative_error < 0.30

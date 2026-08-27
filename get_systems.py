@@ -14,9 +14,9 @@ from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
 # Analysis configuration
 SID_METHOD = 'srim'
-STRUCTURE = "bridge" # "frame", "bridge"
+STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = True  
+ELASTIC = False 
 
 # Verbosity
 # False means print nothing;

@@ -13,10 +13,11 @@ import utilities_visualization
 import plotly.graph_objects as go
 
 # Analysis configuration
-MODEL = "bridge" # "frame", "bridge"
+MODEL = "frame" # "frame", "bridge"
 SID_METHOD = "srim"
+
 SOURCE_CASES = [s.strip() for s in os.environ.get("SID_SOURCE_CASES", "field,elastic,inelastic").split(",") if s.strip()]
-OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
+OUTPUT_QUANTITY = "acceleration"  # "displacement" or "acceleration"
 WINDOWED = os.environ.get("SID_WINDOWED", "1") == "1" # if true, truncates all signals before aligning, computing error, and plotting
 ALIGN_SIGNALS = os.environ.get("SID_ALIGN", "0") == "1"
 VERBOSE = 1 # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback

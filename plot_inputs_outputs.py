@@ -6,8 +6,8 @@ import utilities_visualization
 
 # Analysis configuration
 WINDOWED_PLOT = True
-STRUCTURE = "bridge" # "frame", "bridge"
-ELASTIC = True
+STRUCTURE = "frame" # "frame", "bridge"
+ELASTIC = False
 MULTISUPPORT = False
 VERBOSE = 1
 
