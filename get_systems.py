@@ -16,7 +16,7 @@ from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 SID_METHOD = 'srim'
 STRUCTURE = "bridge" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False
+ELASTIC = True  
 
 # Verbosity
 # False means print nothing;
@@ -30,9 +30,6 @@ WINDOWED = True
 BASE_DIR = Path("Modeling")
 MODEL_OUT_DIR = BASE_DIR / STRUCTURE / ("elastic" if ELASTIC else "inelastic")
 FIELD_OUT_DIR = BASE_DIR / STRUCTURE / "field"
-
-WINDOWED_INTENSITY = True
-
 
 if __name__ == "__main__":
     # Print analysis configuration
@@ -53,9 +50,6 @@ if __name__ == "__main__":
             print(f"\nSystem ID for Event {event_id}")
 
         try:
-            inputs = np.atleast_2d(np.loadtxt(
-                FIELD_OUT_DIR / "acceleration" / "ground" / f"{event_id}.csv",
-            ))
             for source in outputs.keys():
                  for q in quantities:
                     outputs[source][q] = np.loadtxt(
@@ -68,7 +62,6 @@ if __name__ == "__main__":
             continue
 
         # Perform system identification and save systems
-        n = 4
         n = 4
         options = Config(
             m           = 500,
@@ -88,10 +81,6 @@ if __name__ == "__main__":
 
         for source in [elastic_name, "field"]:
              for quantity in quantities:
-                if WINDOWED_INTENSITY:
-                    bounds = intensity_bounds(outputs[source][quantity][0], lb=0.01, ub=0.99)
-                    inputs_truncated = truncate_by_bounds(inputs, bounds)
-                    outputs[source][quantity] = truncate_by_bounds(outputs[source][quantity], bounds)
                 try:
                     input_dir = FIELD_OUT_DIR if source == "field" else MODEL_OUT_DIR
                     sid_inputs = np.atleast_2d(np.loadtxt(
