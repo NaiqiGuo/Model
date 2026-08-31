@@ -22,6 +22,9 @@ WINDOWED = os.environ.get("SID_WINDOWED", "1") == "1" # if true, truncates all s
 ALIGN_SIGNALS = os.environ.get("SID_ALIGN", "0") == "1"
 VERBOSE = 1 # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
+SAVE_NUMBERED_HEATMAP_TO_GOLDEN = False
+GOLDEN_HEATMAP_NAME = "run_01"
+
 Q_MAP = {
     "acceleration": {"name": "Acceleration", "units": "in/s²"},
     "displacement": {"name": "Displacement", "units": "in"},
@@ -124,7 +127,7 @@ if __name__ == "__main__":
         window_bounds_by_event = {}
         window_lengths = []
         if WINDOWED:
-            for event_id in event_ids:
+            for event_id in event_ids: 
                 out_true_path = modeling_path(MODEL, source, OUTPUT_QUANTITY, "structure", event_id)
                 if not out_true_path.exists():
                     continue
@@ -440,6 +443,26 @@ if __name__ == "__main__":
                 color = 'black' if val > half_vmax else 'white'
                 ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=9)
         save_figure_with_pgf(fig, heatmap_dir / f"heatmap_{SID_METHOD}.png", dpi=400)
+        if SAVE_NUMBERED_HEATMAP_TO_GOLDEN:
+            golden_name = GOLDEN_HEATMAP_NAME.strip()
+            if not golden_name or Path(golden_name).name != golden_name:
+                raise ValueError(
+                    "GOLDEN_HEATMAP_NAME must be a non-empty file-name label "
+                    "without directory components."
+                )
+            golden_heatmap_dir = (
+                Path("tests") / "golden" / "heatmaps" /
+                MODEL / source / OUTPUT_QUANTITY
+            )
+            golden_heatmap_path = golden_heatmap_dir / f"{golden_name}_heatmap_{SID_METHOD}.png"
+            if golden_heatmap_path.exists():
+                raise FileExistsError(
+                    f"Golden heatmap already exists and will not be overwritten: {golden_heatmap_path}"
+                )
+            golden_heatmap_dir.mkdir(parents=True, exist_ok=True)
+            save_figure_with_pgf(fig, golden_heatmap_path, dpi=400)
+            if VERBOSE:
+                print(f"saved golden heatmap: {golden_heatmap_path}")
         plt.close(fig)
 
         # Heatmap square with no numbers
