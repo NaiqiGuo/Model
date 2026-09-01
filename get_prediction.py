@@ -17,13 +17,13 @@ MODEL = "frame" # "frame", "bridge"
 SID_METHOD = "srim"
 
 SOURCE_CASES = [s.strip() for s in os.environ.get("SID_SOURCE_CASES", "field,elastic,inelastic").split(",") if s.strip()]
-OUTPUT_QUANTITY = "acceleration"  # "displacement" or "acceleration"
+OUTPUT_QUANTITY = "displacement"  # "displacement" or "acceleration"
 WINDOWED = os.environ.get("SID_WINDOWED", "1") == "1" # if true, truncates all signals before aligning, computing error, and plotting
 ALIGN_SIGNALS = os.environ.get("SID_ALIGN", "0") == "1"
 VERBOSE = 1 # print extra feedback. 0 or False for no feedback; 1 or True for basic feedback; 2 for lots of feedback
 
-SAVE_NUMBERED_HEATMAP_TO_GOLDEN = False
-GOLDEN_HEATMAP_NAME = "run_01"
+SAVE_NUMBERED_HEATMAP_TO_GOLDEN = True
+GOLDEN_HEATMAP_NAME = "run_04"
 
 Q_MAP = {
     "acceleration": {"name": "Acceleration", "units": "in/s²"},
@@ -416,17 +416,22 @@ if __name__ == "__main__":
         heatmap_dir = SYSTEM_ID_DIR / MODEL / source / OUTPUT_QUANTITY / "System ID Results"
         os.makedirs(heatmap_dir, exist_ok=True)
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
-        heatmap_data = np.nan_to_num(errors[:, display_indices].T, nan=0.0)
+        heatmap_data = errors[:, display_indices].T
+        finite_heatmap_values = heatmap_data[np.isfinite(heatmap_data)]
+        heatmap_cmap = plt.get_cmap("viridis").copy()
+        heatmap_cmap.set_bad(color="lightgray")
         if MODEL == "frame":
             vmax = 1.0
         elif MODEL == "bridge":
-            vmax = np.max(heatmap_data)
+            vmax = np.max(finite_heatmap_values) if finite_heatmap_values.size else 1.0
+            if vmax == 0:
+                vmax = 1.0
         im = ax.imshow(
-            heatmap_data,
+            np.ma.masked_invalid(heatmap_data),
             vmin=0, vmax=vmax,
             aspect='auto',
             origin='lower',
-            cmap='viridis'
+            cmap=heatmap_cmap
         )
         cbar = fig.colorbar(im, ax=ax, extend='max')
         cbar.set_label(r"Error, $\epsilon$", fontsize=18)
@@ -436,12 +441,17 @@ if __name__ == "__main__":
         ax.set_xticklabels(event_ids, rotation=45, fontsize=16)
         ax.set_yticks(np.arange(len(display_labels)))
         ax.set_yticklabels(display_labels, fontsize=16)
-        half_vmax = np.nanmax(heatmap_data)/2.0
+        half_vmax = np.max(finite_heatmap_values)/2.0 if finite_heatmap_values.size else 0.0
         for ev in range(n_events):
             for i in range(len(display_labels)):
                 val = heatmap_data[i,ev]
-                color = 'black' if val > half_vmax else 'white'
-                ax.text(ev, i, f"{val:.2f}", ha='center', va='center', color=color, fontsize=9)
+                if np.isfinite(val):
+                    text_value = f"{val:.2f}"
+                    color = 'black' if val > half_vmax else 'white'
+                else:
+                    text_value = "N/A"
+                    color = 'black'
+                ax.text(ev, i, text_value, ha='center', va='center', color=color, fontsize=9)
         save_figure_with_pgf(fig, heatmap_dir / f"heatmap_{SID_METHOD}.png", dpi=400)
         if SAVE_NUMBERED_HEATMAP_TO_GOLDEN:
             golden_name = GOLDEN_HEATMAP_NAME.strip()
@@ -455,24 +465,20 @@ if __name__ == "__main__":
                 MODEL / source / OUTPUT_QUANTITY
             )
             golden_heatmap_path = golden_heatmap_dir / f"{golden_name}_heatmap_{SID_METHOD}.png"
-            if golden_heatmap_path.exists():
-                raise FileExistsError(
-                    f"Golden heatmap already exists and will not be overwritten: {golden_heatmap_path}"
-                )
             golden_heatmap_dir.mkdir(parents=True, exist_ok=True)
             save_figure_with_pgf(fig, golden_heatmap_path, dpi=400)
             if VERBOSE:
-                print(f"saved golden heatmap: {golden_heatmap_path}")
+                print(f"saved/updated golden heatmap: {golden_heatmap_path}")
         plt.close(fig)
 
         # Heatmap square with no numbers
         fig, ax = plt.subplots(figsize=(12,6), constrained_layout=True)
         im = ax.imshow(
-            heatmap_data,
+            np.ma.masked_invalid(heatmap_data),
             vmin=0, vmax=vmax,
             aspect='equal',
             origin='lower',
-            cmap='viridis'
+            cmap=heatmap_cmap
         )
         cbar = fig.colorbar(im, ax=ax, extend='max', fraction=0.02, pad=0.04)
         cbar.set_label("$\\epsilon$: Normalized $L_2$ Error", fontsize=20)
