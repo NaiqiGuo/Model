@@ -10,7 +10,6 @@ from mdof import sysid
 from mdof.utilities.config import Config
 from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 import pickle
-from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 
 # Analysis configuration
 SID_METHOD = 'srim'

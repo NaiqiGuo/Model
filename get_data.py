@@ -271,7 +271,7 @@ class EventAnalysis:
         # with FE model outputs and system identification outputs.
         try:
             self.load_measurements()
-        except Exception:
+        except:
             if cfg.verbose:
                 print(f"Error getting field measurements for event {self.event_id}. Skipping event.")
             return
