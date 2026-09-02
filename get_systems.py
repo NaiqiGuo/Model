@@ -16,7 +16,7 @@ from mdof.utilities.testing import intensity_bounds, truncate_by_bounds
 SID_METHOD = 'srim'
 STRUCTURE = "frame" # "frame", "bridge"
 MULTISUPPORT = False
-ELASTIC = False 
+ELASTIC = True
 
 # Verbosity
 # False means print nothing;
@@ -62,7 +62,7 @@ if __name__ == "__main__":
             continue
 
         # Perform system identification and save systems
-        n = 4
+        n = 3
         options = Config(
             m           = 500,
             horizon     = 190,
