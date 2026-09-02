@@ -26,7 +26,7 @@ A suite of structures, their vibration responses to strong ground motion events,
         - outputs array
         - system matrices (A,B,C,D)
 3. `plot_inputs_outputs.py`: plot the inputs and outputs used for system ID. Primarily used for debugging.
-4.  `plot_series.py`: plot timeseries.
+4. `plot_series.py`: plot timeseries.
     1. Prompts the user for:
         1. structure
         2. event
