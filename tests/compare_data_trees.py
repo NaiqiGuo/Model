@@ -27,8 +27,24 @@ def relative_files(root: Path) -> set:
     return {p.relative_to(root) for p in root.rglob("*") if p.is_file()}
 
 
-def load_csv(path: Path) -> np.ndarray:
-    return np.loadtxt(path, ndmin=2)
+def load_csv(path: Path) -> tuple[list[str] | None, np.ndarray]:
+    """Load a csv as (header, data).
+    """
+    with open(path) as f:
+        first_line = f.readline()
+    # Check for comma delimiter
+    delimiter = "," if "," in first_line else None
+    fields = first_line.strip().split(delimiter)
+    # Check for header row
+    try:
+        [float(field) for field in fields]
+        # There's no header row
+        header, skiprows = None, 0
+    except ValueError:
+        # There's a header row
+        header, skiprows = fields, 1
+    data = np.loadtxt(path, delimiter=delimiter, skiprows=skiprows, ndmin=2)
+    return header, data
 
 
 def load_pickle(path: Path):
@@ -56,7 +72,11 @@ def compare_numeric(a_path: Path, b_path: Path, rtol: float, atol: float) -> dic
     suffix = a_path.suffix.lower()
     try:
         if suffix == ".csv":
-            a_arrays, b_arrays = [load_csv(a_path)], [load_csv(b_path)]
+            a_header, a_data = load_csv(a_path)
+            b_header, b_data = load_csv(b_path)
+            if a_header != b_header:
+                return {"status": "header_mismatch", "headers": (a_header, b_header)}
+            a_arrays, b_arrays = [a_data], [b_data]
         elif suffix == ".pkl":
             a_arrays = list(flatten_arrays(load_pickle(a_path)))
             b_arrays = list(flatten_arrays(load_pickle(b_path)))
@@ -177,6 +197,8 @@ def main():
                 print(f"  - {rel}: shape mismatch {result['shapes'][0]} vs {result['shapes'][1]}")
             elif status == "structure_mismatch":
                 print(f"  - {rel}: different pickled structure (different number of arrays)")
+            elif status == "header_mismatch":
+                print(f"  - {rel}: header mismatch {result['headers'][0]} vs {result['headers'][1]}")
             else:
                 max_abs, max_rel = result.get("max_abs"), result.get("max_rel")
                 if max_abs is None:
