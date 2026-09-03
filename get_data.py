@@ -225,8 +225,8 @@ class EventAnalysis:
     and saves the results. One instance per event.
 
     State schema:
-      inputs  (ground):   {"field": {dt, time, acceleration, displacement},
-                           "model": {dt, time, acceleration, displacement}}
+      inputs  (ground):    {"field": {dt, time, acceleration, displacement},
+                            "model": {dt, time, acceleration, displacement}}
       outputs (structure): {"field": {acceleration, displacement},
                             "model": {acceleration, displacement}}
     """
