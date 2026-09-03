@@ -276,7 +276,7 @@ def create_frame(elastic:bool,
         model.uniaxialMaterial("Steel02", steel_mat, fy, Es, 0.01, 20.0, 0.925, 0.15)
     else:
         model.uniaxialMaterial("Elastic", steel_mat, Es)
-    coupon_section = None
+
     if coupons:
         if zerolength == 'element':
             if elastic:
