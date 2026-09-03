@@ -419,7 +419,7 @@ class EventAnalysis:
 
         if cfg.structure == 'frame':
             output_elements = [cfg.output_element]
-            yFiber = 2
+            yFiber = 4.5 # Near the edge of the 10 in x 10 in coupon cross-section
             zFiber = 0.0
             response_mode = "material" if cfg.output_response == "force_deformation" else "fiber"
             fiber_response_dof = None
@@ -445,7 +445,7 @@ class EventAnalysis:
 
         elif cfg.structure == 'bridge':
             output_elements = [cfg.output_element]
-            yFiber = 22.5
+            yFiber = 22.5 # Inside the column core (column total diameter 60 in; 3.175 in cover)
             zFiber = 0.0
             response_mode = "material" if cfg.output_response == "force_deformation" else "fiber"
             fiber_response_dof = None
