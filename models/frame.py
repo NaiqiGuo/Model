@@ -96,11 +96,11 @@ def ReinforcedRectangle(model, id, h, b, cover, coreID, coverID, steelID, numBar
 
 def create_coupon_fiber_section(bar_material):
     """Create a fiber section for zeroLengthSection coupon elements."""
-    plate_width = 10.0 * units.inch
+    plate_width  = 10.0 * units.inch
     plate_height = 10.0 * units.inch
-    bar_radius = 3/8 * units.inch
-    edge_dist_x = 3.5 * units.inch
-    edge_dist_y = 1.5 * units.inch
+    bar_radius   = 3/8  * units.inch
+    edge_dist_x  = 3.5  * units.inch
+    edge_dist_y  = 1.5  * units.inch
     bar = Circle(
         radius=bar_radius,
         z=1,
@@ -123,6 +123,11 @@ def create_coupon_fiber_section(bar_material):
         ),
     ])
     section = xara.Section("Fiber", shape)
+
+    # ☝️🐭 Visualize section
+    # import veux
+    # veux.draw_shape(section).show()
+
     return section, bar_material
 
 
@@ -305,7 +310,8 @@ def create_frame(elastic:bool,
                 bar_material = xara.UniaxialMaterial(
                     type="Elastic",
                     tag=51,
-                    E=0.003*Es,
+                    Epos=0.003*Es,
+                    Eneg=0.003*Es,
                     nu=0.3,
                 )
             else:
@@ -322,8 +328,11 @@ def create_frame(elastic:bool,
                     cR2=0.15,
                 )
             coupon_section, coupon_material = create_coupon_fiber_section(bar_material)
-            model.add_object(coupon_material)
-            model.add_object(coupon_section)
+            model.material(coupon_material)
+            # give coupon_section an explicit tag
+            # (otherwise it will be assigned the first free "section" tag, which is 1)
+            coupon_section_tag = 54
+            model.section(coupon_section, tag=coupon_section_tag)
 
     
 
@@ -357,10 +366,10 @@ def create_frame(elastic:bool,
                             nfCoverZ=10,
                             GJ=GJ)
     
-    # Number of column integration points (sections)
-    itg_col = 1
+    col_itg_tag = 1
+    # Number of column integration points
     npts_col = 4
-    model.beamIntegration("Lobatto", itg_col, col_sec, npts_col)
+    model.beamIntegration("Lobatto", col_itg_tag, col_sec, npts_col)
         
     # Geometric transformation for columns
     colTransf = 1
@@ -380,10 +389,10 @@ def create_frame(elastic:bool,
             # model.element("zeroLengthSection", 102, (2, 22), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
             # model.element("zeroLengthSection", 103, (3, 23), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
             # model.element("zeroLengthSection", 104, (4, 24), coupon_section, x=(0.0, 0.0, 1.0), y=(0.0, 1.0, 0.0))
-            model.element("forceBeamColumn", 101, (1, 21), transform=colTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 102, (2, 22), transform=colTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 103, (3, 23), transform=colTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 104, (4, 24), transform=colTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 101, (1, 21), transform=colTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 102, (2, 22), transform=colTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 103, (3, 23), transform=colTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 104, (4, 24), transform=colTransf, section=coupon_section, shear=0)
             # # Fiber sections do not provide transverse shear response.
             # model.element("zeroLength", 201, (1, 21), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
             # model.element("zeroLength", 202, (2, 22), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
@@ -391,38 +400,38 @@ def create_frame(elastic:bool,
             # model.element("zeroLength", 204, (4, 24), mat=(coupon_shear_mat, coupon_shear_mat, coupon_axial_mat), dir=(1, 2, 3))
 
         # First floor
-        model.element("forceBeamColumn",  1, ( 1,  5), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  2, ( 2,  6), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  3, ( 3,  7), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  4, ( 4,  8), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  1, ( 1,  5), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  2, ( 2,  6), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  3, ( 3,  7), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  4, ( 4,  8), transform=colTransf, section=col_sec, shear=0)
 
         # Second floor
-        model.element("forceBeamColumn",  5, ( 5, 10), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  6, ( 6, 11), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  7, ( 7, 12), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  8, ( 8, 13), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  5, ( 5, 10), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  6, ( 6, 11), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  7, ( 7, 12), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  8, ( 8, 13), transform=colTransf, section=col_sec, shear=0)
 
         # Third floor
-        model.element("forceBeamColumn",  9, (10, 15), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn", 10, (11, 16), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn", 11, (12, 17), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn", 12, (13, 18), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  9, (10, 15), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame", 10, (11, 16), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame", 11, (12, 17), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame", 12, (13, 18), transform=colTransf, section=col_sec, shear=0)
     else:
         #                                tag ndI ndJ transfTag integrationTag
-        model.element("forceBeamColumn",  1, ( 1,  5), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  2, ( 2,  6), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  3, ( 3,  7), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  4, ( 4,  8), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  1, ( 1,  5), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  2, ( 2,  6), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  3, ( 3,  7), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  4, ( 4,  8), transform=colTransf, section=col_sec, shear=0)
 
-        model.element("forceBeamColumn",  5, ( 5, 10), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  6, ( 6, 11), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  7, ( 7, 12), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn",  8, ( 8, 13), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  5, ( 5, 10), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  6, ( 6, 11), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  7, ( 7, 12), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  8, ( 8, 13), transform=colTransf, section=col_sec, shear=0)
 
-        model.element("forceBeamColumn",  9, (10, 15), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn", 10, (11, 16), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn", 11, (12, 17), transform=colTransf, section=col_sec, shear=0)
-        model.element("forceBeamColumn", 12, (13, 18), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame",  9, (10, 15), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame", 10, (11, 16), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame", 11, (12, 17), transform=colTransf, section=col_sec, shear=0)
+        model.element("ForceFrame", 12, (13, 18), transform=colTransf, section=col_sec, shear=0)
 
 
     # Beam sections and elements
@@ -450,10 +459,10 @@ def create_frame(elastic:bool,
         #                       tag     E    A      Iz       Iy     G    J
         model.section("Elastic", beam_sec, Ec, Abeam, Ibeamzz, Ibeamyy, Gb, Jbeam)
 
-    # Number of beam integration points (sections)
-    itg_beam = 1
+    beam_itg_tag = 2
+    # Number of beam integration points
     npts_beam = 4
-    model.beamIntegration("Lobatto", itg_beam, beam_sec, npts_beam)
+    model.beamIntegration("Lobatto", beam_itg_tag, beam_sec, npts_beam)
 
     # Geometric transformation for beams
     beamTransf = 2
@@ -478,8 +487,8 @@ def create_frame(elastic:bool,
         elif zerolength == 'section':
             # model.element("zeroLengthSection", 105, (5, 25), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
             # model.element("zeroLengthSection", 106, (6, 26), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("forceBeamColumn", 105, (5, 25), transform=beamTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 106, (6, 26), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 105, (5, 25), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 106, (6, 26), transform=beamTransf, section=coupon_section, shear=0)
             # model.element("zeroLength", 205, (5, 25), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
             # model.element("zeroLength", 206, (6, 26), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 13, (25, 26), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
@@ -491,8 +500,8 @@ def create_frame(elastic:bool,
         elif zerolength == 'section':
             # model.element("zeroLengthSection", 107, (7, 27), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
             # model.element("zeroLengthSection", 108, (8, 28), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("forceBeamColumn", 107, (7, 27), transform=beamTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 108, (8, 28), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 107, (7, 27), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 108, (8, 28), transform=beamTransf, section=coupon_section, shear=0)
             # model.element("zeroLength", 207, (7, 27), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
             # model.element("zeroLength", 208, (8, 28), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 15, (27, 28), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
@@ -506,8 +515,8 @@ def create_frame(elastic:bool,
         elif zerolength == 'section':
             # model.element("zeroLengthSection", 109, (10, 30), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
             # model.element("zeroLengthSection", 110, (11, 31), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("forceBeamColumn", 109, (10, 30), transform=beamTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 110, (11, 31), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 109, (10, 30), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 110, (11, 31), transform=beamTransf, section=coupon_section, shear=0)
             # model.element("zeroLength", 209, (10, 30), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
             # model.element("zeroLength", 210, (11, 31), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 17, (30, 31), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
@@ -519,8 +528,8 @@ def create_frame(elastic:bool,
         elif zerolength == 'section':
             # model.element("zeroLengthSection", 111, (12, 32), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
             # model.element("zeroLengthSection", 112, (13, 33), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("forceBeamColumn", 111, (12, 32), transform=beamTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 112, (13, 33), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 111, (12, 32), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 112, (13, 33), transform=beamTransf, section=coupon_section, shear=0)
             # model.element("zeroLength", 211, (12, 32), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
             # model.element("zeroLength", 212, (13, 33), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 19, (32, 33), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
@@ -534,8 +543,8 @@ def create_frame(elastic:bool,
         elif zerolength == 'section':
             # model.element("zeroLengthSection", 113, (15, 35), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
             # model.element("zeroLengthSection", 114, (16, 36), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("forceBeamColumn", 113, (15, 35), transform=beamTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 114, (16, 36), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 113, (15, 35), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 114, (16, 36), transform=beamTransf, section=coupon_section, shear=0)
             # model.element("zeroLength", 213, (15, 35), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
             # model.element("zeroLength", 214, (16, 36), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 21, (35, 36), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
@@ -547,8 +556,8 @@ def create_frame(elastic:bool,
         elif zerolength == 'section':
             # model.element("zeroLengthSection", 115, (17, 37), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
             # model.element("zeroLengthSection", 116, (18, 38), coupon_section, x=(1.0, 0.0, 0.0), y=(0.0, 0.0, 1.0))
-            model.element("forceBeamColumn", 115, (17, 37), transform=beamTransf, section=coupon_section, shear=0)
-            model.element("forceBeamColumn", 116, (18, 38), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 115, (17, 37), transform=beamTransf, section=coupon_section, shear=0)
+            model.element("ForceFrame", 116, (18, 38), transform=beamTransf, section=coupon_section, shear=0)
             # model.element("zeroLength", 215, (17, 37), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
             # model.element("zeroLength", 216, (18, 38), mat=(coupon_axial_mat, coupon_shear_mat, coupon_shear_mat), dir=(1, 2, 3))
         model.element("elasticBeamColumn", 23, (37, 38), transform=beamTransf, section=beam_sec, shear=0, mass=weight_per_length)
@@ -593,6 +602,13 @@ def create_frame(elastic:bool,
     # set rayleigh damping factors
     # model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
     apply_damping(model=model, zeta=[0.03, 0.03], verbose=verbose)
+
+    # ☝️🐭 When the model isn't behaving as expected,
+    # print it to a JSON file and see if all of the elements, nodes,
+    # and materials are assigned as you intended.
+    # model.print(json="model.json")
+    # import sys
+    # sys.exit()
 
     return model
 

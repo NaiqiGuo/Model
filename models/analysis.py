@@ -6,7 +6,7 @@ class ModalAnalysis:
         self.model = model
         self.n = n
     
-        self.lambdas = model.eigen(n)  
+        self.lambdas = model.eigen(n)
         lambdas = np.asarray(lambdas, dtype=float)
         omega = np.sqrt(np.abs(lambdas))                    # rad/s
         self.frequencies = omega / (2*np.pi)
@@ -219,7 +219,11 @@ def analyze(model, nt, dt,
     }
 
     # get modes
-    lambdas = model.eigen(n_modes, "fullGenLapack")  
+    lambdas = model.eigen(n_modes, "fullGenLapack")
+    # ☝️🐭 View modal property summary
+    # model.modalProperties(print=True)
+    # import sys; sys.exit()
+
     omegas = np.sqrt(np.abs(lambdas))
     freqs_before = omegas/(2*np.pi) 
 
