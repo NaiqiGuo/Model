@@ -158,7 +158,6 @@ class RunConfig:
     field_only: bool
     from_scratch: bool
     verbose: int
-    sid_method: str
     upload_dir: Path
     base_dir: Path
     model_out_dir: Path
@@ -208,7 +207,6 @@ class RunConfig:
             field_only=args.field_only,
             from_scratch=args.from_scratch,
             verbose=args.verbose,
-            sid_method="srim",
             upload_dir=upload_dir,
             base_dir=base_dir,
             model_out_dir=model_out_dir,

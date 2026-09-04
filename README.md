@@ -45,6 +45,12 @@ Run all four configurations (frame/bridge × inelastic/elastic):
 for s in frame bridge; do for e in "" "--elastic"; do python get_data.py --structure "$s" $e; done; done
 ```
 
+Run system ID for all structures and sources (frame/bridge × field/elastic/inelastic):
+
+```bash
+for s in frame bridge; do for src in field elastic inelastic; do python get_systems.py --structure "$s" --source "$src"; done; done
+```
+
 ## Overall Directory Structure
 [tree.nathanfriend](https://tree.nathanfriend.com/?s=(%27optjs!(%27fancyY~fullPath!false~trail_gSlashY~rootDotY)~w(%27w%27Model_g8framL4227.csvFKE-4B-dtFVFQtxtFKB-BOG9FE-4B-BO_G-B8bridgL4BFBW-BOG9FE-4B-BOBWWH8framN3A4EJ4K0F*QpklF*frequency%20IDJ4KK*heatmap.pngC3A4EJ4BF0-5OGX3A4K0-5C3A4EJ4BF0-5OO_GX3A4K0-5C3BFUB8bridgN3A4K0-5C3A4BF0-5OGX3A*K0F*K*BCJ*BOO_GJ*B8%27)~versj!%271%27)*%20%20-O*0UsZrealizatj%2F3JH%20Tra__g%20Data%2F*F*4*QcsvF*5**QpklF*K*B8W*9-displacementAVJB...C-acceleratjEstructureF-*GelasticHSZIDJ%2FFK*BFLeOfield-timeFV-Ne%2FOfieldXO8*Q*226.UH%20ResultsJ*VgroundW%5CnX%2F9Y!trueZystem%20_injionwsource!%01wj_ZYXWVUQONLKJHGFECBA985430-*)
 
