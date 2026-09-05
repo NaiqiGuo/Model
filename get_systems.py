@@ -145,10 +145,10 @@ class Train:
         quantity = self.quantity
         if any(x is None for x in [self.sid_inputs, self.sid_outputs, self.sid_time, self.sid_dt]):
             raise ValueError("Training data not processed. Call `process_raw_data()` before fitting.")
-        create_and_save_csv(cfg.out_sid_dir / "dt"        / quantity / "System ID Training Data" / f"{event_id}.csv", self.sid_dt, rewrite=True)
-        create_and_save_csv(cfg.out_sid_dir / "time"      / quantity / "System ID Training Data" / f"{event_id}.csv", self.sid_time, rewrite=True)
-        create_and_save_csv(cfg.out_sid_dir / "ground"    / quantity / "System ID Training Data" / f"{event_id}.csv", self.sid_inputs, rewrite=True)
-        create_and_save_csv(cfg.out_sid_dir / "structure" / quantity / "System ID Training Data" / f"{event_id}.csv", self.sid_outputs, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "dt"        / f"{event_id}.csv", self.sid_dt, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "time"      / f"{event_id}.csv", self.sid_time, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "ground"    / f"{event_id}.csv", self.sid_inputs, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "structure" / f"{event_id}.csv", self.sid_outputs, rewrite=True)
 
     def fit(self):
         """
