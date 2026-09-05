@@ -305,21 +305,21 @@ def create_frame(elastic:bool,
                 coupon_axial_mat,
                 coupon_axial_stiffness,
             )
+            # bar_material = steel_mat # Use this if stiffness and natural frequency get resolved
+            bar_elastic_modulus = 0.003*Es
             if elastic:
-                # bar_material = steel_mat # Use this if stiffness and natural frequency get resolved
                 bar_material = xara.UniaxialMaterial(
                     type="Elastic",
                     tag=51,
-                    Epos=0.003*Es,
-                    Eneg=0.003*Es,
+                    Epos=bar_elastic_modulus,
+                    Eneg=bar_elastic_modulus,
                     nu=0.3,
                 )
             else:
-                # bar_material = steel_mat # Use this if stiffness and natural frequency get resolved
                 bar_material = xara.UniaxialMaterial(
                     type="Steel02",
                     tag=51,
-                    E=0.003*Es,
+                    E=bar_elastic_modulus,
                     nu=0.3,
                     Fy=0.03*fy,
                     b=0.01,
