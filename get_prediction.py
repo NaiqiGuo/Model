@@ -287,8 +287,8 @@ class Predict:
         prediction_plot_dir.mkdir(parents=True, exist_ok=True)
 
         n_outputs = len(out_labels)
-        fig_plt, axs = plt.subplots(n_outputs, 1, figsize=(8, 2 * n_outputs), sharex=True)
-        # fig_plt.subplots_adjust(hspace=0.35, top=0.80, bottom=0.16, left=0.12, right=0.88)
+        fig_plt, axs = plt.subplots(n_outputs, 1, figsize=(8, 1.75 * n_outputs), sharex=True)
+        fig_plt.subplots_adjust(hspace=0.5, top=0.85, bottom=0.17, left=0.13, right=0.85)
         fig_go = go.Figure()
 
         colors_go = iter(["blue", "darkorange", "green"])
@@ -302,9 +302,9 @@ class Predict:
             axs[i].plot(self.time_true, self.out_true[i], color="black", linestyle='-', label="True")
             axs[i].plot(self.time_true, self.out_pred[i], color="red", linestyle='--', label="Pred")
             if annotated:
-                axs[i].set_title(out_label, fontsize=24, fontweight="bold", pad=10)
+                axs[i].set_title(out_label, fontsize=16, fontweight="bold", pad=10)
                 axs[i].set_ylim(*y_limits)
-                axs[i].tick_params(axis="both", labelsize=20)
+                axs[i].tick_params(axis="both", labelsize=14)
             fig_go.add_scatter(
                 x=self.time_true, y=self.out_true[i],
                 mode="lines", line=dict(color=color), name=f"True {out_label}",
@@ -324,24 +324,24 @@ class Predict:
 
         if annotated:
             fig_plt.align_ylabels()
-            fig_plt.supylabel(f"{Q_MAP[self.quantity]['name']} ({Q_MAP[self.quantity]['units']})", fontsize=26, fontweight=900, x=0.04)
-            fig_plt.supxlabel("Time (s)", fontsize=26, fontweight=900, y=0.06)
+            fig_plt.supylabel(f"{Q_MAP[self.quantity]['name']} ({Q_MAP[self.quantity]['units']})", fontsize=16, fontweight=900, x=0.04)
+            fig_plt.supxlabel("Time (s)", fontsize=16, fontweight=900, y=0.06)
             fig_plt.suptitle(
                 f"Event {self.event_id} Prediction ({cfg.source})",
-                fontsize=30, fontweight="bold", y=0.965,
+                fontsize=18, fontweight="bold", y=0.965,
             )
             legend_items = [
-                {"x": 0.93, "y0": 0.60, "y1": 0.67, "label": "True", "color": "black", "linestyle": "-"},
-                {"x": 0.93, "y0": 0.42, "y1": 0.49, "label": "Pred", "color": "red", "linestyle": "--"},
+                {"x": 0.87, "y0": 0.60, "y1": 0.67, "label": "True", "color": "black", "linestyle": "-"},
+                {"x": 0.87, "y0": 0.42, "y1": 0.49, "label": "Pred", "color": "red", "linestyle": "--"},
             ]
             for item in legend_items:
                 fig_plt.add_artist(Line2D(
                     [item["x"], item["x"]], [item["y0"], item["y1"]],
-                    transform=fig_plt.transFigure, color=item["color"], linestyle=item["linestyle"], linewidth=2.0,
+                    transform=fig_plt.transFigure, color=item["color"], linestyle=item["linestyle"], linewidth=1.0,
                 ))
                 fig_plt.text(
-                    item["x"] + 0.018, (item["y0"] + item["y1"]) / 2, item["label"],
-                    rotation=90, va="center", ha="center", fontsize=22, fontweight="bold", transform=fig_plt.transFigure,
+                    item["x"] + 0.03, (item["y0"] + item["y1"]) / 2, item["label"],
+                    rotation=90, va="center", ha="center", fontsize=18, fontweight="bold", transform=fig_plt.transFigure,
                 )
         fig_plt.savefig(prediction_plot_dir / f"{self.event_id}.png", dpi=350)
         plt.close(fig_plt)
@@ -388,7 +388,7 @@ class PredictionHeatmaps:
         self.cmap = cmap
 
         finite_values = heatmap_errors[np.isfinite(heatmap_errors)]
-        solved_vmax = max(np.max(finite_values), 3.0)
+        solved_vmax = max(np.max(0.7*finite_values), 1.5)
         if cfg.structure == "frame":
             # self.vmax = 1.0
             self.vmax = solved_vmax
