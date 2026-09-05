@@ -19,14 +19,31 @@ A suite of structures, their vibration responses to strong ground motion events,
             - strain/stress (or force/deformation) response histories at select output elements
             - model inputs and outputs used for system identification
 2. `get_systems.py` : system identification on the data produced by `get_data.py`.
+    - Choose an analysis configuration via command-line flags
+        - `--structure frame` or `--structure bridge`
+        - `--source field`, `--source elastic`, or `--source inelastic`
+        - `--sid_method srim`
+        - `--no_windowing` to disable training data truncation
     - For each event, saves:
         - timestep (dt)
         - time array
         - inputs array
         - outputs array
         - system matrices (A,B,C,D)
-3. `plot_inputs_outputs.py`: plot the inputs and outputs used for system ID. Primarily used for debugging.
-4. `plot_series.py`: plot timeseries.
+3. `get_prediction.py` : simulates predictions from the system realizations produced by
+   `get_systems.py` and compares them against measured output.
+    - Choose an analysis configuration via command-line flags
+        - `--structure frame` or `--structure bridge`
+        - `--source field`, `--source elastic`, or `--source inelastic`
+        - `--output_quantity displacement` or `--output_quantity acceleration`
+        - `--no_windowing`, `--no_signal_align`
+    - For each event, saves:
+        - simulated (predicted) output
+        - true vs. predicted timeseries plots (PNG + interactive HTML)
+        - normalized L2 prediction error
+    - After all events, saves cross-event error heatmaps
+4. `plot_inputs_outputs.py`: plot the inputs and outputs used for system ID. Primarily used for debugging.
+5. `plot_series.py`: plot timeseries.
     1. Prompts the user for:
         1. structure
         2. event
@@ -39,7 +56,7 @@ A suite of structures, their vibration responses to strong ground motion events,
 
 ## Running
 
-Run all four configurations (frame/bridge × inelastic/elastic):
+Get data for all four configurations (frame/bridge × inelastic/elastic):
 
 ```bash
 for s in frame bridge; do for e in "" "--elastic"; do python get_data.py --structure "$s" $e; done; done
@@ -49,6 +66,12 @@ Run system ID for all structures and sources (frame/bridge × field/elastic/inel
 
 ```bash
 for s in frame bridge; do for src in field elastic inelastic; do python get_systems.py --structure "$s" --source "$src"; done; done
+```
+
+Run prediction for all structures and sources (frame/bridge × field/elastic/inelastic):
+
+```bash
+for s in frame bridge; do for src in field elastic inelastic; do python get_prediction.py --structure "$s" --source "$src" --annotate_plots; done; done
 ```
 
 ## Overall Directory Structure
