@@ -16,6 +16,7 @@ from pathlib import Path
 import os
 import numpy as np
 import pandas as pd
+from get_prediction import get_output_labels
 
 
 # -----------------------------
@@ -166,34 +167,6 @@ def compute_Dr_residual_tail(y_true: np.ndarray, y_pred: np.ndarray, dt: float, 
     for i, val in enumerate(res, start=1):
         out[f"Dr_residual_ch{i}"] = float(val)
     return out
-
-
-def output_labels_for(model: str, source: str, quantity: str):
-    if source == "field":
-        if model == "bridge":
-            return ["Channel 4 (Y)", "Channel 7 (Y)", "Channel 9 (Y)"]
-        if model == "frame":
-            if quantity == "acceleration":
-                return [
-                    "Channel 3 (X)",
-                    "Channel 4 (Y)",
-                    "Channel 6 (X)",
-                    "Channel 7 (Y)",
-                    "Channel 9 (X)",
-                    "Channel 10 (Y)",
-                ]
-            return [
-                "Channel 21",
-                "Channel 22",
-                "Channel 23",
-                "Channel 24",
-                "Channel 25",
-                "Channel 26",
-            ]
-
-    if model == "frame":
-        return ["Floor 1, X", "Floor 1, Y", "Floor 2, X", "Floor 2, Y", "Floor 3, X", "Floor 3, Y"]
-    return ["West Deck Interface, Y", "Column 1 Top, Y", "East Deck Interface, Y"]
 
 
 def sanitize_label(label: str) -> str:
@@ -363,7 +336,7 @@ if __name__ == "__main__":
     kref_ele = compute_kref_from_event_ids(baseline_ids, ELEMENTS) if COMPUTE_DK else {}
     kref_ele_fd = compute_kref_fd_from_event_ids(baseline_ids, FD_ELEMENTS) if COMPUTE_DK_FD else {}
     fbase = compute_fbase_from_event_ids(baseline_ids) if COMPUTE_DF else None
-    error_labels = output_labels_for(STRUCTURE, SOURCE, OUTPUT_QUANTITY) if COMPUTE_ERROR else []
+    error_labels = get_output_labels(STRUCTURE) if COMPUTE_ERROR else []
 
     if COMPUTE_DK:
         print("\nBaseline references for Dk")
