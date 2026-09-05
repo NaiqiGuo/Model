@@ -2,6 +2,7 @@
 Get input and output data from field and model event responses.
 Performs finite element analysis.
 """
+
 from __future__ import annotations
 import argparse
 from dataclasses import dataclass
@@ -92,12 +93,17 @@ def set_channels_dofs(structure, multisupport):
                 channels_dofs["input"][source]["dofs"] = [1, 2]
         else:
             raise ValueError("Multisupport is not applicable for frame structure.")
+        # Input excitation is uniform x, y shake table motions
+        # Measured outputs are x-only motions at 3 floors
+        # Read all 6 wire pot displacement channels so that x direction can be
+        # triangulated from the N/S readings.
+        # X rows are extracted later in load_measurements().
         channels_dofs["output"]["channels"] = {
-            "accel": [3, 4, 6, 7, 9, 10], # A2X_1_W, A2Y, A3X_2_W, A3Y, A4X_3_W, A4Y
+            "accel": [3, 6, 9], # A2X_1_W, A3X_2_W, A4X_3_W
             "displ": [21, 22, 23, 24, 25, 26], # WP1_1stFloor_N, WP2_1stFloor_S, WP3_2ndFloor_N, WP4_2ndFloor_S, WP5_3rdFloor_N, WP6_3rdFloor_S
         }
-        channels_dofs["output"]["dofs"] = [1, 2, 1, 2, 1, 2]
-        channels_dofs["output"]["nodes"] = [5, 5, 10, 10, 15, 15]
+        channels_dofs["output"]["dofs"] = [1, 1, 1]
+        channels_dofs["output"]["nodes"] = [5, 10, 15]
 
     elif structure == "bridge":
             # input channels are labeled channel numbers from quakeio
@@ -114,8 +120,9 @@ def set_channels_dofs(structure, multisupport):
             # sensors. The FE models keep the original two uniform-excitation
             # inputs (longitudinal channel 1 and transverse channel 3).
             channels_dofs["input"]["field"]["channels"] = {
-                "accel": [3, 17, 20], # transverse ground sensors
-                "displ": [3, 17, 20], # transverse ground sensors
+                # transverse ground sensors (west abut, north column, east abut)
+                "accel": [20, 3, 17], 
+                "displ": [20, 3, 17],
             }
             channels_dofs["input"]["field"]["dofs"] = [2, 2, 2]
             channels_dofs["input"]["model"]["channels"] = {
@@ -138,11 +145,12 @@ def set_channels_dofs(structure, multisupport):
             channels_dofs["input"]["model"]["dofs"] = [-1, 2, -1, 2, -1, 2, -1, 2]
             channels_dofs["input"]["model"]["nodes"] = [13, 13, 14, 14, 12, 12, 11, 11]
         channels_dofs["output"]["channels"] = {
-            "accel": [4, 7, 9], # A2, A3, A4
-            "displ": [4, 7, 9], # WP2, WP3, WP4
+            # transverse structure sensors (west deck, north column, east deck)
+            "accel": [4, 7, 9],
+            "displ": [4, 7, 9],
         }
         channels_dofs["output"]["dofs"] = [2, 2, 2]
-        channels_dofs["output"]["nodes"] = [9, 3, 10]
+        channels_dofs["output"]["nodes"] = [9, 3, 10] # west deck, north column, east deck
 
     return channels_dofs
 
@@ -302,7 +310,9 @@ class EventAnalysis:
 
             outputs["field"]["displacement"] = np.vstack([array[ch]*scale_249_units(units=sensor_units[ch])
                                                 for ch in channels_dofs["output"]["channels"]["displ"]])
-            outputs["field"]["displacement"] = triangulate_wirepot(outputs["field"]["displacement"])
+            # triangulate_wirepot needs both N/S channels per floor to triangulate
+            # even the X component; select the X rows (x1,x2,x3) afterward.
+            outputs["field"]["displacement"] = triangulate_wirepot(outputs["field"]["displacement"])[0::2]
 
             outputs["field"]["acceleration"] = np.vstack([np.sign(dof)*array[ch]*scale_249_units(units=sensor_units[ch])
                                                 for ch,dof in zip(channels_dofs["output"]["channels"]["accel"],
