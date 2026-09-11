@@ -311,8 +311,7 @@ def create_frame(elastic:bool,
                 bar_material = xara.UniaxialMaterial(
                     type="Elastic",
                     tag=51,
-                    Epos=bar_elastic_modulus,
-                    Eneg=bar_elastic_modulus,
+                    E=bar_elastic_modulus,
                     nu=0.3,
                 )
             else:
