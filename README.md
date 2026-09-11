@@ -53,6 +53,10 @@ A suite of structures, their vibration responses to strong ground motion events,
         2. location
     3. Save the plot if desired.
 
+## Details on windowing and alignment throughout pipeline
+1. `get_systems`: window inputs and outputs, create A,B,C,D with system ID. save inputs and outputs into System ID / structure / source / quantity / System ID Training Data.
+2. `get_prediction`: take inputs from System ID Training Data. Use A,B,C,D to predict output from inputs. Window and align inputs, predicted outputs, and true outputs, save into System ID / structure / source / quantity / System ID Results / _processed. Use processed data for error computation and heatmap.
+
 
 ## Running
 
