@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
     if cfg.debug:
         event_ids = [event_ids[-1]]
-        print(f"Debug mode. Only running the last event (Event ID {event_ids[-1]})")
+        print(f"Debug mode. Only running the last event (Event ID {event_ids[-1]})") 
     
     failed_events = []
     for event_id in event_ids:
