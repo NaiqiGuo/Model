@@ -469,10 +469,10 @@ def create_frame(elastic:bool,
 
     # Beam mass
     if material == 'steel':
-        density = 490.0*units.pcf # lb/ft^3 -- conversion from weight to mass is handled by units.pcf
+        density = 490.0*units.lbf/(units.ft**3)/(units.gravity) # mass per unit volume
         weight_per_length = density*shape.area
     elif material == 'concrete':
-        density = 150.0*units.pcf # lb/ft^3 -- conversion from weight to mass is handled by units.pcf
+        density = 150.0*units.lbf/(units.ft**3)/(units.gravity) # mass per unit volume
         weight_per_length = density*b_col*h_col
 
     if coupons:
