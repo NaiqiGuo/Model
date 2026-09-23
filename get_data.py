@@ -166,6 +166,7 @@ class RunConfig:
     field_only: bool
     from_scratch: bool
     verbose: int
+    debug: bool
     upload_dir: Path
     base_dir: Path
     model_out_dir: Path
@@ -215,6 +216,7 @@ class RunConfig:
             field_only=args.field_only,
             from_scratch=args.from_scratch,
             verbose=args.verbose,
+            debug=args.debug,
             upload_dir=upload_dir,
             base_dir=base_dir,
             model_out_dir=model_out_dir,
@@ -260,7 +262,8 @@ class EventAnalysis:
         if self.cfg.structure == "frame":
             # filepaths are like .../ce249Run244.txt
             return Path(self.event).stem.replace("ce249Run", "")  # "244"
-        return str(self.event_idx + 1)
+        elif self.cfg.structure == "bridge":
+            return str(self.event_idx + 1)
 
     def run(self):
         """
@@ -566,6 +569,7 @@ def parse_data_args():
     parser.add_argument("--no_frame_coupons", action="store_false", dest="frame_coupons", help="Disable coupons in frame model.")
     parser.add_argument("--frame_zerolength", type=str, default="section", choices=["element", "section"], help="Zerolength element type for frame model: 'element' or 'section'.")
     parser.add_argument("--verbose", type=int, default=1, help="Verbosity level: 0 (silent), 1 (progress), 2 (progress + validation).")
+    parser.add_argument("--debug", action="store_true", help="Only run the last event, for debugging purposes.")
     return parser.parse_args()
 
 
@@ -583,5 +587,15 @@ if __name__ == "__main__":
     events = load_events(cfg)
 
     # Perform model analysis and record responses
-    for event_idx,event in enumerate(events):
-        EventAnalysis(cfg, event, event_idx).run()
+    if cfg.debug:
+        event_idx = len(events)-1
+        if cfg.structure == "frame":
+            event_id = Path(events[-1]).stem.replace("ce249Run", "")
+        elif cfg.structure == "bridge":
+            event_id = event_idx+1
+        print(f"Debug mode. Only running the last event (Event ID {event_id})")
+        EventAnalysis(cfg, events[-1], event_idx).run()
+    
+    else:
+        for event_idx,event in enumerate(events):
+            EventAnalysis(cfg, event, event_idx).run()
