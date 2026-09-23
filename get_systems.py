@@ -48,6 +48,7 @@ class RunConfig:
     sid_options: Config
     windowed: bool
     verbose: int
+    debug: bool
     in_modeling_dir: Path
     out_sid_dir: Path
 
@@ -84,6 +85,7 @@ class RunConfig:
             sid_method=args.sid_method,
             sid_options=sid_options,
             windowed=args.windowed,
+            debug=args.debug,
             verbose=args.verbose,
             in_modeling_dir=in_modeling_dir,
             out_sid_dir=out_sid_dir
@@ -188,6 +190,7 @@ def parse_data_args():
     parser.add_argument("--no_windowing", action="store_false", dest="windowed", help="Disable training data truncation.")
     parser.add_argument("--verbose", type=int, default=1, help="Verbosity level: 0 (silent), 1 (progress), 2 (progress + validation).")
     parser.add_argument("--sid_verbose", type=int, default=1, help="System ID verbosity level: 0 (silent), 1 (progress), 2 (progress + validation).")
+    parser.add_argument("--debug", action="store_true", help="Only run the last event, for debugging purposes.")
     return parser.parse_args()
 
 
@@ -202,6 +205,11 @@ if __name__ == "__main__":
 
     # Perform system ID and record both training data and trained system realization
     event_ids = get_event_ids(cfg.in_modeling_dir)
+
+    if cfg.debug:
+        event_ids = [event_ids[-1]]
+        print(f"Debug mode. Only running the last event (Event ID {event_ids[-1]})")
+    
     failed_events = []
     for event_id in event_ids:
         for quantity in ["displacement", "acceleration"]:
