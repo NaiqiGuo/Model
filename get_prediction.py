@@ -65,6 +65,7 @@ class RunConfig:
     out_labels: list[str]
     annotated: bool
     verbose: int
+    debug: bool
     in_sid_dir: Path
     out_sid_dir: Path
 
@@ -89,6 +90,7 @@ class RunConfig:
             out_labels=out_labels,
             annotated=args.annotated,
             verbose=args.verbose,
+            debug=args.debug,
             in_sid_dir=in_sid_dir,
             out_sid_dir=out_sid_dir,
         )
@@ -463,6 +465,7 @@ def parse_args():
     parser.add_argument("--no_signal_align", action="store_false", dest="align_signals", help="Disable alignment of true/predicted signals via cross-correlation before computing error.")
     parser.add_argument("--annotate_plots", action="store_true", dest="annotated", help="Include plot annotations. Without this flag, plots show lines only; no text.")
     parser.add_argument("--verbose", type=int, default=1, help="Verbosity level: 0 (silent), 1 (progress), 2 (progress + alignment detail).")
+    parser.add_argument("--debug", action="store_true", help="Only run the last event, for debugging purposes.")
     return parser.parse_args()
 
 
@@ -474,6 +477,11 @@ if __name__ == "__main__":
         print(f"source={cfg.source}")
 
     event_ids = get_event_ids(cfg.in_sid_dir)
+
+    if cfg.debug:
+        event_ids = [event_ids[-1]]
+        print(f"Debug mode. Only running the last event (Event ID {event_ids[-1]})") 
+
     n_events = len(event_ids)
     failed_events = []
 

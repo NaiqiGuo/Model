@@ -86,8 +86,8 @@ class RunConfig:
             sid_method=args.sid_method,
             sid_options=sid_options,
             windowed=args.windowed,
-            debug=args.debug,
             verbose=args.verbose,
+            debug=args.debug,
             in_modeling_dir=in_modeling_dir,
             out_sid_dir=out_sid_dir
         )
