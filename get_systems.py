@@ -76,6 +76,7 @@ class RunConfig:
             chunk       = 200,
             i           = 250,
             j           = 4400,
+            stabilize_intermediate = True,
             verbose     = args.sid_verbose,
         )
 
