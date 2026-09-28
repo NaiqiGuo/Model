@@ -489,6 +489,7 @@ class EventAnalysis:
                                                                     material_deformation_dof=material_deformation_dof,
                                                                     material_force_dof=material_force_dof,
                                                                     n_modes=5,
+                                                                    model_name=cfg.structure,
                                                                     verbose=cfg.verbose
                                                                 )
 

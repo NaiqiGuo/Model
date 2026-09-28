@@ -605,7 +605,7 @@ def create_frame(elastic:bool,
     # ☝️🐭 When the model isn't behaving as expected,
     # print it to a JSON file and see if all of the elements, nodes,
     # and materials are assigned as you intended.
-    # model.print(json="model.json")
+    # model.print(json="model_frame.json")
     # import sys
     # sys.exit()
 
