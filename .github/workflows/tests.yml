@@ -9,7 +9,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       # numpy + pytest: golden spot checks. xara: unit constants for the field
       # recompute. quakeio + mdof: unpickle the bridge event fixture and run
       # get_measurements/extract_channels for the bridge field recompute.
