@@ -2,6 +2,8 @@
 import math
 import xara
 import xara.units.iks as units
+# from xara.units import create_units
+# units = create_units(system="iks")
 import numpy as np
 import tqdm
 
@@ -81,16 +83,28 @@ class Painter:
         Ec = self.Ec
         Gc = self.Gc
 
-        if not fiber: #elastic:
-            model.section("Elastic", tag, shape)
-            # e = shape.elastic
-            # model.section("Elastic", tag, E=Ec, A=e.A, Iy=e.Iy, Iz=e.Iz, G=Gc, J=e.J)
-            return
+        try:
+            if not fiber: #elastic:
+                # OLD XARA SYNTAX option 1: manually define section properties
+                # e = shape.elastic
+                # model.section("Elastic", tag, E=Ec, A=e.A, Iy=e.Iy, Iz=e.Iz, G=Gc, J=e.J)
+                # OLD XARA SYNTAX option 2: use a shape to autocompute section properties, but less streamlined
+                # model.section("Elastic", tag, shape)
+                section = xara.FrameSection("Elastic", shape)
+                model.section(section, tag=tag)
+                return
 
-        else:
-            section = xara.Section("AxialFiber", shape)
-            model.section(section)
-            return
+            else:
+                section = xara.FrameSection("AxialFiber", shape)
+                model.section(section, tag=tag)
+                return
+        except:
+            import sys
+            import veux
+            print(shape.elastic)
+            # veux.draw_shape(shape).show()
+            raise
+
         core  = 1 
         cover = 2
         steel = 3
