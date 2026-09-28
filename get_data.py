@@ -561,7 +561,7 @@ class EventAnalysis:
 
 def parse_data_args():
     parser = argparse.ArgumentParser(description="Get input and output data from field and model event responses.")
-    parser.add_argument("--structure", type=str, default="bridge", choices=["frame", "bridge"], help="Structure type: 'frame' or 'bridge'.")
+    parser.add_argument("-S", "--structure", type=str, default="bridge", choices=["frame", "bridge"], help="Structure type: 'frame' or 'bridge'.")
     parser.add_argument("--multisupport", action="store_true", help="Use multisupport excitation for bridge structure.")
     parser.add_argument("--elastic", action="store_true", help="Use elastic model; otherwise inelastic.")
     parser.add_argument("--field_only", action="store_true", help="Save measured field data without creating or analyzing the FE model.")
@@ -569,7 +569,7 @@ def parse_data_args():
     parser.add_argument("--no_frame_coupons", action="store_false", dest="frame_coupons", help="Disable coupons in frame model.")
     parser.add_argument("--frame_zerolength", type=str, default="section", choices=["element", "section"], help="Zerolength element type for frame model: 'element' or 'section'.")
     parser.add_argument("--verbose", type=int, default=1, help="Verbosity level: 0 (silent), 1 (progress), 2 (progress + validation).")
-    parser.add_argument("--debug", action="store_true", help="Only run the last event, for debugging purposes.")
+    parser.add_argument("-D", "--debug", action="store_true", help="Only run the last event, for debugging purposes.")
     return parser.parse_args()
 
 
