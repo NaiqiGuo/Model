@@ -136,7 +136,9 @@ def create_frame(elastic:bool,
                  coupons = False,
                  material = 'steel',
                  zerolength = 'section', # 'element' 'section'
-                 verbose = False):
+                 verbose = False,
+                 model_name = '',
+                 debug = False):
 
     """
     Finite element model of REPEAT frame
@@ -602,12 +604,13 @@ def create_frame(elastic:bool,
     # model.rayleigh(0.0319, 0.0, 0.0125, 0.0)
     apply_damping(model=model, zeta=[0.03, 0.03], verbose=verbose)
 
-    # ☝️🐭 When the model isn't behaving as expected,
-    # print it to a JSON file and see if all of the elements, nodes,
-    # and materials are assigned as you intended.
-    # model.print(json="model_frame.json")
-    # import sys
-    # sys.exit()
+    if debug:
+        # ☝️🐭 When the model isn't behaving as expected,
+        # print it to a JSON file and see if all of the elements, nodes,
+        # and materials are assigned as you intended.
+        model.print(json=f"model_{model_name}.json")
+        # import sys
+        # sys.exit()
 
     return model
 

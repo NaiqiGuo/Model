@@ -447,7 +447,9 @@ class EventAnalysis:
                                  coupons=cfg.frame_coupons,
                                  material='steel',
                                  zerolength=cfg.frame_zerolength,
-                                 verbose=cfg.verbose)
+                                 verbose=cfg.verbose,
+                                 model_name=f'{cfg.structure}_{cfg.elastic}',
+                                 debug=cfg.debug)
 
             model = apply_load_frame(model,
                                      inputx=self.inputs["model"]["acceleration"][0],
@@ -465,7 +467,9 @@ class EventAnalysis:
 
             model = create_bridge(elastic=cfg.elastic,
                                   separate_deck_ends=True,
-                                  verbose=cfg.verbose)
+                                  verbose=cfg.verbose,
+                                  model_name=f'{cfg.structure}_{cfg.elastic}',
+                                  debug=cfg.debug)
 
 
             model = apply_load_bridge(model,
@@ -489,8 +493,9 @@ class EventAnalysis:
                                                                     material_deformation_dof=material_deformation_dof,
                                                                     material_force_dof=material_force_dof,
                                                                     n_modes=5,
-                                                                    model_name=cfg.structure,
-                                                                    verbose=cfg.verbose
+                                                                    verbose=cfg.verbose,
+                                                                    model_name=f'{cfg.structure}_{cfg.elastic}',
+                                                                    debug=cfg.debug,
                                                                 )
 
         except RuntimeError as e:
@@ -570,7 +575,7 @@ def parse_data_args():
     parser.add_argument("--no_frame_coupons", action="store_false", dest="frame_coupons", help="Disable coupons in frame model.")
     parser.add_argument("--frame_zerolength", type=str, default="section", choices=["element", "section"], help="Zerolength element type for frame model: 'element' or 'section'.")
     parser.add_argument("--verbose", type=int, default=1, help="Verbosity level: 0 (silent), 1 (progress), 2 (progress + validation).")
-    parser.add_argument("-D", "--debug", action="store_true", help="Only run the last event, for debugging purposes.")
+    parser.add_argument("-D", "--debug", action="store_true", help="Only run the last event, and save model details, for debugging purposes.")
     return parser.parse_args()
 
 

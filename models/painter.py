@@ -566,7 +566,9 @@ def apply_load_bridge(
 def create_bridge(elastic=True, 
                   separate_deck_ends=True, 
                   echo_file=None,
-                  verbose=False):
+                  verbose=False,
+                  model_name='',
+                  debug=False):
 
     if echo_file is not None:
         echo_file = open(echo_file, 'w+')
@@ -581,12 +583,13 @@ def create_bridge(elastic=True,
     if echo_file is not None:
         echo_file.close()
 
-    # ☝️🐭 When the model isn't behaving as expected,
-    # print it to a JSON file and see if all of the elements, nodes,
-    # and materials are assigned as you intended.
-    # model.print(json="model_bridge.json")
-    # import sys
-    # sys.exit()
+    if debug:
+        # ☝️🐭 When the model isn't behaving as expected,
+        # print it to a JSON file and see if all of the elements, nodes,
+        # and materials are assigned as you intended.
+        model.print(json=f"model_{model_name}.json")
+        # import sys
+        # sys.exit()
 
     return model
 

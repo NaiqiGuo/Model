@@ -146,8 +146,9 @@ def analyze(model, nt, dt,
             fiber_response_dof=None,
             material_deformation_dof=None,
             material_force_dof=None,
-            model_name='',
             verbose=False,
+            model_name='',
+            debug=False,
             ):
 
     # ----------------------------
@@ -221,9 +222,10 @@ def analyze(model, nt, dt,
 
     # get modes
     lambdas = model.eigen(n_modes, "fullGenLapack")
-    # ☝️🐭 View modal property summary
-    # model.modalProperties(print=True, file=f"modal_report_{}.txt")
-    # import sys; sys.exit()
+    if debug:
+        # ☝️🐭 View modal property summary
+        model.modalProperties(print=True, file=f"modal_report_{model_name}.txt")
+        # import sys; sys.exit()
 
     omegas = np.sqrt(np.abs(lambdas))
     freqs_before = omegas/(2*np.pi) 
