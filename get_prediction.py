@@ -25,14 +25,14 @@ Q_MAP = {
     "displacement": {"name": "Displacement", "units": "in"},
 }
 
-def get_event_ids(in_dir: Path):
+def get_event_ids(in_dir: Path, source: str):
     """
     Get event IDs from the input directory.
 
     :param in_dir: Path to the input directory containing event data.
     :return: List of event IDs (str).
     """
-    events = sorted((in_dir / "acceleration" / "System ID Training Data" / "ground").glob("[0-9]*.csv"), key=lambda event_path: int(event_path.stem))
+    events = sorted((in_dir / "acceleration" / source / "System ID Training Data" / "ground").glob("[0-9]*.csv"), key=lambda event_path: int(event_path.stem))
     event_ids = [event.stem for event in events]
     return event_ids
 
@@ -71,9 +71,10 @@ class RunConfig:
 
     @classmethod
     def from_args(cls, args) -> "RunConfig":
-        in_sid_dir = Path("System ID") / args.structure / args.source
-        out_sid_dir = Path("System ID") / args.structure / args.source
-        if not in_sid_dir.exists():
+        in_sid_dir = Path("System ID") / args.structure
+        out_sid_dir = Path("System ID") / args.structure
+        if not all((in_sid_dir / quantity / args.source / "System ID Training Data").is_dir()
+                   for quantity in ("displacement", "acceleration")):
             raise FileNotFoundError(f"Input directory with training data does not exist. \
                                       Run `get_systems.py` first to generate system realizations \
                                       for {args.structure}/{args.source}.")
@@ -117,8 +118,8 @@ def compute_window_plan(cfg: RunConfig,
     window_lengths = []
     window_lengths_seconds = []
     for event_id in event_ids:
-        dt       = np.loadtxt(cfg.in_sid_dir / quantity / "System ID Training Data" / "dt"        / f"{event_id}.csv")
-        out_true = np.loadtxt(cfg.in_sid_dir / quantity / "System ID Training Data" / "structure" / f"{event_id}.csv").copy()
+        dt       = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "dt"        / f"{event_id}.csv")
+        out_true = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "structure" / f"{event_id}.csv").copy()
         bounds_scan = intensity_bounds(out_true, lb=0.01, ub=0.99)
         bounds_by_event[event_id] = bounds_scan
         window_lengths.append(bounds_scan[1] - bounds_scan[0])
@@ -182,15 +183,15 @@ class Predict:
         event_id = self.event_id
         quantity = self.quantity
 
-        self.dt      = np.loadtxt(cfg.in_sid_dir / quantity / "System ID Training Data" / "dt"        / f"{event_id}.csv")
-        self.time    = np.loadtxt(cfg.in_sid_dir / quantity / "System ID Training Data" / "time"      / f"{event_id}.csv")
-        self.inputs  = np.loadtxt(cfg.in_sid_dir / quantity / "System ID Training Data" / "ground"    / f"{event_id}.csv")
-        self.outputs = np.loadtxt(cfg.in_sid_dir / quantity / "System ID Training Data" / "structure" / f"{event_id}.csv")
+        self.dt      = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "dt"        / f"{event_id}.csv")
+        self.time    = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "time"      / f"{event_id}.csv")
+        self.inputs  = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "ground"    / f"{event_id}.csv")
+        self.outputs = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "structure" / f"{event_id}.csv")
 
     def load_system(self):
         """Load the identified system realization and stabilize it."""
         cfg = self.cfg
-        sys_path = cfg.in_sid_dir / self.quantity / "System ID Results" / "system realization" / f"{self.event_id}.pkl"
+        sys_path = cfg.in_sid_dir / self.quantity / cfg.source / "System ID Results" / "system realization" / f"{self.event_id}.pkl"
         with open(sys_path, "rb") as f:
             A, B, C, D = pickle.load(f)
         self.system = (stabilize_discrete(A), B, C, D)
@@ -255,7 +256,7 @@ class Predict:
                                   ("inputs_processed", self.in_true),
                                   ("outputs_true_processed", self.out_true),
                                  ]:
-            create_and_save_csv(cfg.out_sid_dir / self.quantity / "System ID Results" /
+            create_and_save_csv(cfg.out_sid_dir / self.quantity / cfg.source / "System ID Results" /
                                 array_name / f"{self.event_id}.csv",
                                 array,
                                 rewrite=True)
@@ -263,7 +264,7 @@ class Predict:
     def save_prediction(self):
         """Save predicted output."""
         cfg = self.cfg
-        create_and_save_csv(cfg.out_sid_dir / self.quantity / "System ID Results" /
+        create_and_save_csv(cfg.out_sid_dir / self.quantity / cfg.source / "System ID Results" /
                             "outputs_pred_processed" / f"{self.event_id}.csv",
                             self.out_pred,
                             rewrite=True)
@@ -275,7 +276,7 @@ class Predict:
             normalized_l2_error(true, pred)
             for true, pred in zip(self.out_true, self.out_pred)
         ])
-        create_and_save_csv(cfg.out_sid_dir / self.quantity / "System ID Results" /
+        create_and_save_csv(cfg.out_sid_dir / self.quantity / cfg.source / "System ID Results" /
                             "errors" / f"{self.event_id}.csv",
                             self.errors,
                             rewrite=True)
@@ -285,7 +286,7 @@ class Predict:
         cfg = self.cfg
         out_labels = cfg.out_labels
         annotated = cfg.annotated
-        prediction_plot_dir = cfg.out_sid_dir / self.quantity / "System ID Results" / "prediction plots"
+        prediction_plot_dir = cfg.out_sid_dir / self.quantity / cfg.source / "System ID Results" / "prediction plots"
         prediction_plot_dir.mkdir(parents=True, exist_ok=True)
 
         n_outputs = len(out_labels)
@@ -382,7 +383,7 @@ class PredictionHeatmaps:
         self.event_ids = event_ids
         self.out_labels = out_labels
 
-        self.heatmap_dir = cfg.out_sid_dir / quantity / "System ID Results"
+        self.heatmap_dir = cfg.out_sid_dir / quantity / cfg.source / "System ID Results"
         self.heatmap_dir.mkdir(parents=True, exist_ok=True)
 
         cmap = plt.get_cmap("viridis").copy()
@@ -476,7 +477,7 @@ if __name__ == "__main__":
         print(f"structure={cfg.structure}")
         print(f"source={cfg.source}")
 
-    event_ids = get_event_ids(cfg.in_sid_dir)
+    event_ids = get_event_ids(cfg.in_sid_dir, cfg.source)
 
     if cfg.debug:
         event_ids = [event_ids[-1]]

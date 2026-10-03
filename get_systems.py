@@ -58,7 +58,7 @@ class RunConfig:
         source = args.source
 
         in_modeling_dir = Path("Modeling") / structure / source
-        out_sid_dir = Path("System ID") / structure / source
+        out_sid_dir = Path("System ID") / structure
         out_sid_dir.mkdir(parents=True, exist_ok=True)
 
         # System identification parameters
@@ -148,10 +148,10 @@ class Train:
         quantity = self.quantity
         if any(x is None for x in [self.sid_inputs, self.sid_outputs, self.sid_time, self.sid_dt]):
             raise ValueError("Training data not processed. Call `process_raw_data()` before fitting.")
-        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "dt"        / f"{event_id}.csv", self.sid_dt, rewrite=True)
-        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "time"      / f"{event_id}.csv", self.sid_time, rewrite=True)
-        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "ground"    / f"{event_id}.csv", self.sid_inputs, rewrite=True)
-        create_and_save_csv(cfg.out_sid_dir / quantity / "System ID Training Data" / "structure" / f"{event_id}.csv", self.sid_outputs, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / cfg.source / "System ID Training Data" / "dt"        / f"{event_id}.csv", self.sid_dt, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / cfg.source / "System ID Training Data" / "time"      / f"{event_id}.csv", self.sid_time, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / cfg.source / "System ID Training Data" / "ground"    / f"{event_id}.csv", self.sid_inputs, rewrite=True)
+        create_and_save_csv(cfg.out_sid_dir / quantity / cfg.source / "System ID Training Data" / "structure" / f"{event_id}.csv", self.sid_outputs, rewrite=True)
 
     def fit(self):
         """
@@ -168,7 +168,7 @@ class Train:
             raise ValueError("Realization has not been fitted yet. Call `fit()` before saving.")
         A,B,C,D, *rest = self.realization
         system  = (A,B,C,D)
-        system_path = (self.cfg.out_sid_dir / self.quantity / "System ID Results" / 'system realization' / f"{self.event_id}.pkl")
+        system_path = (self.cfg.out_sid_dir / self.quantity / self.cfg.source / "System ID Results" / 'system realization' / f"{self.event_id}.pkl")
         system_path.parent.mkdir(parents=True, exist_ok=True)
         with open(system_path, "wb") as f:
             pickle.dump(system, f)
