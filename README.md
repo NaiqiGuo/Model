@@ -85,148 +85,128 @@ for s in frame bridge; do for src in field elastic inelastic; do python get_pred
 ```
 .
 ├── Modeling/
-│   ├── frame/
+│   ├── bridge/
 │   │   ├── field/
-│   │   │   ├── time/
+│   │   │   ├── acceleration/
 │   │   │   │   ├── ground/
-│   │   │   │   │   ├── 226.csv
-│   │   │   │   │   ├── 227.csv
+│   │   │   │   │   ├── 1.csv
+│   │   │   │   │   ├── 2.csv
 │   │   │   │   │   └── ...
 │   │   │   │   └── structure/
-│   │   │   │       ├── 226.csv
+│   │   │   │       ├── 1.csv
 │   │   │   │       └── ...
-│   │   │   ├── dt/
+│   │   │   ├── displacement/
 │   │   │   │   ├── ground/
-│   │   │   │   │   ├── 226.txt
+│   │   │   │   │   ├── 1.txt
 │   │   │   │   │   └── ...
 │   │   │   │   └── ...
 │   │   │   └── ...
 │   │   ├── elastic/
-│   │   │   ├── displacement/
-│   │   │   │   └── structure/
-│   │   │   │       ├── 226.csv
+│   │   │   ├── acceleration/
+│   │   │   │   └── ground/
+│   │   │   │       ├── 1.csv
 │   │   │   │       └── ...
 │   │   │   └── ...
 │   │   └── inelastic/
 │   │       └── ...
-│   └── bridge/
+│   └── frame/
 │       ├── field/
-│       │   ├── time/
+│       │   ├── acceleration/
 │       │   │   ├── ground/
 │       │   │   │   ├── 226.csv
 │       │   │   │   └── ...
 │       │   │   └── ...
 │       │   └── ...
 │       ├── elastic/
-│       │   ├── displacement/
-│       │   │   └── structure/
+│       │   ├── acceleration/
+│       │   │   └── ground/
 │       │   │       ├── 226.csv
 │       │   │       └── ...
 │       │   └── ...
 │       └── ...
 └── System ID/
-    ├── frame/
-    │   ├── field/
-    │   │   ├── displacement/
+    ├── bridge/
+    │   ├── acceleration/
+    │   │   ├── field/
     │   │   │   ├── System ID Training Data/  
     │   │   │   │   ├── ground/
-    │   │   │   │   │   └── 226.csv
-    │   │   │   │   └── structure/
-    │   │   │   │       ├── 226.csv
+    │   │   │   │   │   └── 1.csv
+    │   │   │   │   |   └── ...
+    │   │   │   │   ├── structure/
+    │   │   │   │   |   ├── 1.csv
+    │   │   │   │   |   └── ...
+    │   │   │   │   ├── dt/
+    │   │   │   │   |   ├── 1.csv
+    │   │   │   │   |   └── ...
+    │   │   │   │   └── time/
     │   │   │   │       └── ...
     │   │   │   └── System ID Results/
     │   │   │       ├── system realization/
-    │   │   │       │   └── 226.pkl
-    │   │   │       ├── frequency ID/
-    │   │   │       │   ├── 226.csv
+    │   │   │       │   ├── 1.pkl
     │   │   │       │   └── ...
-    │   │   │       ├── ...
-    │   │   │       └── heatmap.png
-    │   │   └── acceleration/
-    │   │       ├── System ID Training Data/  
-    │   │       │   ├── ground/
-    │   │       │   │   └── 226.csv
-    │   │       │   ├── structure/
-    │   │       │   │   └── 226.csv
-    │   │       │   └── ...
-    │   │       └── System ID Results/
-    │   │           ├── system realization/
-    │   │           │   ├── 226.pkl
-    │   │           │   └── ...
-    │   │           └── ...
-    │   ├── elastic/
-    │   │   ├── displacement/
-    │   │   │   ├── System ID Training Data/  
-    │   │   │   │   └── ground/
-    │   │   │   │       ├── 226.csv
-    │   │   │   │       └── ...
+    │   │   │       ├── prediction plots/
+    │   │   │       │   ├── 1.pkl
+    │   │   │       │   └── ...
+    │   │   │       ├── inputs_processed
+    │   │   │       │   ├── 1.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── outputs_pred_processed
+    │   │   │       │   ├── 1.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── outputs_true_processed
+    │   │   │       │   ├── 1.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── time_processed
+    │   │   │       │   ├── 1.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── dt
+    │   │   │       │   ├── 1.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── errors
+    │   │   │       │   ├── 1.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── frequency ID (not yet implemented)/
+    │   │   │       │   ├── 1.csv
+    │   │   │       │   └── ...
+    │   │   │       ├── heatmap.png
+    │   │   │       └── heatmap_square.png
+    │   │   ├── elastic/
+    │   │   │   ├── System ID Training Data/
     │   │   │   └── System ID Results/
-    │   │   │       ├── system realization/
-    │   │   │       │   ├── 226.pkl
-    │   │   │       │   └── ...
-    │   │   │       └── ...
-    │   │   └── acceleration/
-    │   │       ├── System ID Training Data/  
-    │   │       │   ├── ground/
-    │   │       │   │   └── 226.csv
-    │   │       │   ├── structure/
-    │   │       │   │   └── 226.csv
-    │   │       │   └── ...
+    │   │   └── inelastic/
+    │   │       ├── System ID Training Data/
     │   │       └── System ID Results/
-    │   │           ├── system realization/
-    │   │           │   ├── 226.pkl
-    │   │           │   └── ...
-    │   │           └── ...
-    │   └── inelastic/
-    │       ├── displacement/
-    │       │   ├── System ID Training Data/  
-    │       │   │   └── ground/
-    │       │   │       ├── 226.csv
-    │       │   │       └── ...
+    │   │
+    │   └── displacement/
+    │       ├── field/
+    │       │   ├── System ID Training Data/
     │       │   └── System ID Results/
-    │       │       ├── system realization/
-    │       │       │   ├── 226.pkl
-    │       │       │   └── ...
-    │       │       └── ...
-    │       └── acceleration/
-    │           ├── System ID Training Data/  
-    │           │   └── ...
+    │       ├── elastic/
+    │       │   ├── System ID Training Data/
+    │       │   └── System ID Results/
+    │       └── inelastic/
+    │           ├── System ID Training Data/
     │           └── System ID Results/
-    │               └── ...
-    └── bridge/
-        ├── field/
-        │   ├── displacement/
+    │
+    └── frame/
+        ├── acceleration/
+        │   ├── field/
         │   │   ├── System ID Training Data/  
-        │   │   │   └── ground/
-        │   │   │       ├── 226.csv
-        │   │   │       └── ...
+        │   │   │   ├── ground/
+        │   │   │   │   └── 226.csv
+        │   │   │   |   └── ...
+        │   │   │   ├── structure/
+        │   │   │   |   ├── 226.csv
+        │   │   │   |   └── ...
+        │   │   │   └── ...
         │   │   └── System ID Results/
-        │   │       ├── system realization/
-        │   │       │   ├── 226.pkl
-        │   │       │   └── ...
         │   │       └── ...
-        │   └── acceleration/
-        │       ├── System ID Training Data/  
-        │       │   ├── ground/
-        │       │   │   └── 226.csv
-        │       │   └── ...
-        │       └── System ID Results/
-        │           ├── system realization/
-        │           │   ├── 226.pkl
-        │           │   └── ...
-        │           └── ...
-        ├── elastic/
-        │   ├── displacement/
+        │   ├── elastic/
         │   │   ├── System ID Training Data/  
-        │   │   │   └── ground/
-        │   │   │       └── ...
         │   │   └── System ID Results/
-        │   │       ├── system realization/
-        │   │       │   └── ...
-        │   │       └── ...
-        │   └── acceleration/
+        │   └── inelastic/
         │       └── ...
-        └── inelastic/
+        └── displacement/
             └── ...
 ```
 
