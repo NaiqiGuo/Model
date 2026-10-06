@@ -30,6 +30,7 @@ def get_event_ids(in_dir: Path, source: str):
     Get event IDs from the input directory.
 
     :param in_dir: Path to the input directory containing event data.
+    :param source: Data source: field, elastic, or inelastic.
     :return: List of event IDs (str).
     """
     events = sorted((in_dir / "acceleration" / source / "System ID Training Data" / "ground").glob("[0-9]*.csv"), key=lambda event_path: int(event_path.stem))
@@ -73,12 +74,12 @@ class RunConfig:
     def from_args(cls, args) -> "RunConfig":
         in_sid_dir = Path("System ID") / args.structure
         out_sid_dir = Path("System ID") / args.structure
-        if not all((in_sid_dir / quantity / args.source / "System ID Training Data").is_dir()
-                   for quantity in ("displacement", "acceleration")):
-            raise FileNotFoundError(f"Input directory with training data does not exist. \
-                                      Run `get_systems.py` first to generate system realizations \
-                                      for {args.structure}/{args.source}.")
-        
+        for quantity in ("displacement", "acceleration"):
+            if not (in_sid_dir / quantity / args.source / "System ID Training Data").is_dir():
+                raise FileNotFoundError(f"Input directory with training data for \
+                                        {args.structure}/{args.source}/{quantity} does not exist. \
+                                        Run `get_systems.py` first to generate system realizations.")
+            
         out_labels = get_output_labels(args.structure)
 
         return cls(
