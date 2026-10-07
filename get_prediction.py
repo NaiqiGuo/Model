@@ -120,8 +120,8 @@ def compute_window_plan(cfg: RunConfig,
     window_lengths_seconds = []
     for event_id in event_ids:
         dt       = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "dt"        / f"{event_id}.csv")
-        out_true = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "structure" / f"{event_id}.csv").copy()
-        bounds_scan = intensity_bounds(out_true, lb=0.01, ub=0.99)
+        reference_signal = np.loadtxt(cfg.in_sid_dir / quantity / cfg.source / "System ID Training Data" / "structure" / f"{event_id}.csv")[0].copy()
+        bounds_scan = intensity_bounds(reference_signal, lb=0.01, ub=0.99)
         bounds_by_event[event_id] = bounds_scan
         window_lengths.append(bounds_scan[1] - bounds_scan[0])
         window_lengths_seconds.append((bounds_scan[1] - bounds_scan[0]) * dt)
@@ -324,7 +324,7 @@ class Predict:
             legend=dict(orientation="h", yanchor="bottom", y=0.0, xanchor="left", x=0, font=dict(size=18)),
         )
         fig_go.update_xaxes(rangeslider=dict(visible=True))
-        fig_go.write_html(prediction_plot_dir / f"prediction.html", include_plotlyjs="cdn")
+        fig_go.write_html(prediction_plot_dir / f"{self.event_id}.html", include_plotlyjs="cdn")
 
         if annotated:
             fig_plt.align_ylabels()
