@@ -41,6 +41,9 @@ Exit status for compare: 0 if the folders match within tolerance, 1 otherwise.
 
 # Preserve the standard-library API when dependencies import inspect.
 # Only direct execution runs the result-inspection CLI below.
+from unicodedata import name
+
+
 if __name__ != "__main__":
     import os as _os
     _stdlib_inspect = _os.path.join(_os.path.dirname(_os.__file__), "inspect.py")
@@ -133,6 +136,7 @@ else:
                             np.savetxt(system_dst / f"{label}.csv", matrix, delimiter=",")
                             copied += 1
             print(f"{out_root}: done")
+        copied += heatmaps(name)
         return copied
 
 
