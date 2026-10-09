@@ -1,7 +1,7 @@
 """Export and compare prediction errors, training data, systems, and environments.
 
-build: a bare name creates a fresh runs/<timestamp>/ directory. An explicit
-path prefix is used exactly as supplied (including by the full-run script).
+build: saves output folders directly in the current directory.
+An explicit path prefix is used exactly as supplied. 
 The actual output paths are printed. Compare uses only the supplied directories,
 without searching for a latest run.
 
@@ -31,17 +31,11 @@ treated as a difference. Files that differ only by floating-point noise
 are counted but not listed.
 
 Usage:
-    python inspect.py build myfoldername
-    python inspect.py heatmaps myfoldername
-    python inspect.py compare chrystal_bridge runs/<timestamp>/naiqi_bridge
-    python inspect.py compare chrystal_bridge runs/<timestamp>/naiqi_bridge --rel-tol 1e-8
-
+    python inspect.py build naiqi
+    python inspect.py compare chrystal_bridge naiqi_bridge
+    python inspect.py compare chrystal_frame naiqi_frame
 Exit status for compare: 0 if the folders match within tolerance, 1 otherwise.
 """
-
-# Preserve the standard-library API when dependencies import inspect.
-# Only direct execution runs the result-inspection CLI below.
-from unicodedata import name
 
 
 if __name__ != "__main__":
@@ -80,21 +74,10 @@ else:
 
 
     def build_prefix(name: str) -> str:
-        """Bare names get a fresh run; explicit paths are used verbatim."""
+        """Use the supplied name directly in the current directory."""
         if not name or not Path(name).name or name in (".", ".."):
-            raise ValueError("Provide an export name such as naiqi, or a path ending in that name")
-        if os.path.dirname(name):
-            return name
-        from zoneinfo import ZoneInfo
-
-        stamp = datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y%m%d_%H%M%S")
-        run_dir = Path("runs") / stamp
-        try:
-            run_dir.mkdir(parents=True, exist_ok=False)
-        except FileExistsError:
-            sys.exit(f"Run directory already exists: {run_dir}. Retry in a second; existing results were not changed.")
-        return str(run_dir / name)
-
+            raise ValueError("Provide an export name such as naiqi")
+        return name
 
     def build(name: str) -> int:
         import numpy as np
@@ -361,7 +344,7 @@ else:
         sub = parser.add_subparsers(dest="command", required=True)
 
         p_build = sub.add_parser("build", help="export errors, training, systems, and the active Python environment")
-        p_build.add_argument("name", help="bare name: new runs/<timestamp>/<name>_* folders; explicit path: use that prefix exactly")
+        p_build.add_argument("name", help="export prefix in the current directory, e.g. naiqi")
 
         p_heat = sub.add_parser("heatmaps", help="copy all System ID heatmaps into <name>_heatmaps/")
         p_heat.add_argument("name", help="prefix for the output folder, e.g. 'myfoldername' -> myfoldername_heatmaps/")
@@ -369,7 +352,7 @@ else:
         p_cmp = sub.add_parser("compare", help="summarize differences between two folders")
         p_cmp.add_argument("dir_a", type=Path)
         p_cmp.add_argument("dir_b", type=Path)
-        p_cmp.add_argument("--rel-tol", type=float, default=1e-6, help="relative tolerance for numbers (default: 1e-6")
+        p_cmp.add_argument("--rel-tol", type=float, default=1e-6, help="relative tolerance for numbers (default: 1e-6)")
         p_cmp.add_argument("--abs-tol", type=float, default=1e-9, help="absolute tolerance for numbers (default: 1e-9)")
 
         args = parser.parse_args()
@@ -382,8 +365,18 @@ else:
             copied = heatmaps(args.name)
             print(f"copied {copied} files")
         else:
-            sys.exit(compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol))
-
+            from contextlib import redirect_stdout
+            from io import StringIO
+            output = StringIO()
+            with redirect_stdout(output):
+                result = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol)
+            report = output.getvalue()
+            print(report, end="")
+            structure = "frame" if args.dir_a.name.endswith("_frame") else "bridge"
+            report_path = Path(f"compare_{structure}.txt")
+            report_path.write_text(report, encoding="utf-8")
+            print(f"Comparison saved to {report_path}")
+            sys.exit(result)
 
     if __name__ == "__main__":
         main()
