@@ -1,0 +1,16 @@
+name: mssp
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12
+  - numpy==2.2.6
+  - scipy==1.18.1
+  - mdof==0.0.22
+  - xara==0.0.40
+  - opensees==0.1.32
+  - matplotlib==3.9.2
+  - plotly==5.23.0
+  - pip
