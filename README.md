@@ -60,6 +60,49 @@ A suite of structures, their vibration responses to strong ground motion events,
 
 ## Running
 
+### Export and compare results
+
+After generating System ID results, run:
+
+```bash
+python inspect.py build naiqi
+python inspect.py compare chrystal_bridge runs/<timestamp>/naiqi_bridge
+python inspect.py compare chrystal_frame runs/<timestamp>/naiqi_frame
+python inspect.py heatmaps runs/<timestamp>/naiqi
+```
+
+Replace `<timestamp>` above with the directory printed by `build`; do not type
+the angle brackets literally. A bare name such as `naiqi` creates a fresh
+`runs/<timestamp>/` on every build. Explicit path prefixes are used as supplied.
+`compare` uses exactly its two input paths and never searches for a latest run.
+
+`build` preserves the existing error CSV names and layout in `naiqi_bridge/`
+and `naiqi_frame/`. Within each structure/quantity/source folder it also adds
+`training/{dt,time,ground,structure}/<event>.csv` and
+`systems/<event>/{A,B,C,D}.csv`. The matrices are the saved identification
+results, before prediction-time stabilization. Matrix differences can reflect
+different state coordinates rather than different input/output behavior.
+
+`naiqi_environment/packages.txt` lists all installed Python packages in the
+interpreter executing `build`; `environment.json` records the interpreter,
+platform, and Conda/virtual environment paths. Comparison automatically locates
+these sibling environment folders and reports environment differences separately.
+They do not affect the numerical comparison exit status. Old error-only exports
+remain readable; missing training/system files are reported, and absent
+environment snapshots are explicitly noted.
+
+Comparison checks numeric array shapes, non-finite values, and symmetric relative
+and absolute tolerances. It prints overall and per-category counts, plus detailed
+differences. Reports go to the terminal unless redirected. Required source files
+must exist for all configured events; an incomplete build exits with an error.
+
+`run_full_comparison.sh` retains its timestamped `runs/<run>/` layout, logs,
+version records, heatmaps, and comparison reports. It exports the additional
+data there using `build "$RUN_DIR/naiqi"`. Previous run directories are untouched.
+Repeated bare-name builds create separate run directories. Reusing an explicit
+path prefix updates same-name files there without deleting other files. `Modeling/` and `System ID/` remain shared working directories.
+The inspection CLI is contained in `inspect.py` (renamed from `inspect_errors.py`).
+
 Get data for all four configurations (frame/bridge × inelastic/elastic):
 
 ```bash
@@ -251,7 +294,6 @@ Level | Name      | Quantities
 #### Method 2
 1. Set up a xara-friendly environment: https://xara.so/user/guides/compile.html
 2. Install requirements: `pip install -r requirements.txt`
-
 
 
 
