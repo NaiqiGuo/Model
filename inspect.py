@@ -32,8 +32,11 @@ are counted but not listed.
 
 Usage:
     python inspect.py build naiqi
-    python inspect.py compare chrystal_bridge naiqi_bridge
-    python inspect.py compare chrystal_frame naiqi_frame
+    python inspect.py compare errors chrystal_bridge naiqi_bridge
+    python inspect.py compare realizations chrystal_bridge naiqi_bridge
+    python inspect.py compare training chrystal_bridge naiqi_bridge
+Reports are saved beside the second input folder as compare_<structure>_<category>.txt.
+Repeat with frame folders for three frame reports. Neither input path is inferred.
 Exit status for compare: 0 if the folders match within tolerance, 1 otherwise.
 """
 
@@ -239,7 +242,9 @@ else:
 
     def category(rel):
         parts = Path(rel).parts
-        return "training" if "training" in parts else "systems" if "systems" in parts else "errors"
+        if Path(rel).suffix.lower() != ".csv":
+            return None
+        return "training" if "training" in parts else "realizations" if "systems" in parts else "errors"
 
 
     def compare_arrays(path_a, path_b, rel_tol, abs_tol):
@@ -269,18 +274,21 @@ else:
                       f"max |diff|={delta[index]:.6g} at row={index[0]}, col={index[1]} (zero-based); relative norm vs A={relative}")
 
 
-    def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float) -> int:
+    def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: str) -> int:
         for d in (dir_a, dir_b):
             if not d.is_dir():
                 sys.exit(f"error: not a directory: {d}")
 
-        files_a, files_b = list_files(dir_a), list_files(dir_b)
+        files_a, files_b = (
+            {rel: path for rel, path in list_files(root).items() if category(rel) == selected}
+            for root in (dir_a, dir_b)
+        )
         only_a = sorted(files_a.keys() - files_b.keys())
         only_b = sorted(files_b.keys() - files_a.keys())
         common = sorted(files_a.keys() & files_b.keys())
 
         identical, noise_only, real = 0, 0, []
-        counts = {k: {s: 0 for s in ("identical", "within tolerance", "different", "only A", "only B")} for k in ("errors", "training", "systems")}
+        counts = {selected: {s: 0 for s in ("identical", "within tolerance", "different", "only A", "only B")}}
         for rel in common:
             group = counts[category(rel)]
             if files_a[rel].suffix.lower() == ".csv":
@@ -307,6 +315,7 @@ else:
 
         print(f"A: {dir_a}")
         print(f"B: {dir_b}")
+        print(f"Comparison: {selected}")
         print(f"tolerance: rel_tol={rel_tol:g}, abs_tol={abs_tol:g}")
         print()
         print(f"files in both:           {len(common)}")
@@ -320,7 +329,8 @@ else:
             print(f"  {name}: " + ", ".join(f"{key}={value}" for key, value in stats.items()))
             if not any(stats.values()):
                 print("    No data provided in either folder; not compared.")
-        print("  systems: raw A/B/C/D before prediction stabilization; matrix differences do not alone establish different input/output behavior.")
+        if selected == "realizations":
+            print("  realizations: raw A/B/C/D before prediction stabilization; matrix differences do not alone establish different input/output behavior.")
 
         if real:
             print("\nReal differences:")
@@ -336,7 +346,13 @@ else:
                 print(f"  {rel}")
 
         compare_environments(dir_a, dir_b)
-        return 0 if not (real or only_a or only_b) else 1
+        return 0 if common and not (real or only_a or only_b) else 1
+
+
+    def report_structure(root):
+        """Identify a structure from an explicitly supplied export folder."""
+        matches = [s for s in STRUCTURES if root.name == s or root.name.endswith(f"_{s}") or (root / s).is_dir()]
+        return matches[0] if len(matches) == 1 else None
 
 
     def main() -> None:
@@ -350,6 +366,7 @@ else:
         p_heat.add_argument("name", help="prefix for the output folder, e.g. 'myfoldername' -> myfoldername_heatmaps/")
 
         p_cmp = sub.add_parser("compare", help="summarize differences between two folders")
+        p_cmp.add_argument("category", choices=("errors", "realizations", "training"), help="compare only this data category")
         p_cmp.add_argument("dir_a", type=Path)
         p_cmp.add_argument("dir_b", type=Path)
         p_cmp.add_argument("--rel-tol", type=float, default=1e-6, help="relative tolerance for numbers (default: 1e-6)")
@@ -368,12 +385,15 @@ else:
             from contextlib import redirect_stdout
             from io import StringIO
             output = StringIO()
+            structure_a, structure_b = report_structure(args.dir_a), report_structure(args.dir_b)
+            if structure_a and structure_b and structure_a != structure_b:
+                parser.error("input folders refer to different structures")
+            structure = structure_b or structure_a or "data"
             with redirect_stdout(output):
-                result = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol)
+                result = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol, args.category)
             report = output.getvalue()
             print(report, end="")
-            structure = "frame" if args.dir_a.name.endswith("_frame") else "bridge"
-            report_path = Path(f"compare_{structure}.txt")
+            report_path = args.dir_b.parent / f"compare_{structure}_{args.category}.txt"
             report_path.write_text(report, encoding="utf-8")
             print(f"Comparison saved to {report_path}")
             sys.exit(result)
