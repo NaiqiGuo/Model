@@ -1,0 +1,34 @@
+{
+  "name": "model-inspect",
+  "displayName": "Model Inspect",
+  "description": "Run inspect.py exports and compare errors, realizations, and training data from a sidebar.",
+  "version": "0.1.5",
+  "publisher": "naiqi-model",
+  "license": "UNLICENSED",
+  "repository": { "type": "git", "url": "https://github.com/NaiqiGuo/Model.git", "directory": "vscode-inspect" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "extensionKind": ["workspace"],
+  "capabilities": { "untrustedWorkspaces": { "supported": false }, "virtualWorkspaces": false },
+  "scripts": { "test": "node --test test.js", "package": "npx @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license --out model-inspect-0.1.5.vsix" },
+  "contributes": {
+    "viewsContainers": { "activitybar": [{ "id": "modelInspect", "title": "Inspect", "icon": "media/inspect.svg" }] },
+    "views": { "modelInspect": [{ "id": "modelInspect.controls", "name": "Inspect" }] },
+    "commands": [
+      { "command": "modelInspect.project", "title": "Inspect: Select Project Folder" },
+      { "command": "modelInspect.python", "title": "Inspect: Select Python Environment" },
+      { "command": "modelInspect.prefix", "title": "Inspect: Set Export Name" },
+      { "command": "modelInspect.build", "title": "Inspect: Build" },
+      { "command": "modelInspect.selectA", "title": "Inspect: Select Directory A" },
+      { "command": "modelInspect.selectB", "title": "Inspect: Select Directory B" },
+      { "command": "modelInspect.errors", "title": "Inspect: Compare Errors" },
+      { "command": "modelInspect.realizations", "title": "Inspect: Compare Realizations" },
+      { "command": "modelInspect.training", "title": "Inspect: Compare Training Data" },
+      { "command": "modelInspect.stop", "title": "Inspect: Stop Running Command", "icon": "$(debug-stop)" }
+    ],
+    "menus": { "view/title": [
+      { "command": "modelInspect.stop", "when": "view == modelInspect.controls && modelInspect.running", "group": "navigation" }
+    ] }
+  }
+}
