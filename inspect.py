@@ -21,7 +21,7 @@ Each file is copied from:
     System ID/<structure>/<quantity>/<source>/System ID Results/errors/<N>.csv
 e.g. System ID/frame/acceleration/elastic/System ID Results/errors/226.csv
 
-heatmaps: copy every heatmap.png from System ID/ into one flat folder,
+build also copies every heatmap.png from System ID/ into one flat folder,
 <name>_heatmaps/. Each file is renamed to include its structure, quantity,
 and source, e.g.
     <name>_heatmaps/frame_acceleration_elastic_heatmap.png
@@ -31,11 +31,13 @@ treated as a difference. Files that differ only by floating-point noise
 are counted but not listed.
 
 Usage:
-    python inspect.py build naiqi
-    python inspect.py compare errors chrystal_bridge naiqi_bridge
-    python inspect.py compare realizations chrystal_bridge naiqi_bridge
-    python inspect.py compare training chrystal_bridge naiqi_bridge
-Reports are saved beside the second input folder as compare_<structure>_<category>.txt.
+    python inspect.py build analysis_export
+    python inspect.py compare errors reference_bridge analysis_export_bridge
+    python inspect.py compare realizations reference_bridge analysis_export_bridge
+    python inspect.py compare training reference_bridge analysis_export_bridge
+    python inspect.py compare environment reference_environment analysis_export_environment
+Environment comparison accepts the two environment folders directly and writes compare_environment.txt.
+Numeric reports are saved beside the second input folder as compare_<structure>_<category>.txt.
 Repeat with frame folders for three frame reports. Neither input path is inferred.
 Exit status for compare: 0 if the folders match within tolerance, 1 otherwise.
 """
@@ -79,7 +81,7 @@ else:
     def build_prefix(name: str) -> str:
         """Use the supplied name directly in the current directory."""
         if not name or not Path(name).name or name in (".", ".."):
-            raise ValueError("Provide an export name such as naiqi")
+            raise ValueError("Provide an export name such as analysis_export")
         return name
 
     def build(name: str) -> int:
@@ -157,11 +159,13 @@ else:
         return root.with_name(root.name + "_environment")
 
 
-    def compare_environments(dir_a, dir_b):
-        print("\nEnvironment (informational; does not affect numeric comparison status):")
+    def compare_environments(dir_a, dir_b, standalone=False):
+        print("\nEnvironment comparison:" if standalone else "\nEnvironment (informational; does not affect numeric comparison status):")
+        print("These snapshots describe the export-time environment, not necessarily the original computation environment.")
+        print("Package versions do not establish identical BLAS/LAPACK builds or source code.")
         snapshots = []
         for label, root in (("A", dir_a), ("B", dir_b)):
-            env = environment_path(root)
+            env = root if standalone else environment_path(root)
             if not all((env / f).is_file() for f in ("environment.json", "packages.txt")):
                 print(f"  {label}: environment information not provided ({env})")
                 snapshots.append(None)
@@ -175,9 +179,11 @@ else:
                 packages[re.sub(r"[-_.]+", "-", name).lower()] = version
             snapshots.append((meta, packages))
         if any(s is None for s in snapshots):
-            return
+            return 1
         (meta_a, a), (meta_b, b) = snapshots
         print(f"  Python version match: {meta_a['python_version'] == meta_b['python_version']}")
+        print(f"  Platform match: {meta_a.get('platform') == meta_b.get('platform')}")
+        print("  Paths and capture timestamps are informational and do not determine match status.")
         different = sorted(k for k in a.keys() & b.keys() if a[k] != b[k])
         print(f"  Packages: {len(different)} version differences, {len(a.keys()-b.keys())} only in A, {len(b.keys()-a.keys())} only in B")
         for k in different:
@@ -186,6 +192,9 @@ else:
             print(f"    only in A: {k}=={a[k]}")
         for k in sorted(b.keys() - a.keys()):
             print(f"    only in B: {k}=={b[k]}")
+        return int(bool(different or a.keys() != b.keys() or
+                        meta_a["python_version"] != meta_b["python_version"] or
+                        meta_a.get("platform") != meta_b.get("platform")))
 
 
     def heatmaps(name: str) -> int:
@@ -359,14 +368,11 @@ else:
         parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
         sub = parser.add_subparsers(dest="command", required=True)
 
-        p_build = sub.add_parser("build", help="export errors, training, systems, and the active Python environment")
-        p_build.add_argument("name", help="export prefix in the current directory, e.g. naiqi")
-
-        p_heat = sub.add_parser("heatmaps", help="copy all System ID heatmaps into <name>_heatmaps/")
-        p_heat.add_argument("name", help="prefix for the output folder, e.g. 'myfoldername' -> myfoldername_heatmaps/")
+        p_build = sub.add_parser("build", help="export errors, training, systems, heatmaps, and the active Python environment")
+        p_build.add_argument("name", help="export prefix in the current directory, e.g. analysis_export")
 
         p_cmp = sub.add_parser("compare", help="summarize differences between two folders")
-        p_cmp.add_argument("category", choices=("errors", "realizations", "training"), help="compare only this data category")
+        p_cmp.add_argument("category", choices=("errors", "realizations", "training", "environment"), help="compare only this data category")
         p_cmp.add_argument("dir_a", type=Path)
         p_cmp.add_argument("dir_b", type=Path)
         p_cmp.add_argument("--rel-tol", type=float, default=1e-6, help="relative tolerance for numbers (default: 1e-6)")
@@ -378,9 +384,6 @@ else:
         if args.command == "build":
             copied = build(args.name)
             print(f"copied {copied} files")
-        elif args.command == "heatmaps":
-            copied = heatmaps(args.name)
-            print(f"copied {copied} files")
         else:
             from contextlib import redirect_stdout
             from io import StringIO
@@ -390,10 +393,17 @@ else:
                 parser.error("input folders refer to different structures")
             structure = structure_b or structure_a or "data"
             with redirect_stdout(output):
-                result = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol, args.category)
+                if args.category == "environment":
+                    for directory in (args.dir_a, args.dir_b):
+                        if not directory.is_dir():
+                            parser.error(f"not a directory: {directory}")
+                    result = compare_environments(args.dir_a, args.dir_b, standalone=True)
+                else:
+                    result = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol, args.category)
             report = output.getvalue()
             print(report, end="")
-            report_path = args.dir_b.parent / f"compare_{structure}_{args.category}.txt"
+            report_name = "compare_environment.txt" if args.category == "environment" else f"compare_{structure}_{args.category}.txt"
+            report_path = args.dir_b.parent / report_name
             report_path.write_text(report, encoding="utf-8")
             print(f"Comparison saved to {report_path}")
             sys.exit(result)

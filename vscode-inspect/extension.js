@@ -7,7 +7,7 @@ const os = require('node:os');
 const { spawn, execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const execute = promisify(execFile);
-const categories = ['errors', 'realizations', 'training'];
+const categories = ['errors', 'realizations', 'training', 'environment'];
 
 function expandHome(value) {
   return value === '~' ? os.homedir() : value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
@@ -57,7 +57,7 @@ function completion(kind, code, output, root) {
   const report = match ? path.resolve(root, match[1].trim()) : undefined;
   if (kind === 'build' && code === 0) return { success: true, message: 'Build completed.' };
   if (kind !== 'build' && report && (code === 0 || code === 1)) {
-    return { success: true, report, message: code === 0 ? `${kind}: match within tolerance.` : `${kind}: differences or missing data found.` };
+    return { success: true, report, message: code === 0 ? (kind === 'environment' ? 'environment: recorded Python version, platform and packages match.' : `${kind}: match within tolerance.`) : `${kind}: differences or missing data found.` };
   }
   const detail = output.trim().split(/\r?\n/).filter(Boolean).slice(-3).join('\n').slice(-1200);
   return { success: false, message: `Command failed (exit ${code}).${detail ? `\n${detail}` : ''}` };

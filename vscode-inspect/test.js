@@ -16,7 +16,7 @@ test('build and all comparison categories preserve exact paths', () => {
   const root = path.join(os.tmpdir(), 'Model with spaces');
   const state = { prefix: 'runs/my run/naiqi', a: '/tmp/Chrystal A', b: '/tmp/Naiqi B' };
   assert.deepEqual(argumentsFor(root, 'build', state), ['-u', path.join(root, 'inspect.py'), 'build', state.prefix]);
-  for (const kind of ['errors', 'realizations', 'training']) {
+  for (const kind of ['errors', 'realizations', 'training', 'environment']) {
     assert.deepEqual(argumentsFor(root, kind, state), ['-u', path.join(root, 'inspect.py'), 'compare', kind, state.a, state.b]);
   }
   assert.throws(() => argumentsFor(root, 'heatmaps', state));
@@ -43,7 +43,7 @@ test('arguments with shell characters reach the process unchanged', () => {
 test('manifest has only requested actions and all runtime files', () => {
   const pkg = require('./package.json');
   assert.equal(pkg.contributes.commands.some(c => /heatmap/i.test(c.command)), false);
-  assert.equal(pkg.contributes.commands.length, 10);
+  assert.equal(pkg.contributes.commands.length, 11);
   assert.ok(fs.existsSync(path.join(__dirname, pkg.main)));
   assert.ok(fs.existsSync(path.join(__dirname, pkg.contributes.viewsContainers.activitybar[0].icon)));
 });
@@ -107,6 +107,31 @@ test('sidebar runs real inspect comparisons and records the generated report', {
     for (const kind of ['errors', 'realizations', 'training']) assert.ok(fs.existsSync(state.reports[kind]));
     assert.equal(commands.has('modelInspect.openErrors'), false);
     assert.equal(commands.has('modelInspect.output'), false);
+    const envA = path.join(root, 'reference_environment');
+    const envB = path.join(root, 'analysis_export_environment');
+    for (const env of [envA, envB]) {
+      fs.mkdirSync(env);
+      fs.writeFileSync(path.join(env, 'environment.json'), JSON.stringify({ python_version: '3.12.0', platform: 'test-platform', python_executable: env, captured_at_utc: env }));
+      fs.writeFileSync(path.join(env, 'packages.txt'), 'numpy==2.2.6\n');
+    }
+    folderSelections.push(envA, envB);
+    await commands.get('modelInspect.selectA')();
+    await commands.get('modelInspect.selectB')();
+    await commands.get('modelInspect.environment')();
+    assert.deepEqual(errors, []);
+    assert.ok(messages.some(s => s.includes('environment: recorded Python version')));
+    assert.equal(state.reports.environment, path.join(root, 'compare_environment.txt'));
+    fs.writeFileSync(path.join(envB, 'packages.txt'), 'numpy==2.1.0\nscipy==1.14.0\n');
+    await commands.get('modelInspect.environment')();
+    assert.ok(messages.some(s => s.includes('environment: differences')));
+    const report = fs.readFileSync(state.reports.environment, 'utf8');
+    assert.match(report, /numpy: A=2.2.6, B=2.1.0/);
+    assert.match(report, /only in B: scipy/);
+    fs.unlinkSync(path.join(envB, 'packages.txt'));
+    await commands.get('modelInspect.environment')();
+    assert.match(fs.readFileSync(state.reports.environment, 'utf8'), /environment information not provided/);
+    assert.deepEqual(errors, []);
+
   } finally {
     Module._load = original;
     fs.rmSync(root, { recursive: true, force: true });

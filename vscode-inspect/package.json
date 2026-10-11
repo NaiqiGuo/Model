@@ -2,7 +2,7 @@
   "name": "model-inspect",
   "displayName": "Model Inspect",
   "description": "Run inspect.py exports and compare errors, realizations, and training data from a sidebar.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "naiqi-model",
   "license": "UNLICENSED",
   "repository": { "type": "git", "url": "https://github.com/NaiqiGuo/Model.git", "directory": "vscode-inspect" },
@@ -11,7 +11,7 @@
   "main": "./extension.js",
   "extensionKind": ["workspace"],
   "capabilities": { "untrustedWorkspaces": { "supported": false }, "virtualWorkspaces": false },
-  "scripts": { "test": "node --test test.js", "package": "npx @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license --out model-inspect-0.1.5.vsix" },
+  "scripts": { "test": "node --test test.js", "package": "npx @vscode/vsce package --no-dependencies --allow-missing-repository --skip-license --out model-inspect-0.1.6.vsix" },
   "contributes": {
     "viewsContainers": { "activitybar": [{ "id": "modelInspect", "title": "Inspect", "icon": "media/inspect.svg" }] },
     "views": { "modelInspect": [{ "id": "modelInspect.controls", "name": "Inspect" }] },
@@ -24,6 +24,7 @@
       { "command": "modelInspect.selectB", "title": "Inspect: Select Directory B" },
       { "command": "modelInspect.errors", "title": "Inspect: Compare Errors" },
       { "command": "modelInspect.realizations", "title": "Inspect: Compare Realizations" },
+      { "command": "modelInspect.environment", "title": "Inspect: Compare Environment" },
       { "command": "modelInspect.training", "title": "Inspect: Compare Training Data" },
       { "command": "modelInspect.stop", "title": "Inspect: Stop Running Command", "icon": "$(debug-stop)" }
     ],

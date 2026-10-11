@@ -1,13 +1,13 @@
 # Model Inspect
 
-A VS Code sidebar for this repository's `inspect.py`. Includes Build, three
+A VS Code sidebar for this repository's `inspect.py`. Includes Build, four
 comparison commands and Python environment selection. No Heatmaps or Reports section.
 
 ## Installation
 
 1. In VS Code, open Extensions with **Cmd+Shift+X** (Windows/Linux: **Ctrl+Shift+X**).
 2. Select **… → Install from VSIX…**.
-3. Choose `vscode-inspect/model-inspect-0.1.5.vsix`.
+3. Choose `vscode-inspect/model-inspect-0.1.6.vsix`.
 4. Open the Model project and click **Inspect** in the Activity Bar.
 
 If upgrading from 0.1.0, install this newer VSIX and reload VS Code if prompted.
@@ -31,6 +31,10 @@ The workspace must be trusted before running scripts.
 - **Directory A / B**: Select the exact export folders to compare, such as
   `reference_bridge` and `analysis_export_bridge`. There is no latest-run lookup.
 - **Compare errors / realizations / training**: Run the selected category.
+- **Compare environment**: Set A/B to the two `_environment` folders. Compares
+  Python version, platform and package versions; paths and capture times are
+  informational. Writes `compare_environment.txt` beside B. These are export-time
+  snapshots, not proof of the original computation environment or identical BLAS builds.
 To compare frame data, select the corresponding frame folders. Generated reports
 remain on disk; the sidebar does not include report links.
 
