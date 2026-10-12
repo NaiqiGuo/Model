@@ -62,46 +62,67 @@ A suite of structures, their vibration responses to strong ground motion events,
 
 ### Export and compare results
 
-After generating System ID results, run:
+You can also run Build and the four comparisons from the VS Code **Inspect**
+sidebar. Install `vscode-inspect/model-inspect-0.1.6.vsix` using Extensions →
+**… → Install from VSIX…**, then select your Python interpreter and input folders.
+See [the extension guide](vscode-inspect/README.md) for setup and usage.
+
+Export all three categories and the active Python environment with one command:
 
 ```bash
 python inspect.py build naiqi
-python inspect.py compare chrystal_bridge runs/<timestamp>/naiqi_bridge
-python inspect.py compare chrystal_frame runs/<timestamp>/naiqi_frame
-python inspect.py heatmaps runs/<timestamp>/naiqi
 ```
 
-Replace `<timestamp>` above with the directory printed by `build`; do not type
-the angle brackets literally. A bare name such as `naiqi` creates a fresh
-`runs/<timestamp>/` on every build. Explicit path prefixes are used as supplied.
-`compare` uses exactly its two input paths and never searches for a latest run.
-
-`build` preserves the existing error CSV names and layout in `naiqi_bridge/`
-and `naiqi_frame/`. Within each structure/quantity/source folder it also adds
+The supplied prefix determines the output location. To save in a particular run,
+use `python inspect.py build runs/your_run/naiqi` instead. Existing error CSV names
+are preserved. Each structure/quantity/source folder additionally contains
 `training/{dt,time,ground,structure}/<event>.csv` and
-`systems/<event>/{A,B,C,D}.csv`. The matrices are the saved identification
-results, before prediction-time stabilization. Matrix differences can reflect
-different state coordinates rather than different input/output behavior.
+`systems/<event>/{A,B,C,D}.csv`. Environment records go in
+`<prefix>_environment/packages.txt` and `environment.json`.
 
-`naiqi_environment/packages.txt` lists all installed Python packages in the
-interpreter executing `build`; `environment.json` records the interpreter,
-platform, and Conda/virtual environment paths. Comparison automatically locates
-these sibling environment folders and reports environment differences separately.
-They do not affect the numerical comparison exit status. Old error-only exports
-remain readable; missing training/system files are reported, and absent
-environment snapshots are explicitly noted.
+Compare one category per command, using the exact input directories you want:
 
-Comparison checks numeric array shapes, non-finite values, and symmetric relative
-and absolute tolerances. It prints overall and per-category counts, plus detailed
-differences. Reports go to the terminal unless redirected. Required source files
-must exist for all configured events; an incomplete build exits with an error.
+```bash
+python inspect.py compare errors chrystal_bridge runs/your_run/naiqi_bridge
+python inspect.py compare realizations chrystal_bridge runs/your_run/naiqi_bridge
+python inspect.py compare training chrystal_bridge runs/your_run/naiqi_bridge
+python inspect.py compare errors chrystal_frame runs/your_run/naiqi_frame
+python inspect.py compare realizations chrystal_frame runs/your_run/naiqi_frame
+python inspect.py compare training chrystal_frame runs/your_run/naiqi_frame
+python inspect.py compare environment reference_environment analysis_export_environment
+```
 
-`run_full_comparison.sh` retains its timestamped `runs/<run>/` layout, logs,
-version records, heatmaps, and comparison reports. It exports the additional
-data there using `build "$RUN_DIR/naiqi"`. Previous run directories are untouched.
-Repeated bare-name builds create separate run directories. Reusing an explicit
-path prefix updates same-name files there without deleting other files. `Modeling/` and `System ID/` remain shared working directories.
-The inspection CLI is contained in `inspect.py` (renamed from `inspect_errors.py`).
+Replace `your_run` with your actual directory name. No latest-run lookup is used.
+Each command prints its result and saves one report beside its second input
+folder: `compare_bridge_errors.txt`, `compare_bridge_realizations.txt`,
+`compare_bridge_training.txt`, and the corresponding three frame files.
+The standalone environment comparison writes `compare_environment.txt` beside
+the second environment folder. It compares recorded Python version, platform
+and package versions, ignoring paths and capture timestamps for match status.
+These snapshots describe the export environment, not necessarily the original
+computation environment; matching versions do not verify identical BLAS builds.
+Rerunning the same category in the same output location updates that report.
+Old `compare_bridge.txt` and `compare_frame.txt` files are left untouched.
+
+`realizations` compares the existing `systems/` CSV exports; their directory
+names do not change. Matrices are compared before prediction-time stabilization.
+Different state coordinates can yield different matrices with equivalent
+input/output behavior. Numeric comparisons check shapes, non-finite values, and
+symmetric relative/absolute tolerances. Missing data is reported; a category
+absent from both folders is not considered a successful match. Exit status is
+0 for a match and 1 for differences or missing data.
+
+Each report includes environment information when available. Package differences
+are informational and do not affect the numeric comparison exit status. Required
+source data must exist for all configured events during export. Files are not
+deleted, but reusing the same explicit export prefix updates same-name files.
+
+`build` also collects heatmaps into `<name>_heatmaps/`; no separate command is needed.
+
+The current `run_full_comparison.sh` runs data generation, system identification,
+and prediction, saving logs in its timestamped run directory. Export and compare
+with the commands above afterward. `Modeling/` and `System ID/` remain shared
+working directories. All inspection logic is in `inspect.py`.
 
 Get data for all four configurations (frame/bridge × inelastic/elastic):
 
@@ -294,7 +315,6 @@ Level | Name      | Quantities
 #### Method 2
 1. Set up a xara-friendly environment: https://xara.so/user/guides/compile.html
 2. Install requirements: `pip install -r requirements.txt`
-
 
 
 
