@@ -1,6 +1,6 @@
 """Export System ID data and compare two such exports.
 
-Four categories are covered:
+Five categories are covered:
     errors        prediction error CSVs (one number per line)
     heatmaps      prediction error heatmaps (one image per structure/quantity/source)
     training      per-event training data (dt, time, ground, structure)
