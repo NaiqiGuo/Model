@@ -1,44 +1,32 @@
-"""Export and compare prediction errors, training data, systems, and environments.
+"""Export System ID data and compare two such exports.
 
-build: saves output folders directly in the current directory.
-An explicit path prefix is used exactly as supplied. 
-The actual output paths are printed. Compare uses only the supplied directories,
-without searching for a latest run.
+Four categories are covered:
+    errors        prediction error CSVs (one number per line)
+    heatmaps      prediction error heatmaps (one image per structure/quantity/source)
+    training      per-event training data (dt, time, ground, structure)
+    realizations  identified state-space matrices (A, B, C, D), as CSVs
+    environment   Python version, platform, and installed packages at
+                  build time
 
-build: preserve error files in <name>_bridge/ and <name>_frame/; add training/
-and systems/<event>/{A,B,C,D}.csv alongside them. Record all installed Python
-packages and interpreter metadata in <name>_environment/. Systems are raw
-identified matrices before prediction-time stabilization. Existing files are
-not deleted. Missing required source data aborts build rather than silently
-creating an incomplete snapshot.
+build:   pick one category and export the corresponding data into
+         <name>/bridge/errors/, <name>/frame/errors/ for errors
+         <name>/bridge/training/, <name>/frame/training/ for training
+         <name>/bridge/realizations/, <name>/frame/realizations/ for realizations
+         <name>/heatmaps/ for heatmaps
+         <name>/environment/ for environment
 
-The output follows this layout:
-    <name>_<structure>/<structure>/<quantity>/<source>/
-        <structure>_<source>_<quantity>_event_<N>.csv
-e.g. chrystal_frame/frame/acceleration/elastic/frame_elastic_acceleration_event_226.csv
-
-Each file is copied from:
-    System ID/<structure>/<quantity>/<source>/System ID Results/errors/<N>.csv
-e.g. System ID/frame/acceleration/elastic/System ID Results/errors/226.csv
-
-build also copies every heatmap.png from System ID/ into one flat folder,
-<name>_heatmaps/. Each file is renamed to include its structure, quantity,
-and source, e.g.
-    <name>_heatmaps/frame_acceleration_elastic_heatmap.png
-
-compare: summarize how two folders differ. Floating-point noise is not
-treated as a difference. Files that differ only by floating-point noise
-are counted but not listed.
+compare: pick one category and summarize the differences between two
+         build exports. Numbers are compared with a tolerance, so
+         floating-point noise is not reported as a difference.
 
 Usage:
-    python inspect.py build analysis_export
-    python inspect.py compare errors reference_bridge analysis_export_bridge
-    python inspect.py compare realizations reference_bridge analysis_export_bridge
-    python inspect.py compare training reference_bridge analysis_export_bridge
-    python inspect.py compare environment reference_environment analysis_export_environment
-Environment comparison accepts the two environment folders directly and writes compare_environment.txt.
-Numeric reports are saved beside the second input folder as compare_<structure>_<category>.txt.
-Repeat with frame folders for three frame reports. Neither input path is inferred.
+    python inspect_sid.py build <category> <name>
+    python inspect_sid.py compare <category> <folder1> <folder2> [--rel-tol <float>] [--abs-tol <float>] [--silent] [--to-file <path>]
+
+Examples:
+    python inspect_sid.py build realizations my_export
+    python inspect_sid.py compare errors reference/bridge/errors my_export/bridge/errors --rel-tol 1e-3 --to-file comparison.txt
+
 Exit status for compare: 0 if the folders match within tolerance, 1 otherwise.
 """
 
