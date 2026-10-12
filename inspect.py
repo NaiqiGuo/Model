@@ -1,19 +1,16 @@
 """Export System ID data and compare two such exports.
 
-Five categories are covered:
+Four categories are covered:
     errors        prediction error CSVs (one number per line)
     heatmaps      prediction error heatmaps (one image per structure/quantity/source)
     training      per-event training data (dt, time, ground, structure)
     realizations  identified state-space matrices (A, B, C, D), as CSVs
-    environment   Python version, platform, and installed packages at
-                  build time
 
 build:   pick one category and export the corresponding data into
          <name>/bridge/errors/, <name>/frame/errors/ for errors
          <name>/bridge/training/, <name>/frame/training/ for training
          <name>/bridge/realizations/, <name>/frame/realizations/ for realizations
          <name>/heatmaps/ for heatmaps
-         <name>/environment/ for environment
 
 compare: pick one category and summarize the differences between two
          build exports. Numbers are compared with a tolerance, so
