@@ -6,15 +6,17 @@ Four categories are covered:
     training      per-event training data (dt, time, ground, structure)
     realizations  identified state-space matrices (A, B, C, D), as CSVs
 
-build:   pick one category and export the corresponding data into
-         <name>/bridge/errors/, <name>/frame/errors/ for errors
-         <name>/bridge/training/, <name>/frame/training/ for training
-         <name>/bridge/realizations/, <name>/frame/realizations/ for realizations
-         <name>/heatmaps/ for heatmaps
+build:   pick one category and export only that data, retaining the layout:
+         <name>_<structure>/<structure>/<quantity>/<source>/ for errors
+         <name>_<structure>/<structure>/<quantity>/<source>/training/ for training
+         <name>_<structure>/<structure>/<quantity>/<source>/systems/ for realizations
+         <name>_heatmaps/ for heatmaps
 
 compare: pick one category and summarize the differences between two
          build exports. Numbers are compared with a tolerance, so
          floating-point noise is not reported as a difference.
+         --silent suppresses terminal output; --to-file saves the report
+         to the specified path. Without --to-file, no report file is saved.
 
 Usage:
     python inspect_sid.py build <category> <name>
@@ -22,376 +24,264 @@ Usage:
 
 Examples:
     python inspect_sid.py build realizations my_export
-    python inspect_sid.py compare errors reference/bridge/errors my_export/bridge/errors --rel-tol 1e-3 --to-file comparison.txt
+    python inspect_sid.py compare errors reference_bridge my_export_bridge --rel-tol 1e-3
 
-Exit status for compare: 0 if the folders match within tolerance, 1 otherwise.
 """
 
 
-if __name__ != "__main__":
-    import os as _os
-    _stdlib_inspect = _os.path.join(_os.path.dirname(_os.__file__), "inspect.py")
-    with open(_stdlib_inspect, "rb") as _source:
-        exec(compile(_source.read(), _stdlib_inspect, "exec"), globals())
-else:
+import argparse
+import filecmp
+import shutil
+import pickle
+from pathlib import Path
+
+SID_DIR = Path("System ID")
+
+STRUCTURES = {
+    "bridge": range(1, 23),      # events 1-22
+    "frame": range(226, 248),    # events 226-247
+}
+QUANTITIES = ["acceleration", "displacement"]
+SOURCES = ["elastic", "field", "inelastic"]
+
+JUNK_NAMES = {".DS_Store"}
 
 
-    import argparse
-    import filecmp
-    import math
-    import re
-    import shutil
-    import sys
-    import json
-    import os
-    import pickle
-    import platform
-    import subprocess
-    from datetime import datetime, timezone
-    from pathlib import Path
+def build_prefix(name: str) -> str:
+    """Use the supplied name directly in the current directory."""
+    if not name or not Path(name).name or name in (".", ".."):
+        raise ValueError("Provide an export name such as analysis_export")
+    return name
 
-    SID_DIR = Path("System ID")
-
-    STRUCTURES = {
-        "bridge": range(1, 23),      # events 1-22
-        "frame": range(226, 248),    # events 226-247
-    }
-    QUANTITIES = ["acceleration", "displacement"]
-    SOURCES = ["elastic", "field", "inelastic"]
-
-    JUNK_NAMES = {".DS_Store"}
-    TOKEN_SPLIT = re.compile(r"[,\s]+")
+def export_groups(name: str):
+    """Yield common source and destination paths without creating directories."""
+    name = build_prefix(name)
+    print(f"Export prefix: {name}")
+    for structure, events in STRUCTURES.items():
+        out_root = Path(f"{name}_{structure}")
+        for quantity in QUANTITIES:
+            for source in SOURCES:
+                source_dir = SID_DIR / structure / quantity / source
+                out_dir = out_root / structure / quantity / source
+                yield structure, quantity, source, events, source_dir, out_dir
+        print(f"{out_root}: done")
 
 
-    def build_prefix(name: str) -> str:
-        """Use the supplied name directly in the current directory."""
-        if not name or not Path(name).name or name in (".", ".."):
-            raise ValueError("Provide an export name such as analysis_export")
-        return name
-
-    def build(name: str) -> int:
-        import numpy as np
-
-        name = build_prefix(name)
-        print(f"Export prefix: {name}")
-        save_environment(name)
-        copied = 0
-        for structure, events in STRUCTURES.items():
-            out_root = Path(f"{name}_{structure}")
-            for quantity in QUANTITIES:
-                for source in SOURCES:
-                    out_dir = out_root / structure / quantity / source
-                    out_dir.mkdir(parents=True, exist_ok=True)
-                    errors_dir = SID_DIR / structure / quantity / source / "System ID Results" / "errors"
-                    for n in events:
-                        src = errors_dir / f"{n}.csv"
-                        dst = out_dir / f"{structure}_{source}_{quantity}_event_{n}.csv"
-                        shutil.copyfile(src, dst)
-                        copied += 1
-                        for item in ("dt", "time", "ground", "structure"):
-                            training_src = SID_DIR / structure / quantity / source / "System ID Training Data" / item / f"{n}.csv"
-                            training_dst = out_dir / "training" / item / f"{n}.csv"
-                            training_dst.parent.mkdir(parents=True, exist_ok=True)
-                            shutil.copyfile(training_src, training_dst)
-                            copied += 1
-                        system_src = errors_dir.parent / "system realization" / f"{n}.pkl"
-                        # Only load the local pipeline's trusted pickle artifacts.
-                        with system_src.open("rb") as stream:
-                            matrices = pickle.load(stream)
-                        if len(matrices) != 4:
-                            raise ValueError(f"Expected A, B, C, D in {system_src}")
-                        system_dst = out_dir / "systems" / str(n)
-                        system_dst.mkdir(parents=True, exist_ok=True)
-                        for label, matrix in zip("ABCD", matrices):
-                            matrix = np.asarray(matrix)
-                            if matrix.ndim != 2:
-                                raise ValueError(f"{system_src}: {label} must be a matrix")
-                            np.savetxt(system_dst / f"{label}.csv", matrix, delimiter=",")
-                            copied += 1
-            print(f"{out_root}: done")
-        copied += heatmaps(name)
-        return copied
-
-
-    def save_environment(name):
-        """Record the interpreter executing build, rather than an unrelated pip."""
-        out = Path(f"{name}_environment")
-        packages = subprocess.run(
-            [sys.executable, "-m", "pip", "list", "--format=json", "--disable-pip-version-check"],
-            check=True, capture_output=True, text=True,
-        )
-        installed = sorted(json.loads(packages.stdout), key=lambda p: p["name"].lower())
-        out.mkdir(parents=True, exist_ok=True)
-        (out / "packages.txt").write_text(
-            "".join(f"{p['name']}=={p['version']}\n" for p in installed), encoding="utf-8"
-        )
-        metadata = {
-            "python_executable": sys.executable, "python_version": platform.python_version(),
-            "platform": platform.platform(), "prefix": sys.prefix, "base_prefix": sys.base_prefix,
-            "conda_prefix": os.environ.get("CONDA_PREFIX"), "virtual_env": os.environ.get("VIRTUAL_ENV"),
-            "captured_at_utc": datetime.now(timezone.utc).isoformat(),
-            "package_count": len(installed),
-            "systems_note": "Raw identified A/B/C/D, before prediction-time stabilization. Different state coordinates can produce different matrices with equivalent input/output behavior.",
-        }
-        (out / "environment.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
-        print(f"{out}: recorded {len(installed)} Python packages")
-
-
-    def environment_path(root):
-        for suffix in ("_bridge", "_frame"):
-            if root.name.endswith(suffix):
-                return root.with_name(root.name[:-len(suffix)] + "_environment")
-        return root.with_name(root.name + "_environment")
-
-
-    def compare_environments(dir_a, dir_b, standalone=False):
-        print("\nEnvironment comparison:" if standalone else "\nEnvironment (informational; does not affect numeric comparison status):")
-        print("These snapshots describe the export-time environment, not necessarily the original computation environment.")
-        print("Package versions do not establish identical BLAS/LAPACK builds or source code.")
-        snapshots = []
-        for label, root in (("A", dir_a), ("B", dir_b)):
-            env = root if standalone else environment_path(root)
-            if not all((env / f).is_file() for f in ("environment.json", "packages.txt")):
-                print(f"  {label}: environment information not provided ({env})")
-                snapshots.append(None)
-                continue
-            meta = json.loads((env / "environment.json").read_text())
-            print(f"  {label}: Python {meta['python_version']}; {meta['python_executable']}")
-            print(f"  {label}: platform={meta.get('platform')}; conda={meta.get('conda_prefix')}; venv={meta.get('virtual_env')}")
-            packages = {}
-            for line in (env / "packages.txt").read_text().splitlines():
-                name, version = line.split("==", 1)
-                packages[re.sub(r"[-_.]+", "-", name).lower()] = version
-            snapshots.append((meta, packages))
-        if any(s is None for s in snapshots):
-            return 1
-        (meta_a, a), (meta_b, b) = snapshots
-        print(f"  Python version match: {meta_a['python_version'] == meta_b['python_version']}")
-        print(f"  Platform match: {meta_a.get('platform') == meta_b.get('platform')}")
-        print("  Paths and capture timestamps are informational and do not determine match status.")
-        different = sorted(k for k in a.keys() & b.keys() if a[k] != b[k])
-        print(f"  Packages: {len(different)} version differences, {len(a.keys()-b.keys())} only in A, {len(b.keys()-a.keys())} only in B")
-        for k in different:
-            print(f"    {k}: A={a[k]}, B={b[k]}")
-        for k in sorted(a.keys() - b.keys()):
-            print(f"    only in A: {k}=={a[k]}")
-        for k in sorted(b.keys() - a.keys()):
-            print(f"    only in B: {k}=={b[k]}")
-        return int(bool(different or a.keys() != b.keys() or
-                        meta_a["python_version"] != meta_b["python_version"] or
-                        meta_a.get("platform") != meta_b.get("platform")))
-
-
-    def heatmaps(name: str) -> int:
-        out_dir = Path(f"{name}_heatmaps")
+def export_errors(name: str) -> int:
+    """Copy prediction error CSVs without changing their contents."""
+    copied = 0
+    for structure, quantity, source, events, source_dir, out_dir in export_groups(name):
         out_dir.mkdir(parents=True, exist_ok=True)
-        copied = 0
-        for structure in STRUCTURES:
-            for quantity in QUANTITIES:
-                for source in SOURCES:
-                    results_dir = SID_DIR / structure / quantity / source / "System ID Results"
-                    src = results_dir / "heatmap.png"
-                    dst = out_dir / f"{structure}_{quantity}_{source}_heatmap.png"
-                    shutil.copyfile(src, dst)
-                    copied += 1
-        print(f"{out_dir}: done")
-        return copied
+        for n in events:
+            src = source_dir / "System ID Results" / "errors" / f"{n}.csv"
+            dst = out_dir / f"{structure}_{source}_{quantity}_event_{n}.csv"
+            shutil.copyfile(src, dst)
+            copied += 1
+    return copied
 
 
-    def is_junk(path: Path) -> bool:
-        """macOS metadata: .DS_Store, and AppleDouble ._* files / __MACOSX/ folders."""
-        return path.name in JUNK_NAMES or path.name.startswith("._") or "__MACOSX" in path.parts
+def export_training(name: str) -> int:
+    """Copy only per-event dt, time, ground, and structure CSVs."""
+    copied = 0
+    for _, _, _, events, source_dir, out_dir in export_groups(name):
+        for n in events:
+            for item in ("dt", "time", "ground", "structure"):
+                src = source_dir / "System ID Training Data" / item / f"{n}.csv"
+                dst = out_dir / "training" / item / f"{n}.csv"
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(src, dst)
+                copied += 1
+    return copied
 
 
-    def list_files(root: Path) -> dict[str, Path]:
-        return {
-            str(p.relative_to(root)): p
-            for p in root.rglob("*")
-            if p.is_file() and not is_junk(p.relative_to(root))
-        }
+def export_realizations(name: str) -> int:
+    """Export raw identified A/B/C/D matrices using the existing CSV format."""
+    import numpy as np
+
+    copied = 0
+    for _, _, _, events, source_dir, out_dir in export_groups(name):
+        for n in events:
+            src = source_dir / "System ID Results" / "system realization" / f"{n}.pkl"
+            # Only load the local pipeline's trusted pickle artifacts.
+            with src.open("rb") as stream:
+                matrices = pickle.load(stream)
+            if len(matrices) != 4:
+                raise ValueError(f"Expected A, B, C, D in {src}")
+            dst = out_dir / "systems" / str(n)
+            dst.mkdir(parents=True, exist_ok=True)
+            for label, matrix in zip("ABCD", matrices):
+                matrix = np.asarray(matrix)
+                if matrix.ndim != 2:
+                    raise ValueError(f"{src}: {label} must be a matrix")
+                np.savetxt(dst / f"{label}.csv", matrix, delimiter=",")
+                copied += 1
+    return copied
 
 
-    def compare_values(a_text: str, b_text: str, rel_tol: float, abs_tol: float) -> tuple[int, float | None]:
-        """Return (number of values that differ beyond tolerance, largest absolute difference).
-
-        Tokens are compared as floats when both sides parse as numbers, otherwise as strings.
-        A token-count mismatch counts every surplus token as a difference.
-        """
-        a_tok = [t for t in TOKEN_SPLIT.split(a_text.strip()) if t]
-        b_tok = [t for t in TOKEN_SPLIT.split(b_text.strip()) if t]
-        n_bad, max_abs = abs(len(a_tok) - len(b_tok)), None
-        for x, y in zip(a_tok, b_tok):
-            try:
-                fx, fy = float(x), float(y)
-            except ValueError:
-                if x != y:
-                    n_bad += 1
-                continue
-            if not math.isclose(fx, fy, rel_tol=rel_tol, abs_tol=abs_tol):
-                n_bad += 1
-                diff = abs(fx - fy)
-                max_abs = diff if max_abs is None else max(max_abs, diff)
-        return n_bad, max_abs
+def export_heatmaps(name: str) -> int:
+    """Copy only the heatmap image for each structure/quantity/source."""
+    name = build_prefix(name)
+    print(f"Export prefix: {name}")
+    out_dir = Path(f"{name}_heatmaps")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for structure in STRUCTURES:
+        for quantity in QUANTITIES:
+            for source in SOURCES:
+                results_dir = SID_DIR / structure / quantity / source / "System ID Results"
+                src = results_dir / "heatmap.png"
+                dst = out_dir / f"{structure}_{quantity}_{source}_heatmap.png"
+                shutil.copyfile(src, dst)
+                copied += 1
+    print(f"{out_dir}: done")
+    return copied
 
 
-    def category(rel):
-        parts = Path(rel).parts
-        if Path(rel).suffix.lower() != ".csv":
-            return None
-        return "training" if "training" in parts else "realizations" if "systems" in parts else "errors"
+def is_junk(path: Path) -> bool:
+    """macOS metadata: .DS_Store, and AppleDouble ._* files / __MACOSX/ folders."""
+    return path.name in JUNK_NAMES or path.name.startswith("._") or "__MACOSX" in path.parts
 
 
-    def compare_arrays(path_a, path_b, rel_tol, abs_tol):
-        """Compare numeric CSV shape and values, using symmetric math.isclose tolerance."""
-        import numpy as np
-
-        arrays = []
-        for path in (path_a, path_b):
-            with path.open() as stream:
-                first = stream.readline()
-            arrays.append(np.loadtxt(path, delimiter="," if "," in first else None, ndmin=2, dtype=complex))
-        a, b = arrays
-        if a.shape != b.shape:
-            return True, f"shape mismatch: A={a.shape}, B={b.shape}"
-        invalid_a, invalid_b = int(np.count_nonzero(~np.isfinite(a))), int(np.count_nonzero(~np.isfinite(b)))
-        if invalid_a or invalid_b:
-            return True, f"non-finite values: A={invalid_a}, B={invalid_b}; shape={a.shape}"
-        delta = np.abs(a - b)
-        threshold = np.maximum(abs_tol, rel_tol * np.maximum(np.abs(a), np.abs(b)))
-        n_bad = int(np.count_nonzero(delta > threshold))
-        if not n_bad:
-            return False, ""
-        index = np.unravel_index(np.argmax(delta), delta.shape)
-        denominator = np.linalg.norm(a)
-        relative = f"{np.linalg.norm(a-b)/denominator:.6g}" if denominator else "undefined (A norm is zero)"
-        return True, (f"{n_bad}/{a.size} values differ ({100*n_bad/a.size:.3g}%); shape={a.shape}; "
-                      f"max |diff|={delta[index]:.6g} at row={index[0]}, col={index[1]} (zero-based); relative norm vs A={relative}")
+def list_files(root: Path) -> dict[str, Path]:
+    return {
+        str(p.relative_to(root)): p
+        for p in root.rglob("*")
+        if p.is_file() and not is_junk(p.relative_to(root))
+    }
 
 
-    def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: str) -> int:
-        for d in (dir_a, dir_b):
-            if not d.is_dir():
-                sys.exit(f"error: not a directory: {d}")
-
-        files_a, files_b = (
-            {rel: path for rel, path in list_files(root).items() if category(rel) == selected}
-            for root in (dir_a, dir_b)
-        )
-        only_a = sorted(files_a.keys() - files_b.keys())
-        only_b = sorted(files_b.keys() - files_a.keys())
-        common = sorted(files_a.keys() & files_b.keys())
-
-        identical, noise_only, real = 0, 0, []
-        counts = {selected: {s: 0 for s in ("identical", "within tolerance", "different", "only A", "only B")}}
-        for rel in common:
-            group = counts[category(rel)]
-            if files_a[rel].suffix.lower() == ".csv":
-                try:
-                    different, detail = compare_arrays(files_a[rel], files_b[rel], rel_tol, abs_tol)
-                except (ValueError, OSError) as exc:
-                    different, detail = True, f"could not read numeric CSV: {exc}"
-            else:
-                n_bad, max_abs = compare_values(files_a[rel].read_text(errors="replace"), files_b[rel].read_text(errors="replace"), rel_tol, abs_tol)
-                different, detail = bool(n_bad), f"{n_bad} values differ; max |diff|={max_abs}"
-            if different:
-                real.append((rel, detail))
-                group["different"] += 1
-            elif filecmp.cmp(files_a[rel], files_b[rel], shallow=False):
-                identical += 1
-                group["identical"] += 1
-            else:
-                noise_only += 1
-                group["within tolerance"] += 1
-        for rel in only_a:
-            counts[category(rel)]["only A"] += 1
-        for rel in only_b:
-            counts[category(rel)]["only B"] += 1
-
-        print(f"A: {dir_a}")
-        print(f"B: {dir_b}")
-        print(f"Comparison: {selected}")
-        print(f"tolerance: rel_tol={rel_tol:g}, abs_tol={abs_tol:g}")
-        print()
-        print(f"files in both:           {len(common)}")
-        print(f"  identical:             {identical}")
-        print(f"  float noise only:      {noise_only}")
-        print(f"  real differences:      {len(real)}")
-        print(f"only in A:               {len(only_a)}")
-        print(f"only in B:               {len(only_b)}")
-        print("\nBy category:")
-        for name, stats in counts.items():
-            print(f"  {name}: " + ", ".join(f"{key}={value}" for key, value in stats.items()))
-            if not any(stats.values()):
-                print("    No data provided in either folder; not compared.")
-        if selected == "realizations":
-            print("  realizations: raw A/B/C/D before prediction stabilization; matrix differences do not alone establish different input/output behavior.")
-
-        if real:
-            print("\nReal differences:")
-            for rel, detail in real:
-                print(f"  {rel}: {detail}")
-        if only_a:
-            print("\nOnly in A:")
-            for rel in only_a:
-                print(f"  {rel}")
-        if only_b:
-            print("\nOnly in B:")
-            for rel in only_b:
-                print(f"  {rel}")
-
-        compare_environments(dir_a, dir_b)
-        return 0 if common and not (real or only_a or only_b) else 1
+def category(rel):
+    parts = Path(rel).parts
+    if Path(rel).suffix.lower() != ".csv":
+        return None
+    return "training" if "training" in parts else "realizations" if "systems" in parts else "errors"
 
 
-    def report_structure(root):
-        """Identify a structure from an explicitly supplied export folder."""
-        matches = [s for s in STRUCTURES if root.name == s or root.name.endswith(f"_{s}") or (root / s).is_dir()]
-        return matches[0] if len(matches) == 1 else None
+def compare_arrays(path_a, path_b, rel_tol, abs_tol, delimiter=None):
+    """Compare numeric CSV shape and values, using symmetric math.isclose tolerance."""
+    import numpy as np
+
+    a, b = (np.loadtxt(path, delimiter=delimiter, ndmin=2) for path in (path_a, path_b))
+    if a.shape != b.shape:
+        return True, f"shape mismatch: A={a.shape}, B={b.shape}"
+    invalid_a, invalid_b = int(np.count_nonzero(~np.isfinite(a))), int(np.count_nonzero(~np.isfinite(b)))
+    if invalid_a or invalid_b:
+        return True, f"non-finite values: A={invalid_a}, B={invalid_b}; shape={a.shape}"
+    delta = np.abs(a - b)
+    threshold = np.maximum(abs_tol, rel_tol * np.maximum(np.abs(a), np.abs(b)))
+    n_bad = int(np.count_nonzero(delta > threshold))
+    if not n_bad:
+        return False, ""
+    index = np.unravel_index(np.argmax(delta), delta.shape)
+    denominator = np.linalg.norm(a)
+    relative = f"{np.linalg.norm(a-b)/denominator:.6g}" if denominator else "undefined (A norm is zero)"
+    return True, (f"{n_bad}/{a.size} values differ ({100*n_bad/a.size:.3g}%); shape={a.shape}; "
+                  f"max |diff|={delta[index]:.6g} at row={index[0]}, col={index[1]} (zero-based); relative norm vs A={relative}")
 
 
-    def main() -> None:
-        parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-        sub = parser.add_subparsers(dest="command", required=True)
+def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: str) -> str:
+    """Return report text without printing or writing files."""
+    for d in (dir_a, dir_b):
+        if not d.is_dir():
+            raise ValueError(f"not a directory: {d}")
 
-        p_build = sub.add_parser("build", help="export errors, training, systems, heatmaps, and the active Python environment")
-        p_build.add_argument("name", help="export prefix in the current directory, e.g. analysis_export")
+    files_a, files_b = (
+        {rel: path for rel, path in list_files(root).items() if category(rel) == selected}
+        for root in (dir_a, dir_b)
+    )
+    only_a = sorted(files_a.keys() - files_b.keys())
+    only_b = sorted(files_b.keys() - files_a.keys())
+    common = sorted(files_a.keys() & files_b.keys())
 
-        p_cmp = sub.add_parser("compare", help="summarize differences between two folders")
-        p_cmp.add_argument("category", choices=("errors", "realizations", "training", "environment"), help="compare only this data category")
-        p_cmp.add_argument("dir_a", type=Path)
-        p_cmp.add_argument("dir_b", type=Path)
-        p_cmp.add_argument("--rel-tol", type=float, default=1e-6, help="relative tolerance for numbers (default: 1e-6)")
-        p_cmp.add_argument("--abs-tol", type=float, default=1e-9, help="absolute tolerance for numbers (default: 1e-9)")
-
-        args = parser.parse_args()
-        if args.command == "compare" and (not math.isfinite(args.rel_tol) or not math.isfinite(args.abs_tol) or args.rel_tol < 0 or args.abs_tol < 0):
-            parser.error("tolerances must be finite and nonnegative")
-        if args.command == "build":
-            copied = build(args.name)
-            print(f"copied {copied} files")
+    identical, noise_only, real = 0, 0, []
+    stats = {s: 0 for s in ("identical", "within tolerance", "different", "only A", "only B")}
+    # Realization exports are comma-separated; training and errors use whitespace.
+    delimiter = "," if selected == "realizations" else None
+    for rel in common:
+        different, detail = compare_arrays(files_a[rel], files_b[rel], rel_tol, abs_tol, delimiter)
+        if different:
+            real.append((rel, detail))
+            stats["different"] += 1
+        elif filecmp.cmp(files_a[rel], files_b[rel], shallow=False):
+            identical += 1
+            stats["identical"] += 1
         else:
-            from contextlib import redirect_stdout
-            from io import StringIO
-            output = StringIO()
-            structure_a, structure_b = report_structure(args.dir_a), report_structure(args.dir_b)
-            if structure_a and structure_b and structure_a != structure_b:
-                parser.error("input folders refer to different structures")
-            structure = structure_b or structure_a or "data"
-            with redirect_stdout(output):
-                if args.category == "environment":
-                    for directory in (args.dir_a, args.dir_b):
-                        if not directory.is_dir():
-                            parser.error(f"not a directory: {directory}")
-                    result = compare_environments(args.dir_a, args.dir_b, standalone=True)
-                else:
-                    result = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol, args.category)
-            report = output.getvalue()
-            print(report, end="")
-            report_name = "compare_environment.txt" if args.category == "environment" else f"compare_{structure}_{args.category}.txt"
-            report_path = args.dir_b.parent / report_name
-            report_path.write_text(report, encoding="utf-8")
-            print(f"Comparison saved to {report_path}")
-            sys.exit(result)
+            noise_only += 1
+            stats["within tolerance"] += 1
+    stats["only A"] = len(only_a)
+    stats["only B"] = len(only_b)
 
-    if __name__ == "__main__":
-        main()
+    lines = []
+    lines.append(f"A: {dir_a}")
+    lines.append(f"B: {dir_b}")
+    lines.append(f"Comparison: {selected}")
+    lines.append(f"tolerance: rel_tol={rel_tol:g}, abs_tol={abs_tol:g}")
+    lines.append("")
+    lines.append(f"files in both:           {len(common)}")
+    lines.append(f"  identical:             {identical}")
+    lines.append(f"  float noise only:      {noise_only}")
+    lines.append(f"  real differences:      {len(real)}")
+    lines.append(f"only in A:               {len(only_a)}")
+    lines.append(f"only in B:               {len(only_b)}")
+    lines.append("\nBy category:")
+    lines.append(f"  {selected}: " + ", ".join(f"{key}={value}" for key, value in stats.items()))
+    if not any(stats.values()):
+        lines.append("    No data provided in either folder; not compared.")
+    if selected == "realizations":
+        lines.append("  realizations: raw A/B/C/D before prediction stabilization; matrix differences do not alone establish different input/output behavior.")
+
+    if real:
+        lines.append("\nReal differences:")
+        for rel, detail in real:
+            lines.append(f"  {rel}: {detail}")
+    if only_a:
+        lines.append("\nOnly in A:")
+        for rel in only_a:
+            lines.append(f"  {rel}")
+    if only_b:
+        lines.append("\nOnly in B:")
+        for rel in only_b:
+            lines.append(f"  {rel}")
+
+    return "\n".join(lines) + "\n"
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    exporters = {
+        "errors": export_errors,
+        "training": export_training,
+        "realizations": export_realizations,
+        "heatmaps": export_heatmaps,
+    }
+    p_build = sub.add_parser("build", help="export one data category")
+    p_build.add_argument("category", choices=exporters, help="export only this data category")
+    p_build.add_argument("name", help="export prefix in the current directory, e.g. analysis_export")
+
+    p_cmp = sub.add_parser("compare", help="summarize differences between two folders")
+    p_cmp.add_argument("category", choices=("errors", "realizations", "training"), help="compare only this data category")
+    p_cmp.add_argument("dir_a", type=Path)
+    p_cmp.add_argument("dir_b", type=Path)
+    p_cmp.add_argument("--rel-tol", type=float, default=1e-6, help="relative tolerance for numbers (default: 1e-6)")
+    p_cmp.add_argument("--abs-tol", type=float, default=1e-9, help="absolute tolerance for numbers (default: 1e-9)")
+
+    p_cmp.add_argument("--silent", action="store_true", help="do not print the comparison report")
+    p_cmp.add_argument("--to-file", type=Path, help="save the comparison report to this file")
+
+    args = parser.parse_args()
+    if args.command == "build":
+        copied = exporters[args.category](args.name)
+        print(f"copied {copied} files")
+        return 0
+    else:
+        report = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol, args.category)
+        if not args.silent:
+            print(report, end="")
+        if args.to_file is not None:
+            args.to_file.write_text(report, encoding="utf-8")
+        return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())

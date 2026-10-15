@@ -1,23 +1,22 @@
 # Model Inspect
 
-A VS Code sidebar for this repository's `inspect.py`. Includes Build, four
-comparison commands and Python environment selection. No Heatmaps or Reports section.
+A VS Code sidebar for this repository's `inspect_sid.py`. Includes category-specific Build, three comparison commands and Python environment selection.
 
 ## Installation
 
 1. In VS Code, open Extensions with **Cmd+Shift+X** (Windows/Linux: **Ctrl+Shift+X**).
 2. Select **… → Install from VSIX…**.
-3. Choose `vscode-inspect/model-inspect-0.1.6.vsix`.
+3. Choose `vscode-inspect/model-inspect-0.1.7.vsix`.
 4. Open the Model project and click **Inspect** in the Activity Bar.
 
-If upgrading from 0.1.0, install this newer VSIX and reload VS Code if prompted.
+If upgrading from an earlier version, install this newer VSIX and reload VS Code if prompted.
 Node.js, TypeScript, and the Microsoft Python extension are not required for use.
-You need VS Code 1.85 or later and a Python environment that can run `inspect.py`.
+You need VS Code 1.85 or later and a Python environment that can run `inspect_sid.py`.
 The workspace must be trusted before running scripts.
 
 ## Usage
 
-- The project is detected from the open workspace containing `inspect.py`; there is
+- The project is detected from the open workspace containing `inspect_sid.py`; there is
   no Project row. With multiple matching workspace folders, choose one when running.
   If none matches, a folder picker is available as a fallback.
 - **Python environment**: Choose a discovered Conda environment, project `.venv` /
@@ -27,24 +26,22 @@ The workspace must be trusted before running scripts.
 - **Export name**: Passed directly to Build, e.g. `analysis_export` or
   `trial_01`. The current Python script determines the output layout and
   whether existing files are updated.
-- **Build**: Export all three categories and environment information.
+- **Build**: Choose errors, training, realizations or heatmaps. Only the selected category is exported.
 - **Directory A / B**: Select the exact export folders to compare, such as
   `reference_bridge` and `analysis_export_bridge`. There is no latest-run lookup.
 - **Compare errors / realizations / training**: Run the selected category.
-- **Compare environment**: Set A/B to the two `_environment` folders. Compares
-  Python version, platform and package versions; paths and capture times are
-  informational. Writes `compare_environment.txt` beside B. These are export-time
-  snapshots, not proof of the original computation environment or identical BLAS builds.
-To compare frame data, select the corresponding frame folders. Generated reports
-remain on disk; the sidebar does not include report links.
+- Each comparison asks where to save its TXT report. Cancel the save dialog to
+  cancel the comparison. The sidebar passes `--silent --to-file <chosen path>`.
+- Frame and bridge folders may be compared without a structure restriction.
+- Environment export/comparison has been removed; Python interpreter selection remains.
 
 Only one command runs at a time. While running, click **Running (click to stop)**
 or the toolbar Stop button to cancel; interrupted exports may be incomplete.
 Completion and failure notifications appear directly in VS Code. Failures include
 an excerpt of the command output. There is no Run log entry or output panel, and
-no log file is saved. Exit code 1 is treated as differences or missing data only
-when the script successfully reports a saved comparison file. Report paths are
-read from script output rather than inferred.
+no log file is saved. Exit codes 0 and 1 indicate a completed comparison when stderr is empty;
+Python errors are shown as failures. Report paths come from the save dialog,
+not from parsing script output. The completion notification offers **Open report**.
 
 Selections are stored in local VS Code workspace state, not in the repository or
 synced by this extension. The extension runs the selected interpreter against the

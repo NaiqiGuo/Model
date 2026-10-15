@@ -14,19 +14,25 @@ Module._load = original;
 
 test('build and all comparison categories preserve exact paths', () => {
   const root = path.join(os.tmpdir(), 'Model with spaces');
-  const state = { prefix: 'runs/my run/naiqi', a: '/tmp/Chrystal A', b: '/tmp/Naiqi B' };
-  assert.deepEqual(argumentsFor(root, 'build', state), ['-u', path.join(root, 'inspect.py'), 'build', state.prefix]);
-  for (const kind of ['errors', 'realizations', 'training', 'environment']) {
-    assert.deepEqual(argumentsFor(root, kind, state), ['-u', path.join(root, 'inspect.py'), 'compare', kind, state.a, state.b]);
+  const state = { prefix: 'runs/my run/naiqi', buildCategory: 'training', report: '/tmp/my report.txt', a: '/tmp/Chrystal A', b: '/tmp/Naiqi B' };
+  assert.deepEqual(argumentsFor(root, 'build', state), ['-u', path.join(root, 'inspect_sid.py'), 'build', state.buildCategory, state.prefix]);
+  for (const kind of ['errors', 'realizations', 'training']) {
+    assert.deepEqual(argumentsFor(root, kind, state), ['-u', path.join(root, 'inspect_sid.py'), 'compare', kind, state.a, state.b, '--silent', '--to-file', state.report]);
   }
+  for (const buildCategory of ['errors', 'training', 'realizations', 'heatmaps']) {
+    assert.deepEqual(argumentsFor(root, 'build', { ...state, buildCategory }), ['-u', path.join(root, 'inspect_sid.py'), 'build', buildCategory, state.prefix]);
+  }
+  assert.throws(() => argumentsFor(root, 'environment', state));
+  assert.throws(() => argumentsFor(root, 'build', { ...state, buildCategory: 'environment' }));
   assert.throws(() => argumentsFor(root, 'heatmaps', state));
 });
 
-test('differences are normal results; traceback/missing data path errors are failures', () => {
+test('completed comparisons point to the report; nonzero exits are failures', () => {
   const output = 'real differences: 3\nComparison saved to runs/my run/compare_bridge_errors.txt\n';
-  assert.equal(completion('errors', 1, output, '/project').success, true);
+  assert.equal(completion('errors', 1, output, '/project').success, false);
   assert.equal(completion('errors', 0, output, '/project').success, true);
-  const failure = completion('errors', 1, 'Traceback: failed', '/project');
+  assert.equal(completion('errors', 0, output, '/project').message, 'errors: comparison completed. See the report for results.');
+  const failure = completion('errors', 1, 'Traceback: failed', '/project', 'Traceback: failed');
   assert.equal(failure.success, false);
   assert.match(failure.message, /Traceback: failed/);
   assert.equal(completion('errors', 2, output, '/project').success, false);
@@ -43,7 +49,7 @@ test('arguments with shell characters reach the process unchanged', () => {
 test('manifest has only requested actions and all runtime files', () => {
   const pkg = require('./package.json');
   assert.equal(pkg.contributes.commands.some(c => /heatmap/i.test(c.command)), false);
-  assert.equal(pkg.contributes.commands.length, 11);
+  assert.equal(pkg.contributes.commands.length, 10);
   assert.ok(fs.existsSync(path.join(__dirname, pkg.main)));
   assert.ok(fs.existsSync(path.join(__dirname, pkg.contributes.viewsContainers.activitybar[0].icon)));
 });
@@ -69,6 +75,7 @@ test('sidebar runs real inspect comparisons and records the generated report', {
       registerTreeDataProvider: () => ({ dispose() {} }),
       showQuickPick: async () => ({ mode: 'input' }),
       showInputBox: async () => process.env.INSPECT_TEST_PYTHON,
+      showSaveDialog: async () => ({ fsPath: path.join(root, `report-${messages.length}.txt`) }),
       showOpenDialog: async () => [{ fsPath: folderSelections.shift() }],
       showInformationMessage: async message => { messages.push(message); },
       showWarningMessage: async message => { errors.push(message); },
@@ -81,7 +88,7 @@ test('sidebar runs real inspect comparisons and records the generated report', {
     }
   };
   try {
-    fs.copyFileSync(path.join(__dirname, '..', 'inspect.py'), path.join(root, 'inspect.py'));
+    fs.copyFileSync(path.join(__dirname, '..', 'inspect_sid.py'), path.join(root, 'inspect_sid.py'));
     const a = path.join(root, 'chrystal_bridge');
     const b = path.join(root, 'run with spaces', 'naiqi_bridge');
     for (const p of [a, b]) {
@@ -107,30 +114,12 @@ test('sidebar runs real inspect comparisons and records the generated report', {
     for (const kind of ['errors', 'realizations', 'training']) assert.ok(fs.existsSync(state.reports[kind]));
     assert.equal(commands.has('modelInspect.openErrors'), false);
     assert.equal(commands.has('modelInspect.output'), false);
-    const envA = path.join(root, 'reference_environment');
-    const envB = path.join(root, 'analysis_export_environment');
-    for (const env of [envA, envB]) {
-      fs.mkdirSync(env);
-      fs.writeFileSync(path.join(env, 'environment.json'), JSON.stringify({ python_version: '3.12.0', platform: 'test-platform', python_executable: env, captured_at_utc: env }));
-      fs.writeFileSync(path.join(env, 'packages.txt'), 'numpy==2.2.6\n');
-    }
-    folderSelections.push(envA, envB);
-    await commands.get('modelInspect.selectA')();
-    await commands.get('modelInspect.selectB')();
-    await commands.get('modelInspect.environment')();
-    assert.deepEqual(errors, []);
-    assert.ok(messages.some(s => s.includes('environment: recorded Python version')));
-    assert.equal(state.reports.environment, path.join(root, 'compare_environment.txt'));
-    fs.writeFileSync(path.join(envB, 'packages.txt'), 'numpy==2.1.0\nscipy==1.14.0\n');
-    await commands.get('modelInspect.environment')();
-    assert.ok(messages.some(s => s.includes('environment: differences')));
-    const report = fs.readFileSync(state.reports.environment, 'utf8');
-    assert.match(report, /numpy: A=2.2.6, B=2.1.0/);
-    assert.match(report, /only in B: scipy/);
-    fs.unlinkSync(path.join(envB, 'packages.txt'));
-    await commands.get('modelInspect.environment')();
-    assert.match(fs.readFileSync(state.reports.environment, 'utf8'), /environment information not provided/);
-    assert.deepEqual(errors, []);
+    assert.equal(commands.has('modelInspect.environment'), false);
+    fs.writeFileSync(path.join(b, 'bridge', 'acceleration', 'field', 'error.csv'), 'not-a-number\n');
+    await commands.get('modelInspect.errors')();
+    assert.ok(errors.some(message => message.includes('Command failed')));
+    assert.equal(state.reports.errors, undefined);
+
 
   } finally {
     Module._load = original;

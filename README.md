@@ -63,7 +63,7 @@ A suite of structures, their vibration responses to strong ground motion events,
 ### Export and compare results
 
 You can also run Build and the four comparisons from the VS Code **Inspect**
-sidebar. Install `vscode-inspect/model-inspect-0.1.6.vsix` using Extensions →
+sidebar. Install `vscode-inspect/model-inspect-0.1.7.vsix` using Extensions →
 **… → Install from VSIX…**, then select your Python interpreter and input folders.
 See [the extension guide](vscode-inspect/README.md) for setup and usage.
 
@@ -109,11 +109,11 @@ names do not change. Matrices are compared before prediction-time stabilization.
 Different state coordinates can yield different matrices with equivalent
 input/output behavior. Numeric comparisons check shapes, non-finite values, and
 symmetric relative/absolute tolerances. Missing data is reported; a category
-absent from both folders is not considered a successful match. Exit status is
-0 for a match and 1 for differences or missing data.
+absent from both folders is not considered a successful match. Comparison results
+are recorded in the report and do not determine the command's exit status.
 
 Each report includes environment information when available. Package differences
-are informational and do not affect the numeric comparison exit status. Required
+are informational. Required
 source data must exist for all configured events during export. Files are not
 deleted, but reusing the same explicit export prefix updates same-name files.
 

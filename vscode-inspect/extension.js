@@ -7,7 +7,8 @@ const os = require('node:os');
 const { spawn, execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const execute = promisify(execFile);
-const categories = ['errors', 'realizations', 'training', 'environment'];
+const exportCategories = ['errors', 'training', 'realizations', 'heatmaps'];
+const categories = ['errors', 'realizations', 'training'];
 
 function expandHome(value) {
   return value === '~' ? os.homedir() : value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
@@ -47,17 +48,18 @@ async function discoverEnvironments(root, selected) {
 }
 
 function argumentsFor(root, kind, state) {
-  if (kind === 'build') return ['-u', path.join(root, 'inspect.py'), 'build', state.prefix];
+  if (kind === 'build') {
+    if (!exportCategories.includes(state.buildCategory)) throw new Error('Select an export category');
+    return ['-u', path.join(root, 'inspect_sid.py'), 'build', state.buildCategory, state.prefix];
+  }
   if (!categories.includes(kind)) throw new Error('Unknown comparison category');
-  return ['-u', path.join(root, 'inspect.py'), 'compare', kind, state.a, state.b];
+  return ['-u', path.join(root, 'inspect_sid.py'), 'compare', kind, state.a, state.b, '--silent', '--to-file', state.report];
 }
 
-function completion(kind, code, output, root) {
-  const match = output.match(/^Comparison saved to (.+)\r?$/m);
-  const report = match ? path.resolve(root, match[1].trim()) : undefined;
+function completion(kind, code, output, report, stderr = '') {
   if (kind === 'build' && code === 0) return { success: true, message: 'Build completed.' };
-  if (kind !== 'build' && report && (code === 0 || code === 1)) {
-    return { success: true, report, message: code === 0 ? (kind === 'environment' ? 'environment: recorded Python version, platform and packages match.' : `${kind}: match within tolerance.`) : `${kind}: differences or missing data found.` };
+  if (kind !== 'build' && report && !stderr.trim() && code === 0) {
+    return { success: true, report, message: `${kind}: comparison completed. See the report for results.` };
   }
   const detail = output.trim().split(/\r?\n/).filter(Boolean).slice(-3).join('\n').slice(-1200);
   return { success: false, message: `Command failed (exit ${code}).${detail ? `\n${detail}` : ''}` };
@@ -102,7 +104,7 @@ class InspectController {
       this.row('Python environment', 'python', s.python ? path.basename(path.dirname(process.platform === 'win32' ? s.python : path.dirname(s.python))) : 'Select an environment', 'terminal'),
       group('Export', [
         this.row('Export name', 'prefix', s.prefix, 'edit'),
-        this.row('Build', 'build', 'Export all data and environment information', 'play')
+        this.row('Build', 'build', 'Choose errors, training, realizations or heatmaps', 'play')
       ]),
       group('Compare', [
         this.row('Directory A', 'selectA', s.a || 'Not selected', 'folder'),
@@ -122,26 +124,26 @@ class InspectController {
   }
 
   async project() {
-    const root = await this.folder('Select the project folder containing inspect.py', this.state.root);
+    const root = await this.folder('Select the project folder containing inspect_sid.py', this.state.root);
     if (!root) return;
-    if (!fs.existsSync(path.join(root, 'inspect.py'))) throw new Error('The selected folder does not contain inspect.py. Select the Model project folder.');
+    if (!fs.existsSync(path.join(root, 'inspect_sid.py'))) throw new Error('The selected folder does not contain inspect_sid.py. Select the Model project folder.');
     this.state = { ...this.state, root, a: undefined, b: undefined, reports: {} };
     await this.save();
   }
 
   async ensureRoot() {
-    const roots = (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath).filter(p => fs.existsSync(path.join(p, 'inspect.py')));
+    const roots = (vscode.workspace.workspaceFolders || []).map(f => f.uri.fsPath).filter(p => fs.existsSync(path.join(p, 'inspect_sid.py')));
     if (roots.length === 1) {
       if (this.state.root !== roots[0]) {
         this.state = { ...this.state, root: roots[0], reports: {} };
         await this.save();
       }
     } else if (roots.length > 1) {
-      const choice = await vscode.window.showQuickPick(roots.map(root => ({ label: path.basename(root), description: root })), { title: 'Select the workspace containing inspect.py' });
+      const choice = await vscode.window.showQuickPick(roots.map(root => ({ label: path.basename(root), description: root })), { title: 'Select the workspace containing inspect_sid.py' });
       if (!choice) return;
       this.state.root = choice.description;
       await this.save();
-    } else if (!this.state.root || !fs.existsSync(path.join(this.state.root, 'inspect.py'))) {
+    } else if (!this.state.root || !fs.existsSync(path.join(this.state.root, 'inspect_sid.py'))) {
       await this.project();
     }
     return this.state.root;
@@ -201,15 +203,27 @@ class InspectController {
       if (!root) return;
       if (!this.state.python) await this.python();
       if (!this.state.python) return;
-      if (kind !== 'build') {
+      let report;
+      if (kind === 'build') {
+        const category = await vscode.window.showQuickPick(exportCategories, { title: 'Select export category' });
+        if (!category) return;
+        this.state.buildCategory = category;
+      } else {
         if (!this.state.a) await this.select('a');
         if (!this.state.b) await this.select('b');
         if (!this.state.a || !this.state.b) return;
         for (const p of [this.state.a, this.state.b]) if (!fs.statSync(p).isDirectory()) throw new Error(`Not a directory: ${p}`);
+        const target = await vscode.window.showSaveDialog({
+          title: 'Save comparison report',
+          defaultUri: vscode.Uri.file(this.state.reports[kind] || path.join(path.dirname(this.state.b), `compare_${kind}.txt`)),
+          filters: { 'Text files': ['txt'] }
+        });
+        if (!target) return;
+        report = target.fsPath;
         delete this.state.reports[kind];
         await this.save();
       }
-      const args = argumentsFor(root, kind, this.state);
+      const args = argumentsFor(root, kind, { ...this.state, report });
       this.cancelled = false;
       this.runningKind = kind;
       // No shell interpolation: spaces and shell characters stay literal arguments.
@@ -219,14 +233,15 @@ class InspectController {
       this.changed.fire();
       let tail = '';
       let failure;
+      let stderr = '';
       const record = chunk => { const text = chunk.toString(); tail = (tail + text).slice(-2 * 1024 * 1024); };
       child.stdout.on('data', record);
-      child.stderr.on('data', record);
+      child.stderr.on('data', chunk => { stderr = (stderr + chunk.toString()).slice(-2 * 1024 * 1024); record(chunk); });
       child.on('error', err => { failure = err; });
       await new Promise(resolve => child.on('close', async code => {
         try {
           if (this.cancelled) { vscode.window.showInformationMessage('Stopped. Outputs may be incomplete.'); return; }
-          const result = failure ? { success: false, message: failure.message } : completion(kind, code, tail, root);
+          const result = failure ? { success: false, message: failure.message } : completion(kind, code, tail, report, stderr);
           if (result.report && fs.existsSync(result.report)) {
             this.state.reports[kind] = result.report;
             await this.save();
