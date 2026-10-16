@@ -8,6 +8,7 @@ __pycache__
 *.png
 *.html
 .DS_Store
+__MACOSX/
 
 .vscode
 
