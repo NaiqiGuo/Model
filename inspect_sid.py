@@ -229,6 +229,12 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
         lines.append("    No data provided in either folder; not compared.")
     if selected == "realizations":
         lines.append("  realizations: raw A/B/C/D before prediction stabilization; matrix differences do not alone establish different input/output behavior.")
+        """
+        xdot = Ax + Bu
+        y = Cx + Du
+        xdot = A1x + B1u
+        y = C1x + D1u
+        """
 
     if real:
         lines.append("\nReal differences:")
