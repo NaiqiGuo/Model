@@ -44,8 +44,6 @@ STRUCTURES = {
 QUANTITIES = ["acceleration", "displacement"]
 SOURCES = ["elastic", "field", "inelastic"]
 
-JUNK_NAMES = {".DS_Store"}
-
 
 def build_prefix(name: str) -> str:
     """Use the supplied name directly in the current directory."""
@@ -137,16 +135,11 @@ def export_heatmaps(name: str) -> int:
     return copied
 
 
-def is_junk(path: Path) -> bool:
-    """macOS metadata: .DS_Store, and AppleDouble ._* files / __MACOSX/ folders."""
-    return path.name in JUNK_NAMES or path.name.startswith("._") or "__MACOSX" in path.parts
-
-
 def list_files(root: Path) -> dict[str, Path]:
     return {
         str(p.relative_to(root)): p
         for p in root.rglob("*")
-        if p.is_file() and not is_junk(p.relative_to(root))
+        if p.is_file()
     }
 
 
