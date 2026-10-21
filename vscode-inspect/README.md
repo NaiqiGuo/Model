@@ -27,6 +27,16 @@ The workspace must be trusted before running scripts.
   `trial_01`. The current Python script determines the output layout and
   whether existing files are updated.
 - **Build**: Choose errors, training, realizations or heatmaps. Only the selected category is exported.
+- Errors, training and realizations use `<name>_bridge/<quantity>/<source>/`
+  and `<name>_frame/<quantity>/<source>/`, without a repeated structure directory.
+  Compare also accepts older exports with the extra `bridge/` or `frame/` layer.
+  Existing exports are not moved; if both layouts coexist, the flat copy takes precedence
+  for matching paths. Use a new export name for a clean directory tree.
+- Training exports use one losslessly compressed `training/<event>.npz` per event,
+  containing `dt`, `time`, `ground`, and `structure`. Original training CSVs are unchanged.
+  Training comparison supports both legacy CSV exports and NPZ exports, including
+  comparisons between the two formats. If both exist for an event, NPZ takes precedence.
+  Use a new export name to avoid retaining old CSV copies alongside NPZ files.
 - **Directory A / B**: Select the exact export folders to compare, such as
   `reference_bridge` and `analysis_export_bridge`. There is no latest-run lookup.
 - **Compare errors / realizations / training**: Run the selected category.

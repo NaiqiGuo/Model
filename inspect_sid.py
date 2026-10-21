@@ -3,13 +3,13 @@
 Four categories are covered:
     errors        prediction error CSVs (one number per line)
     heatmaps      prediction error heatmaps (one image per structure/quantity/source)
-    training      per-event training data (dt, time, ground, structure)
+    training      compressed per-event NPZ data (dt, time, ground, structure)
     realizations  identified state-space matrices (A, B, C, D), as CSVs
 
 build:   pick one category and export only that data, retaining the layout:
-         <name>_<structure>/<structure>/<quantity>/<source>/ for errors
-         <name>_<structure>/<structure>/<quantity>/<source>/training/ for training
-         <name>_<structure>/<structure>/<quantity>/<source>/systems/ for realizations
+         <name>_<structure>/<quantity>/<source>/ for errors
+         <name>_<structure>/<quantity>/<source>/training/ for training
+         <name>_<structure>/<quantity>/<source>/systems/ for realizations
          <name>_heatmaps/ for heatmaps
 
 compare: pick one category and summarize the differences between two
@@ -60,7 +60,7 @@ def export_groups(name: str):
         for quantity in QUANTITIES:
             for source in SOURCES:
                 source_dir = SID_DIR / structure / quantity / source
-                out_dir = out_root / structure / quantity / source
+                out_dir = out_root / quantity / source
                 yield structure, quantity, source, events, source_dir, out_dir
         print(f"{out_root}: done")
 
@@ -79,16 +79,20 @@ def export_errors(name: str) -> int:
 
 
 def export_training(name: str) -> int:
-    """Copy only per-event dt, time, ground, and structure CSVs."""
+    """Save each event's four training arrays in one lossless compressed NPZ."""
+    import numpy as np
+
     copied = 0
     for _, _, _, events, source_dir, out_dir in export_groups(name):
         for n in events:
-            for item in ("dt", "time", "ground", "structure"):
-                src = source_dir / "System ID Training Data" / item / f"{n}.csv"
-                dst = out_dir / "training" / item / f"{n}.csv"
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(src, dst)
-                copied += 1
+            data = {
+                item: np.loadtxt(source_dir / "System ID Training Data" / item / f"{n}.csv")
+                for item in ("dt", "time", "ground", "structure")
+            }
+            dst = out_dir / "training" / f"{n}.npz"
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(dst, **data)
+            copied += 1
     return copied
 
 
@@ -145,16 +149,27 @@ def list_files(root: Path) -> dict[str, Path]:
 
 def category(rel):
     parts = Path(rel).parts
+    if Path(rel).suffix.lower() == ".npz" and "training" in parts:
+        return "training"
     if Path(rel).suffix.lower() != ".csv":
         return None
     return "training" if "training" in parts else "realizations" if "systems" in parts else "errors"
 
 
-def compare_arrays(path_a, path_b, rel_tol, abs_tol, delimiter=None):
-    """Compare numeric CSV shape and values, using symmetric math.isclose tolerance."""
+def compare_arrays(path_a, path_b, rel_tol, abs_tol, delimiter=None, training=False):
+    """Compare CSVs or NPZ members using symmetric math.isclose tolerance."""
     import numpy as np
 
-    a, b = (np.loadtxt(path, delimiter=delimiter, ndmin=2) for path in (path_a, path_b))
+    arrays = []
+    for path in (path_a, path_b):
+        if isinstance(path, tuple):
+            archive, key = path
+            with np.load(archive, allow_pickle=False) as data:
+                arrays.append(np.atleast_2d(data[key]))
+        else:
+            arrays.append(np.atleast_2d(np.loadtxt(path, delimiter=delimiter)) if training
+                          else np.loadtxt(path, delimiter=delimiter, ndmin=2))
+    a, b = arrays
     if a.shape != b.shape:
         return True, f"shape mismatch: A={a.shape}, B={b.shape}"
     invalid_a, invalid_b = int(np.count_nonzero(~np.isfinite(a))), int(np.count_nonzero(~np.isfinite(b)))
@@ -164,7 +179,7 @@ def compare_arrays(path_a, path_b, rel_tol, abs_tol, delimiter=None):
     threshold = np.maximum(abs_tol, rel_tol * np.maximum(np.abs(a), np.abs(b)))
     n_bad = int(np.count_nonzero(delta > threshold))
     if not n_bad:
-        return False, ""
+        return False, "exact" if np.array_equal(a, b) else ""
     index = np.unravel_index(np.argmax(delta), delta.shape)
     denominator = np.linalg.norm(a)
     relative = f"{np.linalg.norm(a-b)/denominator:.6g}" if denominator else "undefined (A norm is zero)"
@@ -182,6 +197,33 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
         {rel: path for rel, path in list_files(root).items() if category(rel) == selected}
         for root in (dir_a, dir_b)
     )
+    for files in (files_a, files_b):
+        # Old exports have one extra bridge/frame directory. Match both layouts.
+        nested = {Path(rel).parts[0] for rel in files if Path(rel).parts[0] in STRUCTURES}
+        if len(nested) > 1:
+            raise ValueError("Select one structure's export folder, not a folder containing both bridge and frame")
+        for rel in list(files):
+            parts = Path(rel).parts
+            if len(parts) > 1 and parts[0] in STRUCTURES and parts[1] in QUANTITIES:
+                # Prefer a new flat export if an old copy also exists.
+                files.setdefault(str(Path(*parts[1:])), files.pop(rel))
+    if selected == "training":
+        import numpy as np
+
+        # Match NPZ members to the legacy CSV paths without extracting files.
+        # When both formats exist, the newer NPZ export takes precedence.
+        for files in (files_a, files_b):
+            for rel, path in list(files.items()):
+                if path.suffix.lower() != ".npz":
+                    continue
+                del files[rel]
+                with np.load(path, allow_pickle=False) as data:
+                    required = {"dt", "time", "ground", "structure"}
+                    if set(data.files) != required:
+                        raise ValueError(f"{path}: expected NPZ members {sorted(required)}")
+                    for key in sorted(required):
+                        logical = str(Path(rel).parent / key / f"{path.stem}.csv")
+                        files[logical] = (path, key)
     only_a = sorted(files_a.keys() - files_b.keys())
     only_b = sorted(files_b.keys() - files_a.keys())
     common = sorted(files_a.keys() & files_b.keys())
@@ -191,11 +233,13 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
     # Realization exports are comma-separated; training and errors use whitespace.
     delimiter = "," if selected == "realizations" else None
     for rel in common:
-        different, detail = compare_arrays(files_a[rel], files_b[rel], rel_tol, abs_tol, delimiter)
+        different, detail = compare_arrays(files_a[rel], files_b[rel], rel_tol, abs_tol, delimiter,
+                                           training=selected == "training")
         if different:
             real.append((rel, detail))
             stats["different"] += 1
-        elif filecmp.cmp(files_a[rel], files_b[rel], shallow=False):
+        elif (detail == "exact" if isinstance(files_a[rel], tuple) or isinstance(files_b[rel], tuple)
+              else filecmp.cmp(files_a[rel], files_b[rel], shallow=False)):
             identical += 1
             stats["identical"] += 1
         else:
@@ -208,6 +252,8 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
     lines.append(f"A: {dir_a}")
     lines.append(f"B: {dir_b}")
     lines.append(f"Comparison: {selected}")
+    if selected == "training":
+        lines.append("Training counts are per array (dt/time/ground/structure); NPZ takes precedence over coexisting legacy CSVs.")
     lines.append(f"tolerance: rel_tol={rel_tol:g}, abs_tol={abs_tol:g}")
     lines.append("")
     lines.append(f"files in both:           {len(common)}")
