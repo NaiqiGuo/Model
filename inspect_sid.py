@@ -13,9 +13,10 @@ build:   pick one category and export only that data, retaining the layout:
          <name>_heatmaps/ for heatmaps
 
 compare: pick one category and summarize the differences between two
-         build exports. Numbers are compared with a tolerance, so
-         floating-point noise is not reported as a difference.
-         --silent suppresses terminal output; --to-file saves the report
+         build exports. Numeric differences within the chosen tolerance
+         are not counted as differences exceeding tolerance.
+         Training comparison requires NPZ exports; paths must use the layout above.
+         --silent suppresses the terminal report; --to-file saves the report
          to the specified path. Without --to-file, no report file is saved.
 
 Usage:
@@ -25,6 +26,21 @@ Usage:
 Examples:
     python inspect_sid.py build realizations my_export
     python inspect_sid.py compare errors reference_bridge my_export_bridge --rel-tol 1e-3
+
+Comparison output (three common forms):
+    # 1. Default: print the report in the terminal; do not save a file.
+    python inspect_sid.py compare errors old_bridge new_bridge
+
+    # 2. Print the report AND save it to a file.
+    python inspect_sid.py compare errors old_bridge new_bridge --to-file report.txt
+
+    # 3. Save the report only; do not print it in the terminal.
+    python inspect_sid.py compare errors old_bridge new_bridge --silent --to-file report.txt
+
+Defaults: rel_tol=1e-6, abs_tol=1e-9, silent=False, to_file=None.
+    --silent is a flag: it takes no value. Used alone, it suppresses the
+    report without saving it; Python errors may still appear in the terminal.
+    --to-file takes a path and overwrites that file if it already exists.
 
 """
 
@@ -46,13 +62,16 @@ SOURCES = ["elastic", "field", "inelastic"]
 
 
 def build_prefix(name: str) -> str:
-    """Use the supplied name directly in the current directory."""
+    """Validate and return the export prefix, which may include a directory path."""
     if not name or not Path(name).name or name in (".", ".."):
         raise ValueError("Provide an export name such as analysis_export")
     return name
 
 def export_groups(name: str):
-    """Yield common source and destination paths without creating directories."""
+    """Yield each structure/quantity/source group, event range, and input/output paths.
+
+    Directory creation and file export are handled by the export functions.
+    """
     name = build_prefix(name)
     print(f"Export prefix: {name}")
     for structure, events in STRUCTURES.items():
@@ -79,7 +98,7 @@ def export_errors(name: str) -> int:
 
 
 def export_training(name: str) -> int:
-    """Save each event's four training arrays in one lossless compressed NPZ."""
+    """Read four training CSVs with loadtxt and losslessly store those arrays in NPZ."""
     import numpy as np
 
     copied = 0
@@ -97,7 +116,7 @@ def export_training(name: str) -> int:
 
 
 def export_realizations(name: str) -> int:
-    """Export raw identified A/B/C/D matrices using the existing CSV format."""
+    """Read raw identified A/B/C/D from pickle and export comma-separated CSVs."""
     import numpy as np
 
     copied = 0
@@ -121,7 +140,7 @@ def export_realizations(name: str) -> int:
 
 
 def export_heatmaps(name: str) -> int:
-    """Copy only the heatmap image for each structure/quantity/source."""
+    """Copy heatmap.png for each structure/quantity/source, excluding heatmap_square.png."""
     name = build_prefix(name)
     print(f"Export prefix: {name}")
     out_dir = Path(f"{name}_heatmaps")
@@ -149,15 +168,20 @@ def list_files(root: Path) -> dict[str, Path]:
 
 def category(rel):
     parts = Path(rel).parts
+    if len(parts) < 3 or parts[0] not in QUANTITIES or parts[1] not in SOURCES:
+        return None
     if Path(rel).suffix.lower() == ".npz" and "training" in parts:
         return "training"
-    if Path(rel).suffix.lower() != ".csv":
+    if Path(rel).suffix.lower() != ".csv" or "training" in parts:
         return None
-    return "training" if "training" in parts else "realizations" if "systems" in parts else "errors"
+    return "realizations" if "systems" in parts else "errors"
 
 
-def compare_arrays(path_a, path_b, rel_tol, abs_tol, delimiter=None, training=False):
-    """Compare CSVs or NPZ members using symmetric math.isclose tolerance."""
+def compare_arrays(path_a, path_b, rel_tol, abs_tol, delimiter=None):
+    """Compare training arrays from NPZ, or error/matrix arrays from CSV.
+
+    A value differs when abs(a-b) > max(abs_tol, rel_tol * max(abs(a), abs(b))).
+    """
     import numpy as np
 
     arrays = []
@@ -167,8 +191,7 @@ def compare_arrays(path_a, path_b, rel_tol, abs_tol, delimiter=None, training=Fa
             with np.load(archive, allow_pickle=False) as data:
                 arrays.append(np.atleast_2d(data[key]))
         else:
-            arrays.append(np.atleast_2d(np.loadtxt(path, delimiter=delimiter)) if training
-                          else np.loadtxt(path, delimiter=delimiter, ndmin=2))
+            arrays.append(np.loadtxt(path, delimiter=delimiter, ndmin=2))
     a, b = arrays
     if a.shape != b.shape:
         return True, f"shape mismatch: A={a.shape}, B={b.shape}"
@@ -192,37 +215,28 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
     for d in (dir_a, dir_b):
         if not d.is_dir():
             raise ValueError(f"not a directory: {d}")
+        if any((d / structure).is_dir() for structure in STRUCTURES):
+            raise ValueError(f"{d}: use a flat export with quantity/source directly inside; rebuild the export")
 
     files_a, files_b = (
         {rel: path for rel, path in list_files(root).items() if category(rel) == selected}
         for root in (dir_a, dir_b)
     )
-    for files in (files_a, files_b):
-        # Old exports have one extra bridge/frame directory. Match both layouts.
-        nested = {Path(rel).parts[0] for rel in files if Path(rel).parts[0] in STRUCTURES}
-        if len(nested) > 1:
-            raise ValueError("Select one structure's export folder, not a folder containing both bridge and frame")
-        for rel in list(files):
-            parts = Path(rel).parts
-            if len(parts) > 1 and parts[0] in STRUCTURES and parts[1] in QUANTITIES:
-                # Prefer a new flat export if an old copy also exists.
-                files.setdefault(str(Path(*parts[1:])), files.pop(rel))
     if selected == "training":
+        if not files_a or not files_b:
+            raise ValueError("Training comparison requires NPZ exports in both folders; run build training with a new export name")
         import numpy as np
 
-        # Match NPZ members to the legacy CSV paths without extracting files.
-        # When both formats exist, the newer NPZ export takes precedence.
+        # Compare each named array inside the NPZ without extracting files.
         for files in (files_a, files_b):
             for rel, path in list(files.items()):
-                if path.suffix.lower() != ".npz":
-                    continue
                 del files[rel]
                 with np.load(path, allow_pickle=False) as data:
                     required = {"dt", "time", "ground", "structure"}
                     if set(data.files) != required:
                         raise ValueError(f"{path}: expected NPZ members {sorted(required)}")
                     for key in sorted(required):
-                        logical = str(Path(rel).parent / key / f"{path.stem}.csv")
+                        logical = f"{rel}::{key}"
                         files[logical] = (path, key)
     only_a = sorted(files_a.keys() - files_b.keys())
     only_b = sorted(files_b.keys() - files_a.keys())
@@ -230,11 +244,10 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
 
     identical, noise_only, real = 0, 0, []
     stats = {s: 0 for s in ("identical", "within tolerance", "different", "only A", "only B")}
-    # Realization exports are comma-separated; training and errors use whitespace.
+    # Matrix CSVs use commas; error CSVs use whitespace. Training uses NPZ arrays.
     delimiter = "," if selected == "realizations" else None
     for rel in common:
-        different, detail = compare_arrays(files_a[rel], files_b[rel], rel_tol, abs_tol, delimiter,
-                                           training=selected == "training")
+        different, detail = compare_arrays(files_a[rel], files_b[rel], rel_tol, abs_tol, delimiter)
         if different:
             real.append((rel, detail))
             stats["different"] += 1
@@ -253,12 +266,12 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
     lines.append(f"B: {dir_b}")
     lines.append(f"Comparison: {selected}")
     if selected == "training":
-        lines.append("Training counts are per array (dt/time/ground/structure); NPZ takes precedence over coexisting legacy CSVs.")
+        lines.append("Training comparison accepts NPZ only; counts are per array (dt/time/ground/structure).")
     lines.append(f"tolerance: rel_tol={rel_tol:g}, abs_tol={abs_tol:g}")
     lines.append("")
-    lines.append(f"files in both:           {len(common)}")
+    lines.append(f"{'arrays in both' if selected == 'training' else 'files in both'}:           {len(common)}")
     lines.append(f"  identical:             {identical}")
-    lines.append(f"  float noise only:      {noise_only}")
+    lines.append(f"  within tolerance:      {noise_only}")
     lines.append(f"  real differences:      {len(real)}")
     lines.append(f"only in A:               {len(only_a)}")
     lines.append(f"only in B:               {len(only_b)}")
@@ -268,12 +281,6 @@ def compare(dir_a: Path, dir_b: Path, rel_tol: float, abs_tol: float, selected: 
         lines.append("    No data provided in either folder; not compared.")
     if selected == "realizations":
         lines.append("  realizations: raw A/B/C/D before prediction stabilization; matrix differences do not alone establish different input/output behavior.")
-        """
-        xdot = Ax + Bu
-        y = Cx + Du
-        xdot = A1x + B1u
-        y = C1x + D1u
-        """
 
     if real:
         lines.append("\nReal differences:")
@@ -303,7 +310,7 @@ def main() -> int:
     }
     p_build = sub.add_parser("build", help="export one data category")
     p_build.add_argument("category", choices=exporters, help="export only this data category")
-    p_build.add_argument("name", help="export prefix in the current directory, e.g. analysis_export")
+    p_build.add_argument("name", help="export prefix, e.g. analysis_export or runs/trial_01")
 
     p_cmp = sub.add_parser("compare", help="summarize differences between two folders")
     p_cmp.add_argument("category", choices=("errors", "realizations", "training"), help="compare only this data category")
@@ -312,13 +319,13 @@ def main() -> int:
     p_cmp.add_argument("--rel-tol", type=float, default=1e-6, help="relative tolerance for numbers (default: 1e-6)")
     p_cmp.add_argument("--abs-tol", type=float, default=1e-9, help="absolute tolerance for numbers (default: 1e-9)")
 
-    p_cmp.add_argument("--silent", action="store_true", help="do not print the comparison report")
-    p_cmp.add_argument("--to-file", type=Path, help="save the comparison report to this file")
+    p_cmp.add_argument("--silent", action="store_true", help="do not print the comparison report; takes no value (default: False, print report)")
+    p_cmp.add_argument("--to-file", type=Path, help="save the comparison report to this file, overwriting it if present (default: None, no file saved)")
 
     args = parser.parse_args()
     if args.command == "build":
         copied = exporters[args.category](args.name)
-        print(f"copied {copied} files")
+        print(f"exported {copied} files")
         return 0
     else:
         report = compare(args.dir_a, args.dir_b, args.rel_tol, args.abs_tol, args.category)

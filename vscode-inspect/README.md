@@ -29,13 +29,11 @@ The workspace must be trusted before running scripts.
 - **Build**: Choose errors, training, realizations or heatmaps. Only the selected category is exported.
 - Errors, training and realizations use `<name>_bridge/<quantity>/<source>/`
   and `<name>_frame/<quantity>/<source>/`, without a repeated structure directory.
-  Compare also accepts older exports with the extra `bridge/` or `frame/` layer.
-  Existing exports are not moved; if both layouts coexist, the flat copy takes precedence
-  for matching paths. Use a new export name for a clean directory tree.
+  Compare requires this flat layout. Older exports with a repeated structure layer
+  must be rebuilt using a new export name. Existing files are not moved.
 - Training exports use one losslessly compressed `training/<event>.npz` per event,
   containing `dt`, `time`, `ground`, and `structure`. Original training CSVs are unchanged.
-  Training comparison supports both legacy CSV exports and NPZ exports, including
-  comparisons between the two formats. If both exist for an event, NPZ takes precedence.
+  Training comparison accepts NPZ only; legacy training CSV exports are not compared.
   Use a new export name to avoid retaining old CSV copies alongside NPZ files.
 - **Directory A / B**: Select the exact export folders to compare, such as
   `reference_bridge` and `analysis_export_bridge`. There is no latest-run lookup.
@@ -49,8 +47,9 @@ Only one command runs at a time. While running, click **Running (click to stop)*
 or the toolbar Stop button to cancel; interrupted exports may be incomplete.
 Completion and failure notifications appear directly in VS Code. Failures include
 an excerpt of the command output. There is no Run log entry or output panel, and
-no log file is saved. Exit codes 0 and 1 indicate a completed comparison when stderr is empty;
-Python errors are shown as failures. Report paths come from the save dialog,
+no log file is saved. Exit code 0 with empty stderr indicates a completed comparison,
+even when data differences were found. Nonzero exit codes are shown as failures.
+Report paths come from the save dialog,
 not from parsing script output. The completion notification offers **Open report**.
 
 Selections are stored in local VS Code workspace state, not in the repository or
@@ -58,6 +57,30 @@ synced by this extension. The extension runs the selected interpreter against th
 current project script. Updating the Python script does not require reinstalling
 the extension; updating the extension itself requires installing a newer VSIX.
 There is no automatic execution, telemetry, or GitHub upload.
+
+## Terminal comparison output
+
+Run these commands from the Model project directory:
+
+```bash
+# 1. Default: print the report only; no file is saved.
+python inspect_sid.py compare errors old_bridge new_bridge
+
+# 2. Print the report and save it to a file.
+python inspect_sid.py compare errors old_bridge new_bridge --to-file report.txt
+
+# 3. Save the report only, without printing it.
+python inspect_sid.py compare errors old_bridge new_bridge --silent --to-file report.txt
+```
+
+Defaults are `rel_tol=1e-6`, `abs_tol=1e-9`, `silent=False`, and `to_file=None`.
+`--silent` takes no value. Used alone, it produces no report output or report file;
+Python errors may still be printed. `--to-file` overwrites an existing report at
+the specified path. These options also apply to `training` and `realizations`.
+The VS Code sidebar uses the third form with the path selected in its save dialog.
+Reports count training arrays (four per NPZ event), and individual CSV files for
+errors and realizations. "Within tolerance" does not establish that a difference
+is floating-point noise; CSV formatting differences can also fall in this category.
 
 ## Sharing through GitHub
 
