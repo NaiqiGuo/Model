@@ -1,0 +1,41 @@
+name: mssp
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.12
+  - numpy==2.2.6
+  - scipy==1.18.1
+  - numba=0.63.1
+  - llvmlite=0.46.0
+  - matplotlib==3.9.2
+  - plotly==5.23.0
+  - pip=26.2.2
+  - fortran-compiler=2.0.0
+  - cxx-compiler=2.0.0
+  - c-compiler=2.0.0
+  - openblas=0.3.34
+  - openmpi=5.0.11
+  - cmake=4.4.4
+  - ninja=1.13.2
+  - cvxpy=1.9.3
+  - pytest=9.1.1
+  - scienceplots=2.2.2
+  - cvxopt=1.3.3
+  - clarabel=0.11.1
+  - osqp=1.1.3
+  - scs=3.3.1
+  - highspy=1.15.1
+  - pip:
+    - numpy==2.2.6
+    - cytriangle==2.0.0
+    - mdof==0.0.23
+    - pandas==3.1.0
+    - quakeio==0.1.21
+    - tqdm==4.70.1
+    - xsection==0.0.40
+    - veux==0.0.46
+    - xara==0.0.46
+    - git+https://github.com/peer-open-source/xara.git@13cc747ffaab23ebea4debaa60268699e358105d
